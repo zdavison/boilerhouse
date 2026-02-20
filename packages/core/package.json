@@ -8,5 +8,10 @@
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@sinclair/typebox": "^0.34.48",
+		"smol-toml": "^1.6.0",
+		"xstate": "^5.28.0"
 	}
 }
