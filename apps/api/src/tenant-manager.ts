@@ -15,6 +15,7 @@ import { instances, snapshots, tenants, workloads } from "@boilerhouse/db";
 import type { InstanceManager } from "./instance-manager";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { TenantDataStore } from "./tenant-data";
+import type { IdleMonitor } from "./idle-monitor";
 
 export type ClaimSource = "existing" | "snapshot" | "cold+data" | "golden";
 
@@ -44,6 +45,7 @@ export class TenantManager {
 		private readonly runtime: Runtime,
 		private readonly nodeId: NodeId,
 		private readonly tenantDataStore: TenantDataStore,
+		private readonly idleMonitor?: IdleMonitor,
 	) {}
 
 	/**
@@ -105,6 +107,7 @@ export class TenantManager {
 				const endpoint = await this.runtime.getEndpoint(handle);
 
 				this.logClaim(tenantId, handle.instanceId, workloadId, "snapshot");
+				this.startIdleWatch(handle.instanceId, workloadId);
 
 				return {
 					tenantId,
@@ -138,6 +141,7 @@ export class TenantManager {
 			const endpoint = await this.runtime.getEndpoint(handle);
 
 			this.logClaim(tenantId, handle.instanceId, workloadId, "cold+data");
+			this.startIdleWatch(handle.instanceId, workloadId);
 
 			return {
 				tenantId,
@@ -165,6 +169,7 @@ export class TenantManager {
 		const endpoint = await this.runtime.getEndpoint(handle);
 
 		this.logClaim(tenantId, handle.instanceId, workloadId, "golden");
+		this.startIdleWatch(handle.instanceId, workloadId);
 
 		return {
 			tenantId,
@@ -190,6 +195,10 @@ export class TenantManager {
 		if (!tenantRow?.instanceId) return;
 
 		const instanceId = tenantRow.instanceId;
+
+		if (this.idleMonitor) {
+			this.idleMonitor.unwatch(instanceId);
+		}
 
 		// Look up the workload config to determine idle action
 		const workloadRow = this.db
@@ -311,6 +320,23 @@ export class TenantManager {
 			workloadId,
 			nodeId: this.nodeId,
 			metadata: { source },
+		});
+	}
+
+	/** Starts idle monitoring for a newly claimed instance, if an IdleMonitor is configured. */
+	private startIdleWatch(instanceId: InstanceId, workloadId: WorkloadId): void {
+		if (!this.idleMonitor) return;
+
+		const workloadRow = this.db
+			.select()
+			.from(workloads)
+			.where(eq(workloads.workloadId, workloadId))
+			.get();
+
+		const idle = workloadRow?.config?.idle;
+		this.idleMonitor.watch(instanceId, {
+			timeoutMs: ((idle?.timeout_seconds as number | undefined) ?? 300) * 1000,
+			action: idle?.action ?? "hibernate",
 		});
 	}
 }
