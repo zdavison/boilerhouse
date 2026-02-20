@@ -9,10 +9,13 @@ import { TenantDataStore } from "./tenant-data";
 import { IdleMonitor } from "./idle-monitor";
 import { EventBus } from "./event-bus";
 import { createApp } from "./app";
+import { recoverState } from "./recovery";
+import { ResourceLimiter } from "./resource-limits";
 
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
 const storagePath = process.env.STORAGE_PATH ?? "./data";
+const maxInstances = Number(process.env.MAX_INSTANCES ?? 100);
 
 const db = initDatabase(dbPath);
 const runtime = new FakeRuntime();
@@ -50,10 +53,28 @@ const tenantManager = new TenantManager(
 	idleMonitor,
 );
 
+const resourceLimiter = new ResourceLimiter(db, { maxInstances });
+
+// Release capacity when instances are destroyed or hibernated
+eventBus.on((event) => {
+	if (
+		event.type === "instance.state" &&
+		(event.status === "destroyed" || event.status === "hibernated")
+	) {
+		resourceLimiter.release(nodeId);
+	}
+});
+
 // Wire idle monitor to release tenants
 idleMonitor.onIdle(async (instanceId, action) => {
 	console.log(`Idle timeout: instance=${instanceId} action=${action}`);
 });
+
+// Recover state before accepting requests
+const report = await recoverState(runtime, db, nodeId, activityLog);
+console.log(
+	`Recovery: ${report.recovered} recovered, ${report.destroyed} destroyed, ${report.orphanedTapsCleaned} orphaned TAPs cleaned`,
+);
 
 const app = createApp({
 	db,
@@ -64,6 +85,7 @@ const app = createApp({
 	tenantManager,
 	snapshotManager,
 	eventBus,
+	resourceLimiter,
 });
 
 app.listen(port);

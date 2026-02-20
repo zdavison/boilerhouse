@@ -6,6 +6,7 @@ import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";
 import { TenantDataStore } from "./tenant-data";
 import { EventBus } from "./event-bus";
+import { ResourceLimiter } from "./resource-limits";
 import { createApp } from "./app";
 import type { RouteDeps } from "./routes/deps";
 
@@ -49,6 +50,8 @@ export function createTestApp(): TestContext {
 		tenantDataStore,
 	);
 
+	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
+
 	const deps: RouteDeps = {
 		db,
 		runtime,
@@ -58,6 +61,7 @@ export function createTestApp(): TestContext {
 		tenantManager,
 		snapshotManager,
 		eventBus,
+		resourceLimiter,
 	};
 
 	const app = createApp(deps);

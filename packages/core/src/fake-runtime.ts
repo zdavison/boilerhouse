@@ -12,7 +12,8 @@ type RuntimeOperation =
 	| "snapshot"
 	| "restore"
 	| "exec"
-	| "getEndpoint";
+	| "getEndpoint"
+	| "list";
 
 export interface FakeRuntimeOptions {
 	/**
@@ -153,6 +154,11 @@ export class FakeRuntime implements Runtime {
 		await this.maybeDelay("getEndpoint");
 		const instance = this.requireInstance(handle.instanceId);
 		return { host: "127.0.0.1", port: instance.port };
+	}
+
+	async list(): Promise<InstanceId[]> {
+		await this.maybeDelay("list");
+		return Array.from(this.instances.keys()) as InstanceId[];
 	}
 
 	async available(): Promise<boolean> {

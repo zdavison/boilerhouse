@@ -205,6 +205,20 @@ export class InstanceManager {
 			.run();
 
 		if (row.tenantId) {
+			// Delete the previous tenant snapshot (keep only the latest)
+			const tenantRow = this.db
+				.select({ lastSnapshotId: tenants.lastSnapshotId })
+				.from(tenants)
+				.where(eq(tenants.tenantId, row.tenantId))
+				.get();
+
+			if (tenantRow?.lastSnapshotId) {
+				this.db
+					.delete(snapshots)
+					.where(eq(snapshots.snapshotId, tenantRow.lastSnapshotId))
+					.run();
+			}
+
 			this.db
 				.update(tenants)
 				.set({ lastSnapshotId: correctedRef.id })

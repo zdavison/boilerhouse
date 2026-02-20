@@ -4,6 +4,7 @@ import type { InstanceManager } from "../instance-manager";
 import type { TenantManager } from "../tenant-manager";
 import type { SnapshotManager } from "../snapshot-manager";
 import type { EventBus } from "../event-bus";
+import type { ResourceLimiter } from "../resource-limits";
 
 export interface RouteDeps {
 	db: DrizzleDb;
@@ -14,4 +15,5 @@ export interface RouteDeps {
 	tenantManager: TenantManager;
 	snapshotManager: SnapshotManager;
 	eventBus: EventBus;
+	resourceLimiter?: ResourceLimiter;
 }

@@ -299,6 +299,50 @@ describe("InstanceManager", () => {
 			expect(tenantRow!.lastSnapshotId).toBe(ref.id);
 		});
 
+		test("deletes previous tenant snapshot on re-hibernate", async () => {
+			const tenantId = generateTenantId();
+
+			db.insert(tenants)
+				.values({
+					tenantId,
+					workloadId,
+					createdAt: new Date(),
+				})
+				.run();
+
+			// First hibernate: create instance, assign tenant, hibernate
+			const h1 = await manager.create(workloadId, TEST_WORKLOAD);
+			db.update(instances)
+				.set({ tenantId })
+				.where(eq(instances.instanceId, h1.instanceId))
+				.run();
+			const ref1 = await manager.hibernate(h1.instanceId);
+
+			// Restore from snapshot, then hibernate again
+			const h2 = await manager.restoreFromSnapshot(ref1, tenantId);
+			const ref2 = await manager.hibernate(h2.instanceId);
+
+			// Old snapshot should be gone
+			const oldRow = db
+				.select()
+				.from(snapshots)
+				.where(eq(snapshots.snapshotId, ref1.id))
+				.get();
+			expect(oldRow).toBeUndefined();
+
+			// New snapshot should exist
+			const newRow = db
+				.select()
+				.from(snapshots)
+				.where(eq(snapshots.snapshotId, ref2.id))
+				.get();
+			expect(newRow).toBeDefined();
+
+			// Only one tenant snapshot total
+			const allSnapshots = db.select().from(snapshots).all();
+			expect(allSnapshots).toHaveLength(1);
+		});
+
 		test("falls back to destroy on snapshot failure", async () => {
 			const failRuntime = new FakeRuntime({
 				failOn: new Set(["snapshot"]),

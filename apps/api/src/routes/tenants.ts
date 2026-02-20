@@ -18,6 +18,12 @@ export function tenantRoutes(deps: RouteDeps) {
 				return { error: "Missing 'workload' in request body" };
 			}
 
+			if (deps.resourceLimiter && !deps.resourceLimiter.canCreate(deps.nodeId)) {
+				set.status = 503;
+				set.headers["Retry-After"] = "5";
+				return { error: "Node at capacity" };
+			}
+
 			const workloadRow = db
 				.select()
 				.from(workloads)

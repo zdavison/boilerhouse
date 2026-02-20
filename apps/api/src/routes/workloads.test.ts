@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { generateWorkloadId } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
-import { workloads } from "@boilerhouse/db";
+import { workloads, snapshots } from "@boilerhouse/db";
 import { createTestApp, apiRequest } from "../test-helpers";
 
 const VALID_TOML = `
@@ -215,6 +215,43 @@ describe("DELETE /api/v1/workloads/:name", () => {
 		});
 
 		expect(res.status).toBe(404);
+	});
+
+	test("deletes associated snapshots when workload is deleted", async () => {
+		const { app, db, snapshotManager } = createTestApp();
+
+		const workloadId = generateWorkloadId();
+		db.insert(workloads)
+			.values({
+				workloadId,
+				name: "snap-app",
+				version: "1.0.0",
+				config: MINIMAL_WORKLOAD,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			})
+			.run();
+
+		// Create a golden snapshot
+		await snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
+
+		const snapshotsBefore = db
+			.select()
+			.from(snapshots)
+			.all();
+		expect(snapshotsBefore.length).toBeGreaterThan(0);
+
+		const res = await apiRequest(app, "/api/v1/workloads/snap-app", {
+			method: "DELETE",
+		});
+
+		expect(res.status).toBe(200);
+
+		const snapshotsAfter = db
+			.select()
+			.from(snapshots)
+			.all();
+		expect(snapshotsAfter.length).toBe(0);
 	});
 
 	test("allows deletion when all instances are destroyed", async () => {

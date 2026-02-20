@@ -68,6 +68,9 @@ export interface Runtime {
 	/** Get the guest IP / connectivity info for reaching the instance. */
 	getEndpoint(handle: InstanceHandle): Promise<Endpoint>;
 
+	/** List all instance IDs currently known to the runtime. */
+	list(): Promise<InstanceId[]>;
+
 	/** Check if the runtime is available on this host. */
 	available(): Promise<boolean>;
 }

@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { eq, count, and, not } from "drizzle-orm";
 import { parseWorkload, generateWorkloadId } from "@boilerhouse/core";
-import { workloads, instances } from "@boilerhouse/db";
+import { workloads, instances, snapshots } from "@boilerhouse/db";
 import type { RouteDeps } from "./deps";
 
 export function workloadRoutes(deps: RouteDeps) {
@@ -128,6 +128,11 @@ export function workloadRoutes(deps: RouteDeps) {
 					error: `Cannot delete workload '${params.name}': has ${activeInstances[0]!.count} active instance(s)`,
 				};
 			}
+
+			// Remove snapshots for this workload
+			db.delete(snapshots)
+				.where(eq(snapshots.workloadId, row.workloadId))
+				.run();
 
 			// Remove destroyed instance rows to satisfy FK constraint
 			db.delete(instances)

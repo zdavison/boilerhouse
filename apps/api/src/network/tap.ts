@@ -15,6 +15,13 @@ export interface TapDevice {
  */
 export class TapManager {
 	/**
+	 * Returns the deterministic TAP device name for a given instance ID.
+	 */
+	getDeviceName(instanceId: InstanceId): string {
+		return this.deriveDevice(instanceId).name;
+	}
+
+	/**
 	 * Generates the shell commands needed to create a TAP device.
 	 *
 	 * Does not execute anything — use {@link create} for that.
