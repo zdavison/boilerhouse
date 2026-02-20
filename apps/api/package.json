@@ -1,0 +1,15 @@
+{
+	"name": "@boilerhouse/api",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --hot src/server.ts",
+		"start": "bun src/server.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@boilerhouse/core": "workspace:*",
+		"@boilerhouse/db": "workspace:*"
+	}
+}

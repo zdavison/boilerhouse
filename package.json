@@ -1,0 +1,16 @@
+{
+  "name": "boilerhouse",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun test --recursive"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.9",
+    "oxlint": "^1.49.0",
+    "typescript": "^5.9.3"
+  }
+}
