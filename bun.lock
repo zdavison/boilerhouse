@@ -16,6 +16,7 @@
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/db": "workspace:*",
+        "drizzle-orm": "0.44.7",
       },
     },
     "apps/dashboard": {
