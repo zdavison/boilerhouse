@@ -20,6 +20,12 @@ export const EndpointSchema = Type.Object({
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export interface ExecResult {
+	exitCode: number;
+	stdout: string;
+	stderr: string;
+}
+
 export interface InstanceHandle {
 	/** The unique instance identifier. */
 	instanceId: InstanceId;
@@ -55,6 +61,9 @@ export interface Runtime {
 	 * Returns a running instance handle.
 	 */
 	restore(ref: SnapshotRef, instanceId: InstanceId): Promise<InstanceHandle>;
+
+	/** Execute a command inside the guest VM. */
+	exec(handle: InstanceHandle, command: string[]): Promise<ExecResult>;
 
 	/** Get the guest IP / connectivity info for reaching the instance. */
 	getEndpoint(handle: InstanceHandle): Promise<Endpoint>;

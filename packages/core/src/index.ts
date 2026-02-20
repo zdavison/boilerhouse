@@ -35,6 +35,8 @@ export {
 	type IdleAction,
 	type PortExpose,
 	type BindMount,
+	type HttpGetProbe,
+	type ExecProbe,
 	WorkloadSchema,
 	parseWorkload,
 	WorkloadParseError,
@@ -71,6 +73,7 @@ export {
 	type Runtime,
 	type InstanceHandle,
 	type Endpoint,
+	type ExecResult,
 	InstanceHandleSchema,
 	EndpointSchema,
 } from "./runtime";

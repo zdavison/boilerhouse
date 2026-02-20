@@ -2,7 +2,7 @@ import type { InstanceId } from "./types";
 import { generateSnapshotId, generateWorkloadId, generateNodeId } from "./types";
 import type { SnapshotRef } from "./snapshot";
 import type { Workload } from "./workload";
-import type { Runtime, InstanceHandle, Endpoint } from "./runtime";
+import type { Runtime, InstanceHandle, Endpoint, ExecResult } from "./runtime";
 
 type RuntimeOperation =
 	| "create"
@@ -11,6 +11,7 @@ type RuntimeOperation =
 	| "destroy"
 	| "snapshot"
 	| "restore"
+	| "exec"
 	| "getEndpoint";
 
 export interface FakeRuntimeOptions {
@@ -24,6 +25,11 @@ export interface FakeRuntimeOptions {
 	 * @example new Set(["start", "snapshot"])
 	 */
 	failOn?: Set<RuntimeOperation>;
+	/**
+	 * Result returned by `exec()`.
+	 * @default { exitCode: 0, stdout: "", stderr: "" }
+	 */
+	execResult?: ExecResult;
 }
 
 interface FakeInstance {
@@ -40,10 +46,12 @@ export class FakeRuntime implements Runtime {
 	private nextPort = 30000;
 	private readonly latencyMs: number;
 	private readonly failOn: Set<RuntimeOperation>;
+	private readonly execResult: ExecResult;
 
 	constructor(options?: FakeRuntimeOptions) {
 		this.latencyMs = options?.latencyMs ?? 0;
 		this.failOn = options?.failOn ?? new Set();
+		this.execResult = options?.execResult ?? { exitCode: 0, stdout: "", stderr: "" };
 	}
 
 	async create(
@@ -133,6 +141,12 @@ export class FakeRuntime implements Runtime {
 		};
 		this.instances.set(instanceId, instance);
 		return { instanceId, running: true };
+	}
+
+	async exec(handle: InstanceHandle, _command: string[]): Promise<ExecResult> {
+		await this.maybeDelay("exec");
+		this.requireInstance(handle.instanceId);
+		return { ...this.execResult };
 	}
 
 	async getEndpoint(handle: InstanceHandle): Promise<Endpoint> {

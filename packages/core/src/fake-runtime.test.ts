@@ -142,6 +142,50 @@ describe("FakeRuntime", () => {
 		expect(handle.instanceId).toBeDefined();
 	});
 
+	test("exec() returns default success result", async () => {
+		const runtime = new FakeRuntime();
+		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
+		await runtime.start(handle);
+
+		const result = await runtime.exec(handle, ["cat", "/tmp/healthy"]);
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toBe("");
+		expect(result.stderr).toBe("");
+	});
+
+	test("exec() uses custom execResult", async () => {
+		const runtime = new FakeRuntime({
+			execResult: { exitCode: 1, stdout: "", stderr: "not found" },
+		});
+		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
+		await runtime.start(handle);
+
+		const result = await runtime.exec(handle, ["cat", "/tmp/healthy"]);
+
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toBe("not found");
+	});
+
+	test("exec() throws on destroyed instance", async () => {
+		const runtime = new FakeRuntime();
+		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
+		await runtime.start(handle);
+		await runtime.destroy(handle);
+
+		await expect(runtime.exec(handle, ["true"])).rejects.toThrow(/destroyed/i);
+	});
+
+	test("exec() respects failOn", async () => {
+		const runtime = new FakeRuntime({
+			failOn: new Set(["exec"]),
+		});
+		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
+		await runtime.start(handle);
+
+		await expect(runtime.exec(handle, ["true"])).rejects.toThrow(/injected failure/i);
+	});
+
 	test("configurable failure injection causes operations to throw", async () => {
 		const runtime = new FakeRuntime({
 			failOn: new Set(["start"]),

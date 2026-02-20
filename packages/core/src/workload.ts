@@ -26,6 +26,24 @@ const IdleActionSchema = Type.Union([
 	Type.Literal("destroy"),
 ]);
 
+const HttpGetProbeSchema = Type.Object({
+	/** Path to probe. */
+	path: Type.String({ minLength: 1 }),
+	/**
+	 * Port to probe.
+	 * @default VM's primary endpoint port
+	 */
+	port: Type.Optional(Type.Integer({ exclusiveMinimum: 0 })),
+});
+
+const ExecProbeSchema = Type.Object({
+	/**
+	 * Command to execute inside the guest VM. Exit code 0 = healthy.
+	 * @example ["cat", "/tmp/healthy"]
+	 */
+	command: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+});
+
 // ── Main schema ──────────────────────────────────────────────────────────────
 
 export const WorkloadSchema = Type.Object({
@@ -71,9 +89,10 @@ export const WorkloadSchema = Type.Object({
 	}),
 	health: Type.Optional(
 		Type.Object({
-			endpoint: Type.String({ minLength: 1 }),
 			interval_seconds: Type.Number({ exclusiveMinimum: 0 }),
 			unhealthy_threshold: Type.Number({ exclusiveMinimum: 0 }),
+			http_get: Type.Optional(HttpGetProbeSchema),
+			exec: Type.Optional(ExecProbeSchema),
 		}),
 	),
 	entrypoint: Type.Optional(
@@ -94,6 +113,8 @@ export type NetworkAccess = Static<typeof NetworkAccessSchema>;
 export type IdleAction = Static<typeof IdleActionSchema>;
 export type PortExpose = Static<typeof PortExposeSchema>;
 export type BindMount = Static<typeof BindMountSchema>;
+export type HttpGetProbe = Static<typeof HttpGetProbeSchema>;
+export type ExecProbe = Static<typeof ExecProbeSchema>;
 
 // ── Error class ──────────────────────────────────────────────────────────────
 
@@ -122,6 +143,7 @@ export function parseWorkload(toml: string): Workload {
 
 	applyDefaults(raw);
 	checkImageMutualExclusivity(raw);
+	checkHealthProbeMutualExclusivity(raw);
 
 	if (!Value.Check(WorkloadSchema, raw)) {
 		const errors = [...Value.Errors(WorkloadSchema, raw)];
@@ -163,6 +185,25 @@ function applyDefaults(raw: Record<string, unknown>): void {
 		if (idle.action === undefined) {
 			idle.action = "hibernate";
 		}
+	}
+}
+
+function checkHealthProbeMutualExclusivity(raw: Record<string, unknown>): void {
+	const health = raw.health as Record<string, unknown> | undefined;
+	if (!health) return;
+
+	const hasHttpGet = health.http_get !== undefined;
+	const hasExec = health.exec !== undefined;
+
+	if (hasHttpGet && hasExec) {
+		throw new WorkloadParseError(
+			"health.http_get and health.exec are mutually exclusive — set only one",
+		);
+	}
+	if (!hasHttpGet && !hasExec) {
+		throw new WorkloadParseError(
+			"health section requires either 'http_get' or 'exec'",
+		);
 	}
 }
 

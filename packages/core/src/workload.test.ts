@@ -44,9 +44,12 @@ timeout_seconds = 300
 action = "hibernate"
 
 [health]
-endpoint = "http://localhost:8080/health"
 interval_seconds = 10
 unhealthy_threshold = 3
+
+[health.http_get]
+path = "/health"
+port = 8080
 
 [entrypoint]
 cmd = "/usr/bin/my-service"
@@ -95,9 +98,10 @@ describe("workload TOML parser", () => {
 		expect(workload.idle.watch_dirs).toEqual(["/var/data", "/tmp/work"]);
 		expect(workload.idle.timeout_seconds).toBe(300);
 		expect(workload.idle.action).toBe("hibernate");
-		expect(workload.health!.endpoint).toBe("http://localhost:8080/health");
 		expect(workload.health!.interval_seconds).toBe(10);
 		expect(workload.health!.unhealthy_threshold).toBe(3);
+		expect(workload.health!.http_get).toEqual({ path: "/health", port: 8080 });
+		expect(workload.health!.exec).toBeUndefined();
 		expect(workload.entrypoint!.cmd).toBe("/usr/bin/my-service");
 		expect(workload.entrypoint!.args).toEqual(["--port", "8080"]);
 		expect(workload.entrypoint!.env).toEqual({ MODE: "production" });
@@ -277,6 +281,104 @@ number_val = 42
 			another: "field",
 			number_val: 42,
 		});
+	});
+
+	test("parses http_get probe without optional port", () => {
+		const toml = `
+[workload]
+name = "my-service"
+version = "1.0.0"
+
+[image]
+ref = "ghcr.io/org/my-service:latest"
+
+[resources]
+vcpus = 2
+memory_mb = 512
+
+[health]
+interval_seconds = 5
+unhealthy_threshold = 3
+
+[health.http_get]
+path = "/ready"
+`;
+		const workload = parseWorkload(toml);
+		expect(workload.health!.http_get!.path).toBe("/ready");
+		expect(workload.health!.http_get!.port).toBeUndefined();
+	});
+
+	test("parses exec probe", () => {
+		const toml = `
+[workload]
+name = "my-service"
+version = "1.0.0"
+
+[image]
+ref = "ghcr.io/org/my-service:latest"
+
+[resources]
+vcpus = 2
+memory_mb = 512
+
+[health]
+interval_seconds = 10
+unhealthy_threshold = 3
+
+[health.exec]
+command = ["cat", "/tmp/healthy"]
+`;
+		const workload = parseWorkload(toml);
+		expect(workload.health!.exec!.command).toEqual(["cat", "/tmp/healthy"]);
+		expect(workload.health!.http_get).toBeUndefined();
+	});
+
+	test("rejects health with both http_get and exec (mutually exclusive)", () => {
+		const toml = `
+[workload]
+name = "my-service"
+version = "1.0.0"
+
+[image]
+ref = "ghcr.io/org/my-service:latest"
+
+[resources]
+vcpus = 2
+memory_mb = 512
+
+[health]
+interval_seconds = 10
+unhealthy_threshold = 3
+
+[health.http_get]
+path = "/health"
+
+[health.exec]
+command = ["cat", "/tmp/healthy"]
+`;
+		expect(() => parseWorkload(toml)).toThrow(WorkloadParseError);
+		expect(() => parseWorkload(toml)).toThrow(/mutually exclusive/i);
+	});
+
+	test("rejects health section with no probe type", () => {
+		const toml = `
+[workload]
+name = "my-service"
+version = "1.0.0"
+
+[image]
+ref = "ghcr.io/org/my-service:latest"
+
+[resources]
+vcpus = 2
+memory_mb = 512
+
+[health]
+interval_seconds = 10
+unhealthy_threshold = 3
+`;
+		expect(() => parseWorkload(toml)).toThrow(WorkloadParseError);
+		expect(() => parseWorkload(toml)).toThrow(/http_get.*exec|exec.*http_get/i);
 	});
 
 	test("accepts workload with dockerfile instead of ref", () => {
