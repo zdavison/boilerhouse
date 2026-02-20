@@ -25,7 +25,7 @@ export class IdleMonitor {
 	private readonly heartbeatDeadlineMs: number;
 	private handler: IdleHandler | null = null;
 
-	constructor(private readonly opts: { defaultPollIntervalMs: number }) {
+	constructor(opts: { defaultPollIntervalMs: number }) {
 		this.heartbeatDeadlineMs = opts.defaultPollIntervalMs * 2;
 	}
 
