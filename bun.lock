@@ -50,6 +50,10 @@
         "drizzle-kit": "^0.31.0",
       },
     },
+    "packages/guest-init": {
+      "name": "@boilerhouse/guest-init",
+      "version": "0.0.1",
+    },
     "packages/runtime-firecracker": {
       "name": "@boilerhouse/runtime-firecracker",
       "version": "0.0.1",
@@ -75,6 +79,8 @@
     "@boilerhouse/dashboard": ["@boilerhouse/dashboard@workspace:apps/dashboard"],
 
     "@boilerhouse/db": ["@boilerhouse/db@workspace:packages/db"],
+
+    "@boilerhouse/guest-init": ["@boilerhouse/guest-init@workspace:packages/guest-init"],
 
     "@boilerhouse/runtime-firecracker": ["@boilerhouse/runtime-firecracker@workspace:packages/runtime-firecracker"],
 
