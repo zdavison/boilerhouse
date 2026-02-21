@@ -31,6 +31,10 @@ const LIVE_STATUSES: InstanceStatus[] = ["active", "starting"];
  *
  * Instances marked as active/starting in the DB but absent from the runtime
  * are transitioned to "destroyed". Orphaned TAP devices are cleaned up.
+ *
+ * Recovery intentionally writes status directly to the DB, bypassing the
+ * state machines. This is the "force" escape hatch for crash recovery where
+ * the in-flight state may be inconsistent.
  */
 export async function recoverState(
 	runtime: Runtime,

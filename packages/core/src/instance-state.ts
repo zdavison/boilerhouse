@@ -1,5 +1,12 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { setup, getNextSnapshot } from "xstate";
+import {
+	createMachine,
+	InvalidTransitionError,
+	type TransitionMap,
+} from "./state-machine";
+
+// Re-export so consumers can catch the shared error type
+export { InvalidTransitionError };
 
 // ── Schemas (for API input validation via TypeBox / Elysia) ──────────────────
 
@@ -14,7 +21,6 @@ export const InstanceStatusSchema = Type.Union([
 
 export const InstanceEventSchema = Type.Union([
 	Type.Literal("started"),
-	Type.Literal("claimed"),
 	Type.Literal("hibernate"),
 	Type.Literal("stop"),
 	Type.Literal("destroy"),
@@ -39,7 +45,6 @@ export const INSTANCE_STATUSES = [
 
 export const INSTANCE_EVENTS = [
 	"started",
-	"claimed",
 	"hibernate",
 	"stop",
 	"destroy",
@@ -48,84 +53,29 @@ export const INSTANCE_EVENTS = [
 	"destroyed",
 ] as const satisfies readonly InstanceEvent[];
 
-// ── XState machine ───────────────────────────────────────────────────────────
+// ── Machine ─────────────────────────────────────────────────────────────────
 
-/** XState machine definition for the instance lifecycle. Exported for
- *  visualization (stately.ai inspector, VS Code extension) and direct
- *  actor usage in higher-level orchestration. */
-export const instanceMachine = setup({
-	types: {
-		events: {} as
-			| { type: "started" }
-			| { type: "claimed" }
-			| { type: "hibernate" }
-			| { type: "stop" }
-			| { type: "destroy" }
-			| { type: "restore" }
-			| { type: "stopped" }
-			| { type: "destroyed" },
-	},
-}).createMachine({
-	id: "instance",
-	initial: "starting",
-	states: {
-		starting: {
-			on: { started: { target: "active" } },
-		},
-		active: {
-			on: {
-				hibernate: { target: "hibernated" },
-				stop: { target: "stopping" },
-				destroy: { target: "destroying" },
-			},
-		},
-		hibernated: {
-			on: { restore: { target: "starting" } },
-		},
-		stopping: {
-			on: { stopped: { target: "destroyed" } },
-		},
-		destroying: {
-			on: { destroyed: { target: "destroyed" } },
-		},
-		destroyed: {
-			type: "final",
-		},
-	},
-});
+const transitions: TransitionMap<InstanceStatus, InstanceEvent> = {
+	starting: { started: "active" },
+	active: { hibernate: "hibernated", stop: "stopping", destroy: "destroying" },
+	hibernated: { restore: "starting", destroy: "destroying" },
+	stopping: { stopped: "destroyed" },
+	destroying: { destroyed: "destroyed" },
+	destroyed: {},
+};
 
-// ── Pure transition function ─────────────────────────────────────────────────
-
-export class InvalidTransitionError extends Error {
-	constructor(
-		public readonly currentStatus: InstanceStatus,
-		public readonly event: InstanceEvent,
-	) {
-		super(
-			`Invalid transition: cannot apply event '${event}' in status '${currentStatus}'`,
-		);
-		this.name = "InvalidTransitionError";
-	}
-}
+const instanceMachine = createMachine<InstanceStatus, InstanceEvent>(
+	"instance",
+	{ transitions },
+);
 
 /**
  * Applies an event to the current instance status, returning the new status.
  * Throws {@link InvalidTransitionError} if the transition is not allowed.
- *
- * This is a pure wrapper around the XState machine for callers that only
- * need a `(status, event) → status` function without actors.
  */
 export function transition(
 	current: InstanceStatus,
 	event: InstanceEvent,
 ): InstanceStatus {
-	const snapshot = instanceMachine.resolveState({ value: current });
-	const next = getNextSnapshot(instanceMachine, snapshot, { type: event });
-	const nextValue = next.value as InstanceStatus;
-
-	if (nextValue === current) {
-		throw new InvalidTransitionError(current, event);
-	}
-
-	return nextValue;
+	return instanceMachine.transition(current, event);
 }

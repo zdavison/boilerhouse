@@ -19,6 +19,15 @@ export {
 } from "./types";
 
 export {
+	InvalidTransitionError,
+	createMachine,
+	type TransitionMap,
+	type Guard,
+	type MachineConfig,
+	type Machine,
+} from "./state-machine";
+
+export {
 	type InstanceStatus,
 	type InstanceEvent,
 	InstanceStatusSchema,
@@ -26,7 +35,6 @@ export {
 	INSTANCE_STATUSES,
 	INSTANCE_EVENTS,
 	transition,
-	InvalidTransitionError,
 } from "./instance-state";
 
 export {
@@ -60,13 +68,17 @@ export {
 	type NodeStatus,
 	type NodeCapacity,
 	type RuntimeType,
+	type NodeEvent,
 	NodeStatusSchema,
 	NodeCapacitySchema,
 	RuntimeTypeSchema,
+	NodeEventSchema,
 	NODE_STATUSES,
+	NODE_EVENTS,
 	RUNTIME_TYPES,
 	validateNodeCapacity,
 	NodeCapacityError,
+	nodeTransition,
 } from "./node";
 
 export {
@@ -79,3 +91,23 @@ export {
 } from "./runtime";
 
 export { FakeRuntime, type FakeRuntimeOptions } from "./fake-runtime";
+
+export {
+	type TenantStatus,
+	type TenantEvent,
+	TenantStatusSchema,
+	TenantEventSchema,
+	TENANT_STATUSES,
+	TENANT_EVENTS,
+	tenantTransition,
+} from "./tenant-state";
+
+export {
+	type SnapshotStatus,
+	type SnapshotEvent,
+	SnapshotStatusSchema,
+	SnapshotEventSchema,
+	SNAPSHOT_STATUSES,
+	SNAPSHOT_EVENTS,
+	snapshotTransition,
+} from "./snapshot-state";

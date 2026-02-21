@@ -6,6 +6,7 @@ import {
 	type Workload,
 	type SnapshotRef,
 	FakeRuntime,
+	InvalidTransitionError,
 	generateWorkloadId,
 	generateNodeId,
 	generateTenantId,
@@ -174,14 +175,13 @@ describe("InstanceManager", () => {
 			expect(destroyEvent!.workloadId).toBe(workloadId);
 		});
 
-		test("is idempotent on already-destroyed instance", async () => {
+		test("throws InvalidTransitionError on already-destroyed instance", async () => {
 			const handle = await manager.create(workloadId, TEST_WORKLOAD);
 			await manager.destroy(handle.instanceId);
 
-			// Second destroy should not throw
 			await expect(
 				manager.destroy(handle.instanceId),
-			).resolves.toBeUndefined();
+			).rejects.toBeInstanceOf(InvalidTransitionError);
 		});
 	});
 

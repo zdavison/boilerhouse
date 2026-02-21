@@ -9,9 +9,11 @@ import type {
 	SnapshotRef,
 	SnapshotMetadata,
 	Endpoint,
+	TenantStatus,
 } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { instances, snapshots, tenants, workloads } from "@boilerhouse/db";
+import { TenantActor } from "./actors";
 import type { InstanceManager } from "./instance-manager";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { TenantDataStore } from "./tenant-data";
@@ -196,6 +198,9 @@ export class TenantManager {
 
 		const instanceId = tenantRow.instanceId;
 
+		const actor = new TenantActor(this.db, tenantId);
+		actor.send("release");
+
 		if (this.idleMonitor) {
 			this.idleMonitor.unwatch(instanceId);
 		}
@@ -211,8 +216,10 @@ export class TenantManager {
 
 		if (idleAction === "hibernate") {
 			await this.instanceManager.hibernate(instanceId);
+			actor.send("hibernated");
 		} else {
 			await this.instanceManager.destroy(instanceId);
+			actor.send("destroyed");
 		}
 
 		// Clear instanceId on tenant row (lastSnapshotId is preserved by hibernate)
@@ -264,7 +271,10 @@ export class TenantManager {
 		};
 	}
 
-	/** Inserts or updates the tenant row with the current instance. */
+	/**
+	 * Inserts or updates the tenant row with the current instance.
+	 * Transitions tenant status through claiming → active.
+	 */
 	private upsertTenant(
 		tenantId: TenantId,
 		workloadId: WorkloadId,
@@ -277,18 +287,24 @@ export class TenantManager {
 			.get();
 
 		if (existing) {
+			const actor = new TenantActor(this.db, tenantId);
+			actor.send("claim");
+			actor.send("claimed");
+
 			this.db
 				.update(tenants)
 				.set({ instanceId, lastActivity: new Date() })
 				.where(eq(tenants.tenantId, tenantId))
 				.run();
 		} else {
+			// New tenant: insert directly as "active" (claim + claimed in one step)
 			this.db
 				.insert(tenants)
 				.values({
 					tenantId,
 					workloadId,
 					instanceId,
+					status: "active" as TenantStatus,
 					lastActivity: new Date(),
 					createdAt: new Date(),
 				})

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "56ca1c6f-89c0-4fed-8514-4dce3eb78fbd",
+  "id": "b62bcfbd-7a11-4fd8-884b-a5dcbd45e7fa",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "activity_log": {
@@ -327,6 +327,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'ready'"
+        },
         "vmstate_path": {
           "name": "vmstate_path",
           "type": "text",
@@ -398,6 +406,13 @@
             "type"
           ],
           "isUnique": false
+        },
+        "snapshots_status_idx": {
+          "name": "snapshots_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -449,6 +464,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'idle'"
+        },
         "instance_id": {
           "name": "instance_id",
           "type": "text",
@@ -497,6 +520,13 @@
           "name": "tenants_instance_id_idx",
           "columns": [
             "instance_id"
+          ],
+          "isUnique": false
+        },
+        "tenants_status_idx": {
+          "name": "tenants_status_idx",
+          "columns": [
+            "status"
           ],
           "isUnique": false
         }

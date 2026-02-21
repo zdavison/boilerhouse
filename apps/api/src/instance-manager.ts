@@ -12,6 +12,7 @@ import type {
 import { generateInstanceId } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { instances, snapshots, tenants } from "@boilerhouse/db";
+import { InstanceActor, SnapshotActor } from "./actors";
 
 export class SnapshotNotFoundError extends Error {
 	constructor(snapshotId: string) {
@@ -49,11 +50,8 @@ export class InstanceManager {
 			const handle = await this.runtime.create(workload, instanceId);
 			await this.runtime.start(handle);
 
-			this.db
-				.update(instances)
-				.set({ status: "active" })
-				.where(eq(instances.instanceId, instanceId))
-				.run();
+			const actor = new InstanceActor(this.db, instanceId);
+			actor.send("started");
 
 			this.activityLog.log({
 				event: "instance.created",
@@ -79,28 +77,19 @@ export class InstanceManager {
 			.where(eq(instances.instanceId, instanceId))
 			.get();
 
-		if (!row || row.status === "destroyed") {
-			return;
-		}
+		if (!row) return;
 
 		const handle: InstanceHandle = {
 			instanceId,
 			running: row.status === "active",
 		};
 
-		this.db
-			.update(instances)
-			.set({ status: "destroying" })
-			.where(eq(instances.instanceId, instanceId))
-			.run();
+		const actor = new InstanceActor(this.db, instanceId);
+		actor.send("destroy");
 
 		await this.runtime.destroy(handle);
 
-		this.db
-			.update(instances)
-			.set({ status: "destroyed" })
-			.where(eq(instances.instanceId, instanceId))
-			.run();
+		actor.send("destroyed");
 
 		this.activityLog.log({
 			event: "instance.destroyed",
@@ -126,19 +115,12 @@ export class InstanceManager {
 			running: row.status === "active",
 		};
 
-		this.db
-			.update(instances)
-			.set({ status: "stopping" })
-			.where(eq(instances.instanceId, instanceId))
-			.run();
+		const actor = new InstanceActor(this.db, instanceId);
+		actor.send("stop");
 
 		await this.runtime.stop(handle);
 
-		this.db
-			.update(instances)
-			.set({ status: "destroyed" })
-			.where(eq(instances.instanceId, instanceId))
-			.run();
+		actor.send("stopped");
 
 		this.activityLog.log({
 			event: "instance.stopped",
@@ -158,6 +140,9 @@ export class InstanceManager {
 		if (!row) {
 			throw new Error(`Instance not found: ${instanceId}`);
 		}
+
+		const actor = new InstanceActor(this.db, instanceId);
+		actor.validate("hibernate");
 
 		const handle: InstanceHandle = {
 			instanceId,
@@ -184,6 +169,7 @@ export class InstanceManager {
 			.values({
 				snapshotId: correctedRef.id,
 				type: correctedRef.type,
+				status: "creating",
 				instanceId,
 				tenantId: row.tenantId,
 				workloadId: row.workloadId,
@@ -196,13 +182,12 @@ export class InstanceManager {
 			})
 			.run();
 
+		const snapActor = new SnapshotActor(this.db, correctedRef.id);
+		snapActor.send("created");
+
 		await this.runtime.destroy(handle);
 
-		this.db
-			.update(instances)
-			.set({ status: "hibernated" })
-			.where(eq(instances.instanceId, instanceId))
-			.run();
+		actor.send("hibernate");
 
 		if (row.tenantId) {
 			// Delete the previous tenant snapshot (keep only the latest)
@@ -268,11 +253,8 @@ export class InstanceManager {
 
 		const handle = await this.runtime.restore(ref, instanceId);
 
-		this.db
-			.update(instances)
-			.set({ status: "active" })
-			.where(eq(instances.instanceId, instanceId))
-			.run();
+		const actor = new InstanceActor(this.db, instanceId);
+		actor.send("started");
 
 		this.activityLog.log({
 			event: "instance.restored",

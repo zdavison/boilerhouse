@@ -47,6 +47,7 @@ CREATE TABLE `snapshots` (
 	`tenant_id` text,
 	`workload_id` text NOT NULL,
 	`node_id` text NOT NULL,
+	`status` text DEFAULT 'ready' NOT NULL,
 	`vmstate_path` text NOT NULL,
 	`memory_path` text,
 	`size_bytes` integer NOT NULL,
@@ -61,9 +62,11 @@ CREATE INDEX `snapshots_workload_id_idx` ON `snapshots` (`workload_id`);--> stat
 CREATE INDEX `snapshots_node_id_idx` ON `snapshots` (`node_id`);--> statement-breakpoint
 CREATE INDEX `snapshots_tenant_id_idx` ON `snapshots` (`tenant_id`);--> statement-breakpoint
 CREATE INDEX `snapshots_type_idx` ON `snapshots` (`type`);--> statement-breakpoint
+CREATE INDEX `snapshots_status_idx` ON `snapshots` (`status`);--> statement-breakpoint
 CREATE TABLE `tenants` (
 	`tenant_id` text PRIMARY KEY NOT NULL,
 	`workload_id` text NOT NULL,
+	`status` text DEFAULT 'idle' NOT NULL,
 	`instance_id` text,
 	`last_snapshot_id` text,
 	`data_overlay_ref` text,
@@ -74,6 +77,7 @@ CREATE TABLE `tenants` (
 --> statement-breakpoint
 CREATE INDEX `tenants_workload_id_idx` ON `tenants` (`workload_id`);--> statement-breakpoint
 CREATE INDEX `tenants_instance_id_idx` ON `tenants` (`instance_id`);--> statement-breakpoint
+CREATE INDEX `tenants_status_idx` ON `tenants` (`status`);--> statement-breakpoint
 CREATE TABLE `workloads` (
 	`workload_id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,

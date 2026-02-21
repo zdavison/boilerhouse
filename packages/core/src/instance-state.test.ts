@@ -36,6 +36,10 @@ describe("instance state machine", () => {
 		test("hibernated → starting (via 'restore' event)", () => {
 			expect(transition("hibernated", "restore")).toBe("starting");
 		});
+
+		test("hibernated → destroying (via 'destroy' event)", () => {
+			expect(transition("hibernated", "destroy")).toBe("destroying");
+		});
 	});
 
 	describe("invalid transitions", () => {
@@ -87,23 +91,23 @@ describe("instance state machine", () => {
 
 	test("all events are enumerable", () => {
 		expect(INSTANCE_EVENTS).toContain("started");
-		expect(INSTANCE_EVENTS).toContain("claimed");
 		expect(INSTANCE_EVENTS).toContain("hibernate");
 		expect(INSTANCE_EVENTS).toContain("stop");
 		expect(INSTANCE_EVENTS).toContain("destroy");
 		expect(INSTANCE_EVENTS).toContain("restore");
 		expect(INSTANCE_EVENTS).toContain("stopped");
 		expect(INSTANCE_EVENTS).toContain("destroyed");
-		expect(INSTANCE_EVENTS).toHaveLength(8);
+		expect(INSTANCE_EVENTS).toHaveLength(7);
 	});
 
-	test("InvalidTransitionError has structured message", () => {
+	test("InvalidTransitionError has structured fields", () => {
 		try {
 			transition("destroyed", "started");
 		} catch (e) {
 			expect(e).toBeInstanceOf(InvalidTransitionError);
 			const err = e as InvalidTransitionError;
-			expect(err.currentStatus).toBe("destroyed");
+			expect(err.entity).toBe("instance");
+			expect(err.status).toBe("destroyed");
 			expect(err.event).toBe("started");
 			expect(err.message).toContain("destroyed");
 			expect(err.message).toContain("started");

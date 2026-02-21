@@ -11,6 +11,7 @@ import type {
 import { generateInstanceId } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { snapshots } from "@boilerhouse/db";
+import { SnapshotActor } from "./actors";
 import { pollHealth, createHttpCheck, createExecCheck } from "./health-check";
 import type { HealthConfig, HealthCheckFn } from "./health-check";
 
@@ -115,6 +116,7 @@ export class SnapshotManager {
 				.values({
 					snapshotId: goldenRef.id,
 					type: "golden",
+					status: "creating",
 					instanceId,
 					workloadId,
 					nodeId: this.nodeId,
@@ -125,6 +127,9 @@ export class SnapshotManager {
 					createdAt: new Date(),
 				})
 				.run();
+
+			const snapActor = new SnapshotActor(this.db, goldenRef.id);
+			snapActor.send("created");
 
 			// Destroy the bootstrap VM
 			await this.runtime.destroy(handle);

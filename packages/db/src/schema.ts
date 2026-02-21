@@ -17,6 +17,8 @@ import type {
 	InstanceStatus,
 	SnapshotId,
 	SnapshotType,
+	TenantStatus,
+	SnapshotStatus,
 } from "@boilerhouse/core";
 import { timestamp, jsonObject } from "./columns";
 
@@ -95,6 +97,7 @@ export const snapshots = sqliteTable(
 			.notNull()
 			.$type<NodeId>()
 			.references(() => nodes.nodeId),
+		status: text("status").notNull().default("ready").$type<SnapshotStatus>(),
 		vmstatePath: text("vmstate_path").notNull(),
 		memoryPath: text("memory_path"),
 		sizeBytes: integer("size_bytes").notNull(),
@@ -107,6 +110,7 @@ export const snapshots = sqliteTable(
 		index("snapshots_node_id_idx").on(table.nodeId),
 		index("snapshots_tenant_id_idx").on(table.tenantId),
 		index("snapshots_type_idx").on(table.type),
+		index("snapshots_status_idx").on(table.status),
 	],
 );
 
@@ -120,6 +124,7 @@ export const tenants = sqliteTable(
 			.notNull()
 			.$type<WorkloadId>()
 			.references(() => workloads.workloadId),
+		status: text("status").notNull().default("idle").$type<TenantStatus>(),
 		instanceId: text("instance_id").$type<InstanceId>(),
 		lastSnapshotId: text("last_snapshot_id").$type<SnapshotId>(),
 		dataOverlayRef: text("data_overlay_ref"),
@@ -129,6 +134,7 @@ export const tenants = sqliteTable(
 	(table) => [
 		index("tenants_workload_id_idx").on(table.workloadId),
 		index("tenants_instance_id_idx").on(table.instanceId),
+		index("tenants_status_idx").on(table.status),
 	],
 );
 

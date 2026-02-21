@@ -1,5 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
+import { createMachine, type TransitionMap } from "./state-machine";
 
 export const NodeStatusSchema = Type.Union([
 	Type.Literal("online"),
@@ -22,6 +23,45 @@ export const NodeCapacitySchema = Type.Object({
 	diskGb: Type.Integer({ exclusiveMinimum: 0 }),
 });
 export type NodeCapacity = Static<typeof NodeCapacitySchema>;
+
+// ── Node events ─────────────────────────────────────────────────────────────
+
+export const NodeEventSchema = Type.Union([
+	Type.Literal("drain"),
+	Type.Literal("shutdown"),
+	Type.Literal("cancel_drain"),
+	Type.Literal("activate"),
+]);
+export type NodeEvent = Static<typeof NodeEventSchema>;
+export const NODE_EVENTS = [
+	"drain",
+	"shutdown",
+	"cancel_drain",
+	"activate",
+] as const satisfies readonly NodeEvent[];
+
+const nodeTransitions: TransitionMap<NodeStatus, NodeEvent> = {
+	online: { drain: "draining" },
+	draining: { shutdown: "offline", cancel_drain: "online" },
+	offline: { activate: "online" },
+};
+
+const nodeMachine = createMachine<NodeStatus, NodeEvent>("node", {
+	transitions: nodeTransitions,
+});
+
+/**
+ * Applies an event to the current node status, returning the new status.
+ * Throws {@link InvalidTransitionError} if the transition is not allowed.
+ */
+export function nodeTransition(
+	current: NodeStatus,
+	event: NodeEvent,
+): NodeStatus {
+	return nodeMachine.transition(current, event);
+}
+
+// ── Capacity validation ─────────────────────────────────────────────────────
 
 export class NodeCapacityError extends Error {
 	constructor(message: string) {
