@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useApi } from "../hooks";
 import { api, type WorkloadSummary, type ClaimResult } from "../api";
-import { LoadingState, ErrorState, PageHeader, DataTable, DataRow, ActionButton } from "../components";
+import { LoadingState, ErrorState, PageHeader, DataTable, DataRow, ActionButton, StatusIndicator } from "../components";
 
-function ClaimCell({ workloadName }: { workloadName: string }) {
+function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?: boolean }) {
 	const [expanded, setExpanded] = useState(false);
 	const [tenantId, setTenantId] = useState("");
 	const [claiming, setClaiming] = useState(false);
@@ -30,6 +30,7 @@ function ClaimCell({ workloadName }: { workloadName: string }) {
 			<ActionButton
 				label="claim"
 				variant="info"
+				disabled={disabled}
 				onClick={() => setExpanded(true)}
 			/>
 		);
@@ -87,13 +88,16 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 			{data.length === 0 ? (
 				<p className="text-muted font-mono text-sm">no workloads registered.</p>
 			) : (
-				<DataTable headers={["Name", "Version", "Created", "Updated", "Actions"]}>
+				<DataTable headers={["Name", "Version", "Status", "Created", "Updated", "Actions"]}>
 					{data.map((w) => (
 						<DataRow key={w.workloadId} onClick={() => navigate(`/workloads/${w.name}`)}>
 							<td className="px-4 py-3 text-accent hover:text-accent-bright">
 								{w.name}
 							</td>
 							<td className="px-4 py-3 text-muted-light">{w.version}</td>
+							<td className="px-4 py-3">
+								<StatusIndicator status={w.status} />
+							</td>
 							<td className="px-4 py-3 text-muted">
 								{new Date(w.createdAt).toLocaleString()}
 							</td>
@@ -101,7 +105,7 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 								{new Date(w.updatedAt).toLocaleString()}
 							</td>
 							<td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-								<ClaimCell workloadName={w.name} />
+								<ClaimCell workloadName={w.name} disabled={w.status !== "ready"} />
 							</td>
 						</DataRow>
 					))}

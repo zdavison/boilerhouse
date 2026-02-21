@@ -4,6 +4,7 @@ import type {
 	TenantId,
 	WorkloadId,
 	InstanceStatus,
+	WorkloadStatus,
 } from "@boilerhouse/core";
 import type { ClaimSource } from "./tenant-manager";
 
@@ -29,10 +30,17 @@ export interface TenantReleaseEvent {
 	instanceId: InstanceId;
 }
 
+export interface WorkloadStateEvent {
+	type: "workload.state";
+	workloadId: WorkloadId;
+	status: WorkloadStatus;
+}
+
 export type DomainEvent =
 	| InstanceStateEvent
 	| TenantClaimEvent
-	| TenantReleaseEvent;
+	| TenantReleaseEvent
+	| WorkloadStateEvent;
 
 export class EventBus {
 	private readonly emitter = new EventEmitter();

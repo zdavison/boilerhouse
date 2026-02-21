@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { availableRuntimes, E2E_TIMEOUTS } from "./runtime-matrix";
-import { startE2EServer, api, readFixture, type E2EServer } from "./e2e-helpers";
+import { startE2EServer, api, readFixture, waitForWorkloadReady, type E2EServer } from "./e2e-helpers";
 
 for (const rt of availableRuntimes()) {
 	const timeouts = E2E_TIMEOUTS[rt.name as keyof typeof E2E_TIMEOUTS] ?? E2E_TIMEOUTS.fake;
@@ -24,20 +24,26 @@ for (const rt of availableRuntimes()) {
 
 			// Step 1: Register broken workload (parsing succeeds, failure at instance create)
 			const brokenRegRes = await api(server, "POST", "/api/v1/workloads", brokenToml);
-			// Golden snapshot creation may fail, but workload itself registers.
-			// For fake with failOn: the whole POST may return 201 (workload saved)
-			// but golden snapshot creation failed silently.
+			// Workload registers with status "creating", golden creation fails in background
 			expect(brokenRegRes.status).toBe(201);
 
 			const brokenBody = await brokenRegRes.json();
 			const brokenWorkloadName = brokenBody.name;
 
-			// Step 2: Claim a tenant — should fail
+			// Wait for golden creation to fail (workload transitions to "error")
+			const start = Date.now();
+			while (Date.now() - start < 5000) {
+				const res = await fetch(`${server.baseUrl}/api/v1/workloads/${brokenWorkloadName}`);
+				const body = (await res.json()) as { status: string };
+				if (body.status === "error") break;
+				await new Promise((r) => setTimeout(r, 50));
+			}
+
+			// Step 2: Claim a tenant — should fail (workload not ready)
 			const claimRes = await api(server, "POST", "/api/v1/tenants/e2e-err-1/claim", {
 				workload: brokenWorkloadName,
 			});
-			// For fake with failOn: NoGoldenSnapshotError (503) since golden creation failed
-			// For docker: instance creation fails (error propagates as 500 or similar)
+			// Workload is in "error" status, so claim returns 503
 			expect(claimRes.status).not.toBe(200);
 
 			// Step 3: No orphaned active instances
@@ -62,6 +68,8 @@ for (const rt of availableRuntimes()) {
 			const workingRegRes = await api(server, "POST", "/api/v1/workloads", workingToml);
 			expect(workingRegRes.status).toBe(201);
 			const workingBody = await workingRegRes.json();
+
+			await waitForWorkloadReady(server, workingBody.name);
 
 			const claimRecoverRes = await api(server, "POST", "/api/v1/tenants/e2e-err-recover/claim", {
 				workload: workingBody.name,

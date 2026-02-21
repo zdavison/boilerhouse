@@ -5,7 +5,7 @@ import { workloads, instances, snapshots } from "@boilerhouse/db";
 import type { RouteDeps } from "./deps";
 
 export function workloadRoutes(deps: RouteDeps) {
-	const { db, snapshotManager } = deps;
+	const { db, goldenCreator } = deps;
 
 	return new Elysia({ name: "workloads" })
 		.post("/workloads", async ({ request, set }) => {
@@ -48,28 +48,21 @@ export function workloadRoutes(deps: RouteDeps) {
 					name: workload.workload.name,
 					version: workload.workload.version,
 					config: workload,
+					status: "creating",
 					createdAt: now,
 					updatedAt: now,
 				})
 				.run();
 
-			// Create golden snapshot so the workload is immediately claimable
-			let goldenSnapshotId: string | null = null;
-			try {
-				const ref = await snapshotManager.createGolden(workloadId, workload);
-				goldenSnapshotId = ref.id;
-			} catch (err) {
-				console.error(
-					`Failed to create golden snapshot for ${workload.workload.name}: ${err instanceof Error ? err.message : err}`,
-				);
-			}
+			// Enqueue golden snapshot creation in the background
+			goldenCreator.enqueue(workloadId, workload);
 
 			set.status = 201;
 			return {
 				workloadId,
 				name: workload.workload.name,
 				version: workload.workload.version,
-				goldenSnapshotId,
+				status: "creating" as const,
 			};
 		})
 		.get("/workloads", () => {
@@ -78,6 +71,7 @@ export function workloadRoutes(deps: RouteDeps) {
 				workloadId: r.workloadId,
 				name: r.name,
 				version: r.version,
+				status: r.status,
 				createdAt: r.createdAt.toISOString(),
 				updatedAt: r.updatedAt.toISOString(),
 			}));
@@ -104,6 +98,7 @@ export function workloadRoutes(deps: RouteDeps) {
 				workloadId: row.workloadId,
 				name: row.name,
 				version: row.version,
+				status: row.status,
 				config: row.config,
 				instanceCount: instanceCount!.count,
 				createdAt: row.createdAt.toISOString(),
@@ -131,6 +126,7 @@ export function workloadRoutes(deps: RouteDeps) {
 			return rows.map((s) => ({
 				snapshotId: s.snapshotId,
 				type: s.type,
+				status: s.status,
 				instanceId: s.instanceId,
 				tenantId: s.tenantId,
 				workloadId: s.workloadId,
@@ -149,6 +145,13 @@ export function workloadRoutes(deps: RouteDeps) {
 			if (!row) {
 				set.status = 404;
 				return { error: `Workload '${params.name}' not found` };
+			}
+
+			if (row.status === "creating") {
+				set.status = 409;
+				return {
+					error: `Cannot delete workload '${params.name}': golden snapshot is still being created`,
+				};
 			}
 
 			// Check for active (non-destroyed) instances

@@ -1,0 +1,1 @@
+ALTER TABLE `workloads` ADD `status` text DEFAULT 'ready' NOT NULL;

@@ -163,6 +163,7 @@ export class SnapshotManager {
 					eq(snapshots.workloadId, workloadId),
 					eq(snapshots.nodeId, nodeId),
 					eq(snapshots.type, "golden"),
+					eq(snapshots.status, "ready"),
 				),
 			)
 			.get();

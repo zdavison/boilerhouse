@@ -21,11 +21,13 @@ import { TenantManager } from "./tenant-manager";
 import { TenantDataStore } from "./tenant-data";
 import { IdleMonitor } from "./idle-monitor";
 import { EventBus } from "./event-bus";
+import { GoldenCreator } from "./golden-creator";
 import { createApp } from "./app";
 import { recoverState } from "./recovery";
 import type { RecoveryOptions } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { TapManager } from "./network/tap";
+import { WorkloadActor } from "./actors";
 
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
@@ -184,24 +186,28 @@ const recoverySummary = [
 ].join(", ");
 console.log(`Recovery: ${recoverySummary}`);
 
-// Ensure all workloads have golden snapshots
+const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus);
+
+// Enqueue golden snapshot creation for workloads that need it
 {
 	const allWorkloads = db.select().from(workloadsTable).all();
-	let created = 0;
+	let enqueued = 0;
 	for (const row of allWorkloads) {
 		if (!snapshotManager.goldenExists(row.workloadId, nodeId)) {
-			try {
-				await snapshotManager.createGolden(row.workloadId, row.config as Workload);
-				created++;
-			} catch (err) {
-				console.error(
-					`Failed to create golden snapshot for ${row.name}: ${err instanceof Error ? err.message : err}`,
-				);
+			// Set status to creating (new workloads already are; error workloads need retry)
+			const actor = new WorkloadActor(db, row.workloadId);
+			if (row.status === "error") {
+				actor.send("retry");
+			} else if (row.status !== "creating") {
+				actor.forceStatus("creating");
 			}
+
+			goldenCreator.enqueue(row.workloadId, row.config as Workload);
+			enqueued++;
 		}
 	}
-	if (created > 0) {
-		console.log(`Golden snapshots: ${created} created`);
+	if (enqueued > 0) {
+		console.log(`Golden snapshots: ${enqueued} enqueued for background creation`);
 	}
 }
 
@@ -214,6 +220,7 @@ const app = createApp({
 	tenantManager,
 	snapshotManager,
 	eventBus,
+	goldenCreator,
 	resourceLimiter,
 });
 

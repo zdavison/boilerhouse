@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { availableRuntimes, E2E_TIMEOUTS } from "./runtime-matrix";
-import { startE2EServer, api, readFixture, type E2EServer } from "./e2e-helpers";
+import { startE2EServer, api, readFixture, waitForWorkloadReady, type E2EServer } from "./e2e-helpers";
 
 for (const rt of availableRuntimes()) {
 	const timeouts = E2E_TIMEOUTS[rt.name as keyof typeof E2E_TIMEOUTS] ?? E2E_TIMEOUTS.fake;
@@ -21,6 +21,8 @@ for (const rt of availableRuntimes()) {
 			expect(registerRes.status).toBe(201);
 			const registerBody = await registerRes.json();
 			const workloadName = registerBody.name;
+
+			await waitForWorkloadReady(server, workloadName);
 
 			// Step 2: Verify golden snapshot exists
 			const snapshotsRes = await api(server, "GET", `/api/v1/workloads/${workloadName}/snapshots`);

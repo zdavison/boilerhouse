@@ -35,6 +35,14 @@ export function tenantRoutes(deps: RouteDeps) {
 				return { error: `Workload '${workloadName}' not found` };
 			}
 
+			if (workloadRow.status !== "ready") {
+				set.status = 503;
+				set.headers["Retry-After"] = "5";
+				return {
+					error: `Workload '${workloadName}' is not ready (status: ${workloadRow.status})`,
+				};
+			}
+
 			let result;
 			try {
 				result = await tenantManager.claim(

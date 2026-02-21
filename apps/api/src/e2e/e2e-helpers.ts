@@ -11,6 +11,7 @@ import { SnapshotManager } from "../snapshot-manager";
 import { TenantManager } from "../tenant-manager";
 import { TenantDataStore } from "../tenant-data";
 import { EventBus } from "../event-bus";
+import { GoldenCreator } from "../golden-creator";
 import { ResourceLimiter } from "../resource-limits";
 import { TapManager } from "../network/tap";
 import { createApp } from "../app";
@@ -131,6 +132,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 	);
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
+	const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus);
 
 	const app = createApp({
 		db,
@@ -141,6 +143,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		tenantManager,
 		snapshotManager,
 		eventBus,
+		goldenCreator,
 		resourceLimiter,
 	});
 
@@ -158,6 +161,32 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 			if (runtimeCleanup) await runtimeCleanup();
 		},
 	};
+}
+
+/**
+ * Waits for a workload to reach "ready" status by polling.
+ * Throws if the workload doesn't become ready within the timeout.
+ */
+export async function waitForWorkloadReady(
+	server: E2EServer,
+	workloadName: string,
+	timeoutMs = 30_000,
+): Promise<void> {
+	const start = Date.now();
+	while (Date.now() - start < timeoutMs) {
+		const res = await fetch(
+			`${server.baseUrl}/api/v1/workloads/${encodeURIComponent(workloadName)}`,
+		);
+		if (res.ok) {
+			const body = (await res.json()) as { status: string };
+			if (body.status === "ready") return;
+			if (body.status === "error") {
+				throw new Error(`Workload '${workloadName}' failed to create golden snapshot`);
+			}
+		}
+		await new Promise((r) => setTimeout(r, 50));
+	}
+	throw new Error(`Workload '${workloadName}' did not become ready within ${timeoutMs}ms`);
 }
 
 /**

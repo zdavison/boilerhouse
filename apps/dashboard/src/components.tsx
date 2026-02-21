@@ -7,25 +7,31 @@ import { api, type InstanceEndpoint } from "./api";
 const STATUS_SYMBOLS: Record<string, string> = {
 	active: "●",
 	online: "●",
+	ready: "●",
 	starting: "◐",
+	creating: "◐",
 	draining: "◐",
 	stopping: "◐",
 	destroying: "◐",
 	hibernated: "○",
 	destroyed: "✕",
 	offline: "✕",
+	error: "✕",
 };
 
 const STATUS_COLORS: Record<string, string> = {
 	active: "text-status-green",
 	online: "text-status-green",
+	ready: "text-status-green",
 	starting: "text-status-yellow",
+	creating: "text-status-yellow",
 	draining: "text-status-yellow",
 	stopping: "text-status-orange",
 	destroying: "text-status-orange",
 	hibernated: "text-status-blue",
 	destroyed: "text-status-red",
 	offline: "text-status-red",
+	error: "text-status-red",
 };
 
 export function StatusIndicator({ status }: { status: string }) {

@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { availableRuntimes, E2E_TIMEOUTS } from "./runtime-matrix";
-import { startE2EServer, api, readFixture, type E2EServer } from "./e2e-helpers";
+import { startE2EServer, api, readFixture, waitForWorkloadReady, type E2EServer } from "./e2e-helpers";
 
 interface DomainEvent {
 	type: string;
@@ -43,6 +43,8 @@ for (const rt of availableRuntimes()) {
 			const registerRes = await api(server, "POST", "/api/v1/workloads", toml);
 			expect(registerRes.status).toBe(201);
 			const { name: workloadName } = await registerRes.json();
+
+			await waitForWorkloadReady(server, workloadName);
 
 			// Step 3: Claim tenant
 			const claimRes = await api(server, "POST", "/api/v1/tenants/e2e-ws-1/claim", {

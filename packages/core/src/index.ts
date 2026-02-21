@@ -111,3 +111,13 @@ export {
 	SNAPSHOT_EVENTS,
 	snapshotTransition,
 } from "./snapshot-state";
+
+export {
+	type WorkloadStatus,
+	type WorkloadEvent,
+	WorkloadStatusSchema,
+	WorkloadEventSchema,
+	WORKLOAD_STATUSES,
+	WORKLOAD_EVENTS,
+	workloadTransition,
+} from "./workload-state";

@@ -15,6 +15,7 @@ export function snapshotRoutes(deps: RouteDeps) {
 		return rows.map((s) => ({
 			snapshotId: s.snapshotId,
 			type: s.type,
+			status: s.status,
 			instanceId: s.instanceId,
 			tenantId: s.tenantId,
 			workloadId: s.workloadId,

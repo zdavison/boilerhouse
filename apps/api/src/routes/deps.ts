@@ -5,6 +5,7 @@ import type { TenantManager } from "../tenant-manager";
 import type { SnapshotManager } from "../snapshot-manager";
 import type { EventBus } from "../event-bus";
 import type { ResourceLimiter } from "../resource-limits";
+import type { GoldenCreator } from "../golden-creator";
 
 export interface RouteDeps {
 	db: DrizzleDb;
@@ -15,5 +16,6 @@ export interface RouteDeps {
 	tenantManager: TenantManager;
 	snapshotManager: SnapshotManager;
 	eventBus: EventBus;
+	goldenCreator: GoldenCreator;
 	resourceLimiter?: ResourceLimiter;
 }

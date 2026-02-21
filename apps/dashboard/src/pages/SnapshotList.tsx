@@ -1,6 +1,6 @@
 import { useApi } from "../hooks";
 import { api, type SnapshotSummary } from "../api";
-import { LoadingState, ErrorState, PageHeader } from "../components";
+import { LoadingState, ErrorState, PageHeader, StatusIndicator } from "../components";
 
 /**
  * Tree node representing a golden snapshot and its tenant-snapshot children.
@@ -71,6 +71,9 @@ function SnapshotNode({
 					<span className="text-border-light select-none">└</span>
 				)}
 				<span className={`font-mono font-medium ${colorClass}`}>{label}</span>
+				{snapshot.status !== "ready" && (
+					<StatusIndicator status={snapshot.status} />
+				)}
 				<span
 					className="font-mono text-muted-light truncate"
 					title={snapshot.snapshotId}

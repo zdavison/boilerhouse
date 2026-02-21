@@ -81,6 +81,7 @@ export function loadWorkloadsFromDir(
 					name,
 					version,
 					config: workload,
+					status: "creating",
 					createdAt: now,
 					updatedAt: now,
 				})

@@ -52,6 +52,8 @@ export interface WorkloadSummary {
 	workloadId: string;
 	name: string;
 	version: string;
+	/** @example "ready" */
+	status: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -121,6 +123,8 @@ export interface SnapshotSummary {
 	snapshotId: string;
 	/** @example "golden" */
 	type: "golden" | "tenant";
+	/** @example "ready" */
+	status: string;
 	instanceId: string;
 	tenantId: string | null;
 	workloadId: string;

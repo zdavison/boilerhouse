@@ -42,7 +42,7 @@ describe("POST /api/v1/workloads", () => {
 		expect(body.workloadId).toBeDefined();
 	});
 
-	test("creates a golden snapshot on registration", async () => {
+	test("returns status 'creating' and enqueues golden snapshot", async () => {
 		const { app, db } = createTestApp();
 
 		const res = await apiRequest(app, "/api/v1/workloads", {
@@ -53,12 +53,14 @@ describe("POST /api/v1/workloads", () => {
 
 		expect(res.status).toBe(201);
 		const body = await res.json();
-		expect(body.goldenSnapshotId).toBeDefined();
+		expect(body.status).toBe("creating");
+
+		// Golden snapshot is created asynchronously — wait for it
+		await new Promise((r) => setTimeout(r, 100));
 
 		const snapshotRows = db.select().from(snapshots).all();
 		expect(snapshotRows).toHaveLength(1);
 		expect(snapshotRows[0]!.type).toBe("golden");
-		expect(snapshotRows[0]!.snapshotId).toBe(body.goldenSnapshotId);
 	});
 
 	test("returns 400 for invalid TOML", async () => {
