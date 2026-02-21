@@ -52,6 +52,33 @@ export class TapManager {
 	 */
 	async create(instanceId: InstanceId): Promise<TapDevice> {
 		const { commands, device } = this.createCommands(instanceId);
+		await this.runCommands(commands);
+		return device;
+	}
+
+	/**
+	 * Creates a TAP device with a specific pre-determined config.
+	 * Used during snapshot restore to recreate the exact TAP device
+	 * that existed when the snapshot was taken.
+	 * Idempotent: destroys any existing device with the same name first.
+	 */
+	async createFromDevice(device: TapDevice): Promise<TapDevice> {
+		// Destroy existing device if present (leaked from a previous run)
+		const check = Bun.spawnSync(["ip", "link", "show", device.name]);
+		if (check.exitCode === 0) {
+			await this.runCommands([`ip link delete ${device.name}`]);
+		}
+
+		const commands = [
+			`ip tuntap add dev ${device.name} mode tap`,
+			`ip addr add ${device.ip}/30 dev ${device.name}`,
+			`ip link set ${device.name} up`,
+		];
+		await this.runCommands(commands);
+		return device;
+	}
+
+	private async runCommands(commands: string[]): Promise<void> {
 		for (const cmd of commands) {
 			const parts = cmd.split(" ");
 			const proc = Bun.spawn(parts, { stdout: "pipe", stderr: "pipe" });
@@ -63,7 +90,6 @@ export class TapManager {
 				);
 			}
 		}
-		return device;
 	}
 
 	/**

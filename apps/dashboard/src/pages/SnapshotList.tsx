@@ -103,9 +103,12 @@ function SnapshotTreeView({ snapshots }: { snapshots: SnapshotSummary[] }) {
 	const { trees, orphans } = buildTree(snapshots);
 
 	return (
-		<div className="space-y-1">
+		<div className="space-y-3">
 			{trees.map((node) => (
 				<div key={node.golden.snapshotId}>
+					<div className="text-xs font-mono text-muted mb-1 px-1">
+						{node.golden.workloadName ?? node.golden.workloadId}
+					</div>
 					<SnapshotNode snapshot={node.golden} depth={0} />
 					{node.children.map((child) => (
 						<SnapshotNode

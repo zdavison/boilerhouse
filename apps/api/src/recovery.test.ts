@@ -211,7 +211,87 @@ describe("recoverState", () => {
 		expect(destroyedTaps).toContain("tap-00000000");
 	});
 
-	test("idempotent — second run returns {0, 0, 0}", async () => {
+	test("orphaned network namespaces are cleaned up", async () => {
+		const liveId = generateInstanceId();
+		insertInstance(liveId, "active");
+		await addToRuntime(liveId);
+
+		const destroyedNetns: string[] = [];
+
+		const report = await recoverState(runtime, db, nodeId, log, {
+			listNetns: async () => ["fc-orphaned1", "fc-orphaned2"],
+			destroyNetns: async (name) => {
+				destroyedNetns.push(name);
+			},
+			deriveNsName: () => "fc-expected",
+		});
+
+		expect(report.orphanedNetnsCleaned).toBe(2);
+		expect(destroyedNetns).toContain("fc-orphaned1");
+		expect(destroyedNetns).toContain("fc-orphaned2");
+	});
+
+	test("keeps network namespaces matching active instances", async () => {
+		const liveId = generateInstanceId();
+		insertInstance(liveId, "active");
+		await addToRuntime(liveId);
+
+		const destroyedNetns: string[] = [];
+
+		const report = await recoverState(runtime, db, nodeId, log, {
+			listNetns: async () => ["fc-matching", "fc-orphaned"],
+			destroyNetns: async (name) => {
+				destroyedNetns.push(name);
+			},
+			deriveNsName: () => "fc-matching",
+		});
+
+		expect(report.orphanedNetnsCleaned).toBe(1);
+		expect(destroyedNetns).toContain("fc-orphaned");
+		expect(destroyedNetns).not.toContain("fc-matching");
+	});
+
+	test("orphaned jail directories are cleaned up", async () => {
+		const liveId = generateInstanceId();
+		insertInstance(liveId, "active");
+		await addToRuntime(liveId);
+
+		const cleanedJails: string[] = [];
+
+		const report = await recoverState(runtime, db, nodeId, log, {
+			listJails: async () => ["orphan-inst-1", "orphan-inst-2"],
+			cleanJail: async (instanceId) => {
+				cleanedJails.push(instanceId);
+			},
+			chrootBaseDir: "/srv/jailer",
+		});
+
+		expect(report.orphanedJailsCleaned).toBe(2);
+		expect(cleanedJails).toContain("orphan-inst-1");
+		expect(cleanedJails).toContain("orphan-inst-2");
+	});
+
+	test("keeps jail directories matching active instances", async () => {
+		const liveId = generateInstanceId();
+		insertInstance(liveId, "active");
+		await addToRuntime(liveId);
+
+		const cleanedJails: string[] = [];
+
+		const report = await recoverState(runtime, db, nodeId, log, {
+			listJails: async () => [liveId, "orphan-inst"],
+			cleanJail: async (instanceId) => {
+				cleanedJails.push(instanceId);
+			},
+			chrootBaseDir: "/srv/jailer",
+		});
+
+		expect(report.orphanedJailsCleaned).toBe(1);
+		expect(cleanedJails).toContain("orphan-inst");
+		expect(cleanedJails).not.toContain(liveId);
+	});
+
+	test("idempotent — second run returns all zeros", async () => {
 		const id = generateInstanceId();
 		insertInstance(id, "active");
 		// No VM — will be destroyed on first run
@@ -222,6 +302,8 @@ describe("recoverState", () => {
 		expect(report.recovered).toBe(0);
 		expect(report.destroyed).toBe(0);
 		expect(report.orphanedTapsCleaned).toBe(0);
+		expect(report.orphanedNetnsCleaned).toBe(0);
+		expect(report.orphanedJailsCleaned).toBe(0);
 	});
 
 	test("logs activity for each destroyed instance", async () => {

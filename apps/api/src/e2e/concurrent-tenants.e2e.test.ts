@@ -5,7 +5,7 @@ import { startE2EServer, api, readFixture, type E2EServer } from "./e2e-helpers"
 for (const rt of availableRuntimes()) {
 	const timeouts = E2E_TIMEOUTS[rt.name as keyof typeof E2E_TIMEOUTS] ?? E2E_TIMEOUTS.fake;
 
-	describe(`[${rt.name}] concurrent tenants`, () => {
+	describe.skipIf(!rt.capabilities.concurrentRestore)(`[${rt.name}] concurrent tenants`, () => {
 		let server: E2EServer;
 
 		afterEach(async () => {

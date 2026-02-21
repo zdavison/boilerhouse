@@ -1,7 +1,17 @@
 import { join } from "node:path";
+import { readdirSync } from "node:fs";
 import { generateNodeId } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
-import { FirecrackerRuntime } from "@boilerhouse/runtime-firecracker";
+import {
+	FirecrackerRuntime,
+	NetnsManagerImpl,
+	JailPreparer,
+	deriveNetnsConfig,
+} from "@boilerhouse/runtime-firecracker";
+import type {
+	FirecrackerConfig,
+	JailerConfig,
+} from "@boilerhouse/runtime-firecracker";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
 import { workloads as workloadsTable } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
@@ -13,7 +23,9 @@ import { IdleMonitor } from "./idle-monitor";
 import { EventBus } from "./event-bus";
 import { createApp } from "./app";
 import { recoverState } from "./recovery";
+import type { RecoveryOptions } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
+import { TapManager } from "./network/tap";
 
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
@@ -26,16 +38,45 @@ const snapshotDir = process.env.SNAPSHOT_DIR ?? join(storagePath, "snapshots");
 const instanceDir = process.env.INSTANCE_DIR ?? join(storagePath, "instances");
 const imagesDir = process.env.IMAGES_DIR ?? join(storagePath, "images");
 
-const db = initDatabase(dbPath);
-const nodeId = generateNodeId();
-const runtime = new FirecrackerRuntime({
+// Jailer configuration — enabled when JAILER_BIN is set
+const jailerBin = process.env.JAILER_BIN;
+const jailerChrootBase = process.env.JAILER_CHROOT_BASE ?? "/srv/jailer";
+const jailerUidStart = Number(process.env.JAILER_UID_START ?? 100000);
+const jailerGid = Number(process.env.JAILER_GID ?? 100000);
+
+const useJailer = !!jailerBin;
+
+// Build FirecrackerConfig
+const runtimeConfig: FirecrackerConfig = {
 	binaryPath: firecrackerBinary,
 	kernelPath,
 	snapshotDir,
 	instanceDir,
-	nodeId,
+	nodeId: undefined!, // Set after nodeId generation below
 	imagesDir,
-});
+};
+
+if (useJailer) {
+	const jailerConfig: JailerConfig = {
+		jailerPath: jailerBin,
+		chrootBaseDir: jailerChrootBase,
+		uidRangeStart: jailerUidStart,
+		gid: jailerGid,
+		daemonize: true,
+		newPidNs: true,
+		cgroupVersion: 2,
+	};
+	runtimeConfig.jailer = jailerConfig;
+	console.log(`Jailer mode: ${jailerBin} (chroot: ${jailerChrootBase})`);
+} else {
+	runtimeConfig.tapManager = new TapManager();
+}
+
+const db = initDatabase(dbPath);
+const nodeId = generateNodeId();
+runtimeConfig.nodeId = nodeId;
+
+const runtime = new FirecrackerRuntime(runtimeConfig);
 const activityLog = new ActivityLog(db);
 const eventBus = new EventBus();
 
@@ -97,11 +138,51 @@ idleMonitor.onIdle(async (instanceId, action) => {
 	console.log(`Idle timeout: instance=${instanceId} action=${action}`);
 });
 
+// Build recovery options with cleanup callbacks
+const recoveryOptions: RecoveryOptions = {};
+
+if (useJailer) {
+	const netnsManager = new NetnsManagerImpl();
+	const jailPreparer = new JailPreparer();
+
+	recoveryOptions.listNetns = () => netnsManager.list();
+	recoveryOptions.destroyNetns = async (nsName) => {
+		await netnsManager.destroy({
+			nsName,
+			nsPath: `/var/run/netns/${nsName}`,
+			tapName: "tap0",
+			tapIp: "",
+			tapMac: "",
+			vethHostIp: "",
+			guestIp: "",
+			vethHostName: "",
+		});
+	};
+	recoveryOptions.deriveNsName = (id) => deriveNetnsConfig(id).nsName;
+	recoveryOptions.listJails = async (chrootBaseDir) => {
+		const jailsDir = join(chrootBaseDir, "firecracker");
+		try {
+			return readdirSync(jailsDir);
+		} catch {
+			return [];
+		}
+	};
+	recoveryOptions.cleanJail = (id, chrootBaseDir) =>
+		jailPreparer.cleanup(id, chrootBaseDir);
+	recoveryOptions.chrootBaseDir = jailerChrootBase;
+}
+
 // Recover state before accepting requests
-const report = await recoverState(runtime, db, nodeId, activityLog);
-console.log(
-	`Recovery: ${report.recovered} recovered, ${report.destroyed} destroyed, ${report.orphanedTapsCleaned} orphaned TAPs cleaned`,
-);
+const report = await recoverState(runtime, db, nodeId, activityLog, recoveryOptions);
+
+const recoverySummary = [
+	`${report.recovered} recovered`,
+	`${report.destroyed} destroyed`,
+	`${report.orphanedTapsCleaned} orphaned TAPs`,
+	`${report.orphanedNetnsCleaned} orphaned netns`,
+	`${report.orphanedJailsCleaned} orphaned jails`,
+].join(", ");
+console.log(`Recovery: ${recoverySummary}`);
 
 // Ensure all workloads have golden snapshots
 {

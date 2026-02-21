@@ -124,6 +124,8 @@ export interface SnapshotSummary {
 	instanceId: string;
 	tenantId: string | null;
 	workloadId: string;
+	/** @example "minimal" */
+	workloadName: string | null;
 	nodeId: string;
 	sizeBytes: number;
 	createdAt: string;

@@ -17,7 +17,8 @@ import {
 } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
 import { FirecrackerRuntime } from "./runtime";
-import type { FirecrackerConfig, TapDevice, TapManager } from "./types";
+import type { FirecrackerConfig, TapDevice, TapManager, JailerConfig } from "./types";
+import { NetnsManagerImpl } from "./netns";
 
 const INTEGRATION = process.env.BOILERHOUSE_INTEGRATION === "1";
 
@@ -58,6 +59,30 @@ class IntegrationTapManager implements TapManager {
 		}
 
 		this.devices.set(instanceId, device);
+		return device;
+	}
+
+	async createFromDevice(device: TapDevice): Promise<TapDevice> {
+		const commands = [
+			`ip tuntap add dev ${device.name} mode tap`,
+			`ip addr add ${device.ip}/30 dev ${device.name}`,
+			`ip link set ${device.name} up`,
+		];
+
+		for (const cmd of commands) {
+			const proc = Bun.spawn(cmd.split(" "), {
+				stdout: "pipe",
+				stderr: "pipe",
+			});
+			const exitCode = await proc.exited;
+			if (exitCode !== 0) {
+				const stderr = await new Response(proc.stderr).text();
+				throw new Error(
+					`TAP setup failed (exit ${exitCode}): ${cmd}\n${stderr}`,
+				);
+			}
+		}
+
 		return device;
 	}
 
@@ -302,3 +327,201 @@ describe.skipIf(!INTEGRATION)("FirecrackerRuntime integration", () => {
 		expect(restored.running).toBe(true);
 	});
 });
+
+// ── Jailer Integration Tests ───────────────────────────────────────────────
+
+const IS_ROOT = process.getuid?.() === 0;
+
+const JAILER_WORKLOAD: Workload = {
+	workload: { name: "test-jailer", version: "1.0.0" },
+	image: { ref: "" },
+	resources: { vcpus: 1, memory_mb: 128, disk_gb: 1 },
+	network: { access: "none" },
+	idle: { action: "hibernate" },
+};
+
+describe.skipIf(!INTEGRATION || !IS_ROOT)(
+	"FirecrackerRuntime integration (jailer)",
+	() => {
+		let tmpDir: string;
+		let config: FirecrackerConfig;
+		let runtime: FirecrackerRuntime;
+		let netnsManager: NetnsManagerImpl;
+		const activeHandles: InstanceHandle[] = [];
+
+		beforeAll(() => {
+			tmpDir = mkdtempSync(join(tmpdir(), "fc-jailer-integ-"));
+
+			const binaryPath =
+				process.env.FIRECRACKER_BIN ?? "/usr/local/bin/firecracker";
+			const kernelPath =
+				process.env.FIRECRACKER_KERNEL ?? "/var/lib/firecracker/vmlinux";
+			const rootfsPath =
+				process.env.FIRECRACKER_ROOTFS ??
+				"/var/lib/firecracker/rootfs.ext4";
+			const jailerPath =
+				process.env.JAILER_BIN ?? "/usr/local/bin/jailer";
+
+			JAILER_WORKLOAD.image.ref = rootfsPath;
+
+			netnsManager = new NetnsManagerImpl();
+
+			const jailerConfig: JailerConfig = {
+				jailerPath,
+				chrootBaseDir: join(tmpDir, "jailer"),
+				uidRangeStart: 200000,
+				gid: 200000,
+				daemonize: true,
+				newPidNs: true,
+				cgroupVersion: 2,
+			};
+
+			config = {
+				binaryPath,
+				kernelPath,
+				snapshotDir: join(tmpDir, "snapshots"),
+				instanceDir: join(tmpDir, "instances"),
+				imagesDir: join(tmpDir, "images"),
+				nodeId: "test-jailer-node" as NodeId,
+				jailer: jailerConfig,
+				bootArgs: "console=ttyS0 reboot=k panic=1 pci=off",
+				cpuTemplate: "None",
+			};
+
+			runtime = new FirecrackerRuntime(config);
+		});
+
+		afterEach(async () => {
+			for (const handle of activeHandles) {
+				try {
+					await runtime.destroy(handle);
+				} catch {
+					// Best-effort cleanup
+				}
+			}
+			activeHandles.length = 0;
+		});
+
+		afterAll(() => {
+			rmSync(tmpDir, { recursive: true, force: true });
+		});
+
+		test("create() boots a VM in a chroot", async () => {
+			const instanceId = generateInstanceId();
+			const handle = await runtime.create(JAILER_WORKLOAD, instanceId);
+			activeHandles.push(handle);
+
+			expect(handle.instanceId).toBe(instanceId);
+			expect(handle.running).toBe(false);
+
+			// Chroot directory should exist
+			const chrootRoot = join(
+				config.jailer!.chrootBaseDir,
+				"firecracker",
+				instanceId,
+				"root",
+			);
+			expect(existsSync(chrootRoot)).toBe(true);
+
+			await runtime.start(handle);
+			expect(handle.running).toBe(true);
+		});
+
+		test("VM process runs as unprivileged UID", async () => {
+			const instanceId = generateInstanceId();
+			const handle = await runtime.create(JAILER_WORKLOAD, instanceId);
+			activeHandles.push(handle);
+			await runtime.start(handle);
+
+			// Check that the Firecracker process is running as the derived UID
+			const pidFile = join(
+				config.jailer!.chrootBaseDir,
+				"firecracker",
+				instanceId,
+				"root",
+				"firecracker.pid",
+			);
+			if (existsSync(pidFile)) {
+				const pid = (await Bun.file(pidFile).text()).trim();
+				const proc = Bun.spawn(["ps", "-o", "uid=", "-p", pid], {
+					stdout: "pipe",
+					stderr: "pipe",
+				});
+				const stdout = await new Response(proc.stdout).text();
+				const uid = Number(stdout.trim());
+				expect(uid).toBeGreaterThanOrEqual(
+					config.jailer!.uidRangeStart,
+				);
+			}
+		});
+
+		test("VM is in its own network namespace", async () => {
+			const instanceId = generateInstanceId();
+			const handle = await runtime.create(JAILER_WORKLOAD, instanceId);
+			activeHandles.push(handle);
+
+			const nsList = await netnsManager.list();
+			const hasNs = nsList.some((ns) => ns.startsWith("fc-"));
+			expect(hasNs).toBe(true);
+		});
+
+		test("destroy() removes chroot and namespace", async () => {
+			const instanceId = generateInstanceId();
+			const handle = await runtime.create(JAILER_WORKLOAD, instanceId);
+			await runtime.start(handle);
+
+			const chrootDir = join(
+				config.jailer!.chrootBaseDir,
+				"firecracker",
+				instanceId,
+			);
+			expect(existsSync(chrootDir)).toBe(true);
+
+			await runtime.destroy(handle);
+
+			expect(handle.running).toBe(false);
+			expect(existsSync(chrootDir)).toBe(false);
+		});
+
+		test("snapshot() creates files and copies them out of chroot", async () => {
+			const instanceId = generateInstanceId();
+			const handle = await runtime.create(JAILER_WORKLOAD, instanceId);
+			activeHandles.push(handle);
+			await runtime.start(handle);
+
+			const ref = await runtime.snapshot(handle);
+
+			expect(ref.id).toBeDefined();
+			expect(existsSync(ref.paths.vmstate)).toBe(true);
+			expect(existsSync(ref.paths.memory)).toBe(true);
+
+			const snapshotDir = join(config.snapshotDir, ref.id);
+			expect(existsSync(join(snapshotDir, "rootfs.ext4"))).toBe(true);
+		});
+
+		test("restore() creates new jail with snapshot state", async () => {
+			const instanceId = generateInstanceId();
+			const handle = await runtime.create(JAILER_WORKLOAD, instanceId);
+			activeHandles.push(handle);
+			await runtime.start(handle);
+
+			const ref = await runtime.snapshot(handle);
+
+			const newInstanceId = generateInstanceId();
+			const restored = await runtime.restore(ref, newInstanceId);
+			activeHandles.push(restored);
+
+			expect(restored.instanceId).toBe(newInstanceId);
+			expect(restored.running).toBe(true);
+
+			// New chroot should exist
+			const newChrootRoot = join(
+				config.jailer!.chrootBaseDir,
+				"firecracker",
+				newInstanceId,
+				"root",
+			);
+			expect(existsSync(newChrootRoot)).toBe(true);
+		});
+	},
+);

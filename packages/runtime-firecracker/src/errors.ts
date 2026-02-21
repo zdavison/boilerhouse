@@ -56,3 +56,30 @@ export class OverlayError extends FirecrackerError {
 		this.name = "OverlayError";
 	}
 }
+
+/** Error during network namespace operations. */
+export class NetnsError extends FirecrackerError {
+	constructor(message: string) {
+		super(message);
+		this.name = "NetnsError";
+	}
+}
+
+/** Error during jail preparation or cleanup. */
+export class JailError extends FirecrackerError {
+	constructor(message: string) {
+		super(message);
+		this.name = "JailError";
+	}
+}
+
+/** Error from the jailer process itself. */
+export class JailerProcessError extends FirecrackerError {
+	constructor(
+		message: string,
+		public readonly exitCode?: number,
+	) {
+		super(message);
+		this.name = "JailerProcessError";
+	}
+}

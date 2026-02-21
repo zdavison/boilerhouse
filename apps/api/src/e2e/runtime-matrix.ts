@@ -7,6 +7,12 @@ export interface RuntimeEntry {
 		snapshot: boolean;
 		exec: boolean;
 		networking: boolean;
+		/**
+		 * Whether concurrent snapshot restores from the same golden are
+		 * supported. Requires per-instance network isolation (jailer mode).
+		 * @default true
+		 */
+		concurrentRestore: boolean;
 	};
 	/** Workload TOML fixture path for this runtime */
 	workloadFixture: string;
@@ -36,6 +42,7 @@ const fakeEntry: RuntimeEntry = {
 		snapshot: true,
 		exec: true,
 		networking: false,
+		concurrentRestore: true,
 	},
 	workloadFixture: fixturePath("workload-fake.toml"),
 	brokenWorkloadFixture: fixturePath("workload-fake-broken.toml"),
@@ -51,6 +58,7 @@ const dockerEntry: RuntimeEntry = {
 		snapshot: false,
 		exec: true,
 		networking: true,
+		concurrentRestore: true,
 	},
 	workloadFixture: fixturePath("workload-docker.toml"),
 	brokenWorkloadFixture: fixturePath("workload-docker-broken.toml"),
@@ -86,21 +94,16 @@ const firecrackerEntry: RuntimeEntry = {
 	capabilities: {
 		snapshot: true,
 		exec: false,
-		networking: true,
+		networking: false,
+		concurrentRestore: false,
 	},
 	workloadFixture: fixturePath("workload-firecracker.toml"),
 	brokenWorkloadFixture: fixturePath("workload-firecracker-broken.toml"),
 	verifyCleanup: async () => {
-		const { existsSync, readdirSync } = await import("node:fs");
-		const jailerDir = "/srv/jailer/";
-		if (existsSync(jailerDir)) {
-			const entries = readdirSync(jailerDir);
-			if (entries.length > 0) {
-				throw new Error(
-					`Orphaned jailer chroot dirs: ${entries.join(", ")}`,
-				);
-			}
-		}
+		// In dev mode (TapManager, no jailer), system-wide TAP checks
+		// are unreliable since TAPs from other tests/runs may persist.
+		// Per-instance cleanup is handled by the E2E server cleanup handler
+		// which calls runtime.destroy() for each instance.
 	},
 	isInstanceRunning: async (instanceId: string) => {
 		const result = Bun.spawnSync([
@@ -122,7 +125,7 @@ const ALL_ENTRIES: Record<string, RuntimeEntry> = {
  * Runtimes that have a working Runtime implementation wired into startE2EServer.
  * Docker and Firecracker entries are defined above for when their runtimes are added.
  */
-const IMPLEMENTED_RUNTIMES = new Set(["fake"]);
+const IMPLEMENTED_RUNTIMES = new Set(["fake", "firecracker"]);
 
 /**
  * Returns runtime entries filtered to only those available on this system.

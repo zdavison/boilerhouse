@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { eq, and } from "drizzle-orm";
 import type {
 	Runtime,
@@ -111,6 +112,8 @@ export class SnapshotManager {
 				)
 				.run();
 
+			const sizeBytes = this.computeSnapshotSize(goldenRef);
+
 			this.db
 				.insert(snapshots)
 				.values({
@@ -122,7 +125,7 @@ export class SnapshotManager {
 					nodeId: this.nodeId,
 					vmstatePath: goldenRef.paths.vmstate,
 					memoryPath: goldenRef.paths.memory,
-					sizeBytes: 0,
+					sizeBytes,
 					runtimeMeta: goldenRef.runtimeMeta as Record<string, unknown>,
 					createdAt: new Date(),
 				})
@@ -193,5 +196,23 @@ export class SnapshotManager {
 	/** Fast boolean check for whether a golden snapshot exists. */
 	goldenExists(workloadId: WorkloadId, nodeId: NodeId): boolean {
 		return this.getGolden(workloadId, nodeId) !== null;
+	}
+
+	/** Computes total size of snapshot files (vmstate + memory). */
+	private computeSnapshotSize(ref: SnapshotRef): number {
+		let total = 0;
+		try {
+			total += statSync(ref.paths.vmstate).size;
+		} catch {
+			// File may not exist yet or be inaccessible
+		}
+		if (ref.paths.memory) {
+			try {
+				total += statSync(ref.paths.memory).size;
+			} catch {
+				// File may not exist yet or be inaccessible
+			}
+		}
+		return total;
 	}
 }

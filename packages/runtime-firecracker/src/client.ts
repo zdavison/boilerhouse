@@ -29,6 +29,14 @@ export class FirecrackerClient {
 		await this.request("PUT", `/drives/${driveId}`, body);
 	}
 
+	/** Updates drive properties after snapshot load (e.g. path_on_host). */
+	async patchDrive(
+		driveId: string,
+		body: Partial<DriveRequest>,
+	): Promise<void> {
+		await this.request("PATCH", `/drives/${driveId}`, body);
+	}
+
 	async putNetworkInterface(
 		ifaceId: string,
 		body: NetworkInterfaceRequest,

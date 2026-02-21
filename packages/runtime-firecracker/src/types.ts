@@ -12,6 +12,8 @@ export interface TapDevice {
 
 export interface TapManager {
 	create(instanceId: InstanceId): Promise<TapDevice>;
+	/** Recreates a TAP device with a specific config (for snapshot restore). */
+	createFromDevice(device: TapDevice): Promise<TapDevice>;
 	destroy(device: TapDevice): Promise<void>;
 }
 
@@ -112,6 +114,93 @@ export interface FirecrackerErrorBody {
 	fault_message: string;
 }
 
+// ── Jailer types ───────────────────────────────────────────────────────────
+
+export interface JailerConfig {
+	/**
+	 * Path to the jailer binary.
+	 * @default "/usr/local/bin/jailer"
+	 */
+	jailerPath: string;
+	/**
+	 * Base directory for chroot jails.
+	 * @default "/srv/jailer"
+	 */
+	chrootBaseDir: string;
+	/**
+	 * Start of the UID range for per-VM isolation.
+	 * @default 100000
+	 */
+	uidRangeStart: number;
+	/**
+	 * GID for all jailed processes.
+	 * @default 100000
+	 */
+	gid: number;
+	/**
+	 * Whether the jailer should daemonize.
+	 * @default true
+	 */
+	daemonize: boolean;
+	/**
+	 * Whether to create a new PID namespace.
+	 * @default true
+	 */
+	newPidNs: boolean;
+	/**
+	 * Cgroup version to use.
+	 * @default 2
+	 */
+	cgroupVersion: 1 | 2;
+}
+
+export interface NetnsHandle {
+	/** Network namespace name, e.g. "fc-a1b2c3d4". */
+	nsName: string;
+	/**
+	 * Path to the namespace in /var/run/netns/.
+	 * @example "/var/run/netns/fc-a1b2c3d4"
+	 */
+	nsPath: string;
+	/** TAP device name inside the namespace. */
+	tapName: string;
+	/** TAP device IP (gateway for the guest). */
+	tapIp: string;
+	/** MAC address of the TAP device. */
+	tapMac: string;
+	/** Host-side IP on the veth pair. */
+	vethHostIp: string;
+	/** Guest IP derived for the VM. */
+	guestIp: string;
+	/**
+	 * Host-side veth interface name.
+	 * @example "veth-a1b2c3-h"
+	 */
+	vethHostName: string;
+}
+
+export interface JailPaths {
+	/**
+	 * Chroot root directory.
+	 * @example "/srv/jailer/firecracker/inst-abc123/root"
+	 */
+	chrootRoot: string;
+	/** Host-side API socket path. */
+	apiSocket: string;
+	/**
+	 * Kernel path relative to chroot root.
+	 * @example "vmlinux"
+	 */
+	kernelRelative: string;
+	/**
+	 * Rootfs path relative to chroot root.
+	 * @example "rootfs.ext4"
+	 */
+	rootfsRelative: string;
+	/** Log file path outside the chroot. */
+	logPath: string;
+}
+
 // ── Config ──────────────────────────────────────────────────────────────────
 
 export interface FirecrackerConfig {
@@ -125,8 +214,16 @@ export interface FirecrackerConfig {
 	instanceDir: string;
 	/** Node ID of the host running this runtime. */
 	nodeId: NodeId;
-	/** TAP device manager for network setup. */
-	tapManager: TapManager;
+	/**
+	 * TAP device manager for network setup (dev mode).
+	 * Required when `jailer` is not set.
+	 */
+	tapManager?: TapManager;
+	/**
+	 * Jailer configuration for production isolation.
+	 * When set, the runtime uses jailer-based spawning with network namespaces.
+	 */
+	jailer?: JailerConfig;
 	/**
 	 * Kernel boot arguments.
 	 * @default "console=ttyS0 reboot=k panic=1 pci=off"

@@ -1,13 +1,18 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import type { Runtime } from "@boilerhouse/core";
 import { createTestDatabase, ActivityLog, nodes } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
+import { FirecrackerRuntime } from "@boilerhouse/runtime-firecracker";
 import { InstanceManager } from "../instance-manager";
 import { SnapshotManager } from "../snapshot-manager";
 import { TenantManager } from "../tenant-manager";
 import { TenantDataStore } from "../tenant-data";
 import { EventBus } from "../event-bus";
 import { ResourceLimiter } from "../resource-limits";
+import { TapManager } from "../network/tap";
 import { createApp } from "../app";
 import { E2E_TIMEOUTS } from "./runtime-matrix";
 
@@ -61,12 +66,47 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 
 	let runtime: Runtime;
 	let fakeFailOn: Set<RuntimeOperation> | undefined;
+	let runtimeCleanup: (() => Promise<void>) | undefined;
 
 	if (runtimeName === "fake") {
 		fakeFailOn = new Set<RuntimeOperation>();
 		runtime = new FakeRuntime({ failOn: fakeFailOn });
+	} else if (runtimeName === "firecracker") {
+		const instanceDir = mkdtempSync(join(tmpdir(), "bh-e2e-fc-inst-"));
+		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-e2e-fc-snap-"));
+
+		const binaryPath =
+			process.env.FIRECRACKER_BIN ?? "/usr/local/bin/firecracker";
+		const kernelPath =
+			process.env.FIRECRACKER_KERNEL ?? "/var/lib/boilerhouse/vmlinux";
+		const imagesDir =
+			process.env.FIRECRACKER_IMAGES_DIR ?? "/var/lib/boilerhouse/images";
+
+		const tapManager = new TapManager();
+		const fcRuntime = new FirecrackerRuntime({
+			binaryPath,
+			kernelPath,
+			instanceDir,
+			snapshotDir,
+			imagesDir,
+			nodeId,
+			tapManager,
+		});
+		runtime = fcRuntime;
+
+		runtimeCleanup = async () => {
+			const ids = await fcRuntime.list();
+			for (const id of ids) {
+				try {
+					await fcRuntime.destroy({ instanceId: id, running: false });
+				} catch {
+					// Best-effort cleanup
+				}
+			}
+			rmSync(instanceDir, { recursive: true, force: true });
+			rmSync(snapshotDir, { recursive: true, force: true });
+		};
 	} else {
-		// Real runtimes (docker, firecracker) would be wired here
 		throw new Error(`Runtime '${runtimeName}' not implemented for E2E`);
 	}
 
@@ -115,6 +155,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		cleanup: async () => {
 			server.stop();
 			resourceLimiter.dispose();
+			if (runtimeCleanup) await runtimeCleanup();
 		},
 	};
 }
