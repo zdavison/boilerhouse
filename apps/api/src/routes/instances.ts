@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { eq } from "drizzle-orm";
 import type { InstanceId, InstanceStatus } from "@boilerhouse/core";
+import { InvalidTransitionError } from "@boilerhouse/core";
 import { instances } from "@boilerhouse/db";
 import type { RouteDeps } from "./deps";
 
@@ -95,7 +96,15 @@ export function instanceRoutes(deps: RouteDeps) {
 				return { error: `Instance '${params.id}' not found` };
 			}
 
-			await instanceManager.stop(instanceId);
+			try {
+				await instanceManager.stop(instanceId);
+			} catch (err) {
+				if (err instanceof InvalidTransitionError) {
+					set.status = 409;
+					return { error: err.message };
+				}
+				throw err;
+			}
 
 			eventBus.emit({
 				type: "instance.state",
@@ -120,7 +129,16 @@ export function instanceRoutes(deps: RouteDeps) {
 				return { error: `Instance '${params.id}' not found` };
 			}
 
-			const ref = await instanceManager.hibernate(instanceId);
+			let ref;
+			try {
+				ref = await instanceManager.hibernate(instanceId);
+			} catch (err) {
+				if (err instanceof InvalidTransitionError) {
+					set.status = 409;
+					return { error: err.message };
+				}
+				throw err;
+			}
 
 			eventBus.emit({
 				type: "instance.state",
@@ -149,7 +167,15 @@ export function instanceRoutes(deps: RouteDeps) {
 				return { error: `Instance '${params.id}' not found` };
 			}
 
-			await instanceManager.destroy(instanceId);
+			try {
+				await instanceManager.destroy(instanceId);
+			} catch (err) {
+				if (err instanceof InvalidTransitionError) {
+					set.status = 409;
+					return { error: err.message };
+				}
+				throw err;
+			}
 
 			eventBus.emit({
 				type: "instance.state",

@@ -1,0 +1,13 @@
+[workload]
+name = "e2e-firecracker"
+version = "1.0.0"
+
+[image]
+ref = "firecracker-minimal:latest"
+
+[resources]
+vcpus = 1
+memory_mb = 128
+
+[idle]
+action = "hibernate"

@@ -1,0 +1,13 @@
+[workload]
+name = "e2e-docker-broken"
+version = "1.0.0"
+
+[image]
+ref = "boilerhouse/no-such-image:never"
+
+[resources]
+vcpus = 1
+memory_mb = 256
+
+[idle]
+action = "destroy"

@@ -1,0 +1,17 @@
+[workload]
+name = "e2e-docker"
+version = "1.0.0"
+
+[image]
+ref = "alpine:latest"
+
+[resources]
+vcpus = 1
+memory_mb = 256
+
+[network]
+access = "none"
+expose = [{ guest = 8080, host_range = [30000, 31000] }]
+
+[idle]
+action = "destroy"

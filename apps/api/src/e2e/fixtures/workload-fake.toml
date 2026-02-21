@@ -1,0 +1,13 @@
+[workload]
+name = "e2e-fake"
+version = "1.0.0"
+
+[image]
+ref = "fake:latest"
+
+[resources]
+vcpus = 1
+memory_mb = 256
+
+[idle]
+action = "hibernate"

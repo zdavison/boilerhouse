@@ -1,0 +1,13 @@
+[workload]
+name = "e2e-firecracker-broken"
+version = "1.0.0"
+
+[image]
+ref = "/nonexistent/kernel/path"
+
+[resources]
+vcpus = 1
+memory_mb = 128
+
+[idle]
+action = "destroy"
