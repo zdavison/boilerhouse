@@ -33,7 +33,7 @@ export class TenantDataStore {
 	 * Returns the path to the stored overlay for this tenant+workload,
 	 * or `null` if no overlay exists.
 	 */
-	restoreOverlay(tenantId: TenantId, _workloadId: WorkloadId): string | null {
+	restoreOverlay(tenantId: TenantId): string | null {
 		const row = this.db
 			.select({ dataOverlayRef: tenants.dataOverlayRef })
 			.from(tenants)

@@ -97,7 +97,6 @@ beforeEach(() => {
 		snapshotManager,
 		db,
 		log,
-		runtime,
 		nodeId,
 		tenantDataStore,
 	);
@@ -250,14 +249,14 @@ describe("TenantManager", () => {
 			expect(second.source).toBe("existing");
 		});
 
-		test("returns endpoint with host + port", async () => {
+		test("returns endpoint with host + ports", async () => {
 			const tenantId = generateTenantId();
 
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const result = await tenantManager.claim(tenantId, workloadId);
 
 			expect(result.endpoint.host).toBeTruthy();
-			expect(result.endpoint.port).toBeGreaterThan(0);
+			expect(result.endpoint.ports.length).toBeGreaterThan(0);
 		});
 
 		test("response includes latencyMs >= 0", async () => {
@@ -326,7 +325,6 @@ describe("TenantManager", () => {
 				snapshotManager,
 				db,
 				log,
-				runtime,
 				nodeId,
 				tenantDataStore,
 			);

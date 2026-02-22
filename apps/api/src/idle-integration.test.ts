@@ -105,7 +105,6 @@ beforeEach(() => {
 		snapshotManager,
 		db,
 		log,
-		runtime,
 		nodeId,
 		tenantDataStore,
 		idleMonitor,

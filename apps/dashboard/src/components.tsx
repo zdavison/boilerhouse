@@ -299,18 +299,17 @@ export function ConnectionModal({
 				<div className="space-y-3">
 					<div className="grid grid-cols-2 gap-3">
 						<InfoCard label="Host" value={endpointData.endpoint.host} />
-						<InfoCard label="Port" value={String(endpointData.endpoint.port)} />
+						<InfoCard label="Ports" value={endpointData.endpoint.ports.join(", ")} />
 					</div>
 					<InfoCard label="Instance" value={endpointData.instanceId} />
 					<InfoCard label="Status" value={endpointData.status} />
 					<div className="bg-surface-2 rounded-md p-3">
 						<p className="text-xs font-tight uppercase tracking-wider text-muted mb-2">Connect via</p>
-						<pre className="text-xs font-mono text-muted-light select-all">
-							ssh root@{endpointData.endpoint.host} -p {endpointData.endpoint.port}
-						</pre>
-						<pre className="text-xs font-mono text-muted-light select-all mt-1">
-							curl http://{endpointData.endpoint.host}:{endpointData.endpoint.port}/
-						</pre>
+						{endpointData.endpoint.ports.map((port: number) => (
+							<pre key={port} className="text-xs font-mono text-muted-light select-all mt-1">
+								curl http://{endpointData.endpoint.host}:{port}/
+							</pre>
+						))}
 					</div>
 				</div>
 			)}

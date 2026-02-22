@@ -8,11 +8,22 @@ import type {
 	TenantId,
 	SnapshotRef,
 	Workload,
+	Endpoint,
 } from "@boilerhouse/core";
-import { generateInstanceId } from "@boilerhouse/core";
+import { generateInstanceId, canTransition, InvalidTransitionError } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { instances, snapshots, tenants } from "@boilerhouse/db";
-import { InstanceActor, SnapshotActor, TenantActor } from "./actors";
+import {
+	applyInstanceTransition,
+	applySnapshotTransition,
+	applyTenantTransition,
+} from "./transitions";
+import type { EventBus } from "./event-bus";
+
+/** Derives an InstanceHandle from a DB row's status. */
+export function instanceHandleFrom(instanceId: InstanceId, status: string): InstanceHandle {
+	return { instanceId, running: status === "active" };
+}
 
 export class SnapshotNotFoundError extends Error {
 	constructor(snapshotId: string) {
@@ -27,6 +38,7 @@ export class InstanceManager {
 		private readonly db: DrizzleDb,
 		private readonly activityLog: ActivityLog,
 		private readonly nodeId: NodeId,
+		private readonly eventBus?: EventBus,
 	) {}
 
 	async create(
@@ -50,8 +62,7 @@ export class InstanceManager {
 			const handle = await this.runtime.create(workload, instanceId);
 			await this.runtime.start(handle);
 
-			const actor = new InstanceActor(this.db, instanceId);
-			actor.send("started");
+			applyInstanceTransition(this.db, instanceId, "starting", "started");
 
 			this.activityLog.log({
 				event: "instance.created",
@@ -79,17 +90,13 @@ export class InstanceManager {
 
 		if (!row) return;
 
-		const handle: InstanceHandle = {
-			instanceId,
-			running: row.status === "active",
-		};
+		const handle = instanceHandleFrom(instanceId, row.status);
 
-		const actor = new InstanceActor(this.db, instanceId);
-		actor.send("destroy");
+		applyInstanceTransition(this.db, instanceId, row.status, "destroy");
 
 		await this.runtime.destroy(handle);
 
-		actor.send("destroyed");
+		applyInstanceTransition(this.db, instanceId, "destroying", "destroyed");
 
 		if (row.tenantId) {
 			const tenantRow = this.db
@@ -99,9 +106,8 @@ export class InstanceManager {
 				.get();
 
 			if (tenantRow?.status === "active") {
-				const tenantActor = new TenantActor(this.db, row.tenantId);
-				tenantActor.send("release");
-				tenantActor.send("destroyed");
+				applyTenantTransition(this.db, row.tenantId, "active", "release");
+				applyTenantTransition(this.db, row.tenantId, "releasing", "destroyed");
 
 				this.db
 					.update(tenants)
@@ -118,6 +124,14 @@ export class InstanceManager {
 			workloadId: row.workloadId,
 			tenantId: row.tenantId,
 		});
+
+		this.eventBus?.emit({
+			type: "instance.state",
+			instanceId,
+			status: "destroyed",
+			workloadId: row.workloadId,
+			tenantId: row.tenantId ?? undefined,
+		});
 	}
 
 	async hibernate(instanceId: InstanceId): Promise<SnapshotRef> {
@@ -131,13 +145,11 @@ export class InstanceManager {
 			throw new Error(`Instance not found: ${instanceId}`);
 		}
 
-		const actor = new InstanceActor(this.db, instanceId);
-		actor.validate("hibernate");
+		if (!canTransition(row.status, "hibernate")) {
+			throw new InvalidTransitionError("instance", row.status, "hibernate");
+		}
 
-		const handle: InstanceHandle = {
-			instanceId,
-			running: row.status === "active",
-		};
+		const handle = instanceHandleFrom(instanceId, row.status);
 
 		let ref: SnapshotRef;
 		try {
@@ -172,12 +184,11 @@ export class InstanceManager {
 			})
 			.run();
 
-		const snapActor = new SnapshotActor(this.db, correctedRef.id);
-		snapActor.send("created");
+		applySnapshotTransition(this.db, correctedRef.id, "creating", "created");
 
 		await this.runtime.destroy(handle);
 
-		actor.send("hibernate");
+		applyInstanceTransition(this.db, instanceId, row.status, "hibernate");
 
 		if (row.tenantId) {
 			// Delete the previous tenant snapshot (keep only the latest)
@@ -204,9 +215,8 @@ export class InstanceManager {
 			// (not through the tenant release flow). Transition the tenant to
 			// "released" and clear its instanceId so it can be re-claimed.
 			if (tenantRow?.status === "active") {
-				const tenantActor = new TenantActor(this.db, row.tenantId);
-				tenantActor.send("release");
-				tenantActor.send("hibernated");
+				applyTenantTransition(this.db, row.tenantId, "active", "release");
+				applyTenantTransition(this.db, row.tenantId, "releasing", "hibernated");
 
 				this.db
 					.update(tenants)
@@ -223,6 +233,14 @@ export class InstanceManager {
 			workloadId: row.workloadId,
 			tenantId: row.tenantId,
 			metadata: { snapshotId: correctedRef.id },
+		});
+
+		this.eventBus?.emit({
+			type: "instance.state",
+			instanceId,
+			status: "hibernated",
+			workloadId: row.workloadId,
+			tenantId: row.tenantId ?? undefined,
 		});
 
 		return correctedRef;
@@ -259,8 +277,7 @@ export class InstanceManager {
 
 		const handle = await this.runtime.restore(ref, instanceId);
 
-		const actor = new InstanceActor(this.db, instanceId);
-		actor.send("started");
+		applyInstanceTransition(this.db, instanceId, "starting", "started");
 
 		this.activityLog.log({
 			event: "instance.restored",
@@ -275,5 +292,9 @@ export class InstanceManager {
 		});
 
 		return handle;
+	}
+
+	async getEndpoint(handle: InstanceHandle): Promise<Endpoint> {
+		return this.runtime.getEndpoint(handle);
 	}
 }

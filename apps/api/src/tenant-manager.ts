@@ -1,19 +1,18 @@
 import { eq, and } from "drizzle-orm";
 import type {
-	Runtime,
 	InstanceId,
 	WorkloadId,
 	NodeId,
 	TenantId,
 	SnapshotId,
 	SnapshotRef,
-	SnapshotMetadata,
 	Endpoint,
 	TenantStatus,
 } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
-import { instances, snapshots, tenants, workloads } from "@boilerhouse/db";
-import { TenantActor } from "./actors";
+import { instances, snapshots, tenants, workloads, snapshotRefFrom } from "@boilerhouse/db";
+import { applyTenantTransition } from "./transitions";
+import { instanceHandleFrom } from "./instance-manager";
 import type { InstanceManager } from "./instance-manager";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { TenantDataStore } from "./tenant-data";
@@ -44,7 +43,6 @@ export class TenantManager {
 		private readonly snapshotManager: SnapshotManager,
 		private readonly db: DrizzleDb,
 		private readonly activityLog: ActivityLog,
-		private readonly runtime: Runtime,
 		private readonly nodeId: NodeId,
 		private readonly tenantDataStore: TenantDataStore,
 		private readonly idleMonitor?: IdleMonitor,
@@ -73,11 +71,8 @@ export class TenantManager {
 			.get();
 
 		if (existingInstance) {
-			const handle = {
-				instanceId: existingInstance.instanceId,
-				running: true,
-			};
-			const endpoint = await this.runtime.getEndpoint(handle);
+			const handle = instanceHandleFrom(existingInstance.instanceId, existingInstance.status);
+			const endpoint = await this.instanceManager.getEndpoint(handle);
 
 			return {
 				tenantId,
@@ -98,32 +93,13 @@ export class TenantManager {
 		if (tenantRow?.lastSnapshotId) {
 			const snapshotRef = this.getSnapshotRef(tenantRow.lastSnapshotId);
 			if (snapshotRef) {
-				const handle = await this.instanceManager.restoreFromSnapshot(
-					snapshotRef,
-					tenantId,
-				);
-
-				this.upsertTenant(tenantId, workloadId, handle.instanceId);
-				this.updateInstanceClaimed(handle.instanceId);
-
-				const endpoint = await this.runtime.getEndpoint(handle);
-
-				this.logClaim(tenantId, handle.instanceId, workloadId, "snapshot");
-				this.startIdleWatch(handle.instanceId, workloadId);
-
-				return {
-					tenantId,
-					instanceId: handle.instanceId,
-					endpoint,
-					source: "snapshot",
-					latencyMs: performance.now() - start,
-				};
+				return this.restoreAndClaim(snapshotRef, tenantId, workloadId, "snapshot", start);
 			}
 		}
 
 		// 3. Check for data overlay (cold+data path)
 		const overlayPath = tenantRow
-			? this.tenantDataStore.restoreOverlay(tenantId, workloadId)
+			? this.tenantDataStore.restoreOverlay(tenantId)
 			: null;
 
 		if (overlayPath) {
@@ -132,26 +108,7 @@ export class TenantManager {
 				throw new NoGoldenSnapshotError(workloadId, this.nodeId);
 			}
 
-			const handle = await this.instanceManager.restoreFromSnapshot(
-				goldenRef,
-				tenantId,
-			);
-
-			this.upsertTenant(tenantId, workloadId, handle.instanceId);
-			this.updateInstanceClaimed(handle.instanceId);
-
-			const endpoint = await this.runtime.getEndpoint(handle);
-
-			this.logClaim(tenantId, handle.instanceId, workloadId, "cold+data");
-			this.startIdleWatch(handle.instanceId, workloadId);
-
-			return {
-				tenantId,
-				instanceId: handle.instanceId,
-				endpoint,
-				source: "cold+data",
-				latencyMs: performance.now() - start,
-			};
+			return this.restoreAndClaim(goldenRef, tenantId, workloadId, "cold+data", start);
 		}
 
 		// 4. Fresh from golden
@@ -160,26 +117,7 @@ export class TenantManager {
 			throw new NoGoldenSnapshotError(workloadId, this.nodeId);
 		}
 
-		const handle = await this.instanceManager.restoreFromSnapshot(
-			goldenRef,
-			tenantId,
-		);
-
-		this.upsertTenant(tenantId, workloadId, handle.instanceId);
-		this.updateInstanceClaimed(handle.instanceId);
-
-		const endpoint = await this.runtime.getEndpoint(handle);
-
-		this.logClaim(tenantId, handle.instanceId, workloadId, "golden");
-		this.startIdleWatch(handle.instanceId, workloadId);
-
-		return {
-			tenantId,
-			instanceId: handle.instanceId,
-			endpoint,
-			source: "golden",
-			latencyMs: performance.now() - start,
-		};
+		return this.restoreAndClaim(goldenRef, tenantId, workloadId, "golden", start);
 	}
 
 	/**
@@ -198,8 +136,8 @@ export class TenantManager {
 
 		const instanceId = tenantRow.instanceId;
 
-		const actor = new TenantActor(this.db, tenantId);
-		actor.send("release");
+		const tenantStatus = tenantRow.status as TenantStatus;
+		applyTenantTransition(this.db, tenantId, tenantStatus, "release");
 
 		if (this.idleMonitor) {
 			this.idleMonitor.unwatch(instanceId);
@@ -216,10 +154,10 @@ export class TenantManager {
 
 		if (idleAction === "hibernate") {
 			await this.instanceManager.hibernate(instanceId);
-			actor.send("hibernated");
+			applyTenantTransition(this.db, tenantId, "releasing", "hibernated");
 		} else {
 			await this.instanceManager.destroy(instanceId);
-			actor.send("destroyed");
+			applyTenantTransition(this.db, tenantId, "releasing", "destroyed");
 		}
 
 		// Clear instanceId on tenant row (lastSnapshotId is preserved by hibernate)
@@ -238,7 +176,32 @@ export class TenantManager {
 		});
 	}
 
-	/** Reconstructs a SnapshotRef from a snapshot DB row. */
+	private async restoreAndClaim(
+		ref: SnapshotRef,
+		tenantId: TenantId,
+		workloadId: WorkloadId,
+		source: ClaimSource,
+		start: number,
+	): Promise<ClaimResult> {
+		const handle = await this.instanceManager.restoreFromSnapshot(ref, tenantId);
+
+		this.upsertTenant(tenantId, workloadId, handle.instanceId);
+		this.updateInstanceClaimed(handle.instanceId);
+
+		const endpoint = await this.instanceManager.getEndpoint(handle);
+
+		this.logClaim(tenantId, handle.instanceId, workloadId, source);
+		this.startIdleWatch(handle.instanceId, workloadId);
+
+		return {
+			tenantId,
+			instanceId: handle.instanceId,
+			endpoint,
+			source,
+			latencyMs: performance.now() - start,
+		};
+	}
+
 	private getSnapshotRef(snapshotId: SnapshotId): SnapshotRef | null {
 		const row = this.db
 			.select()
@@ -248,27 +211,7 @@ export class TenantManager {
 
 		if (!row) return null;
 
-		const meta = row.runtimeMeta as Record<string, unknown> | null;
-		if (
-			!meta ||
-			typeof meta.runtimeVersion !== "string" ||
-			typeof meta.cpuTemplate !== "string" ||
-			typeof meta.architecture !== "string"
-		) {
-			return null;
-		}
-
-		return {
-			id: row.snapshotId,
-			type: row.type,
-			paths: {
-				memory: row.memoryPath ?? "",
-				vmstate: row.vmstatePath,
-			},
-			workloadId: row.workloadId,
-			nodeId: row.nodeId,
-			runtimeMeta: meta as unknown as SnapshotMetadata,
-		};
+		return snapshotRefFrom(row);
 	}
 
 	/**
@@ -287,9 +230,8 @@ export class TenantManager {
 			.get();
 
 		if (existing) {
-			const actor = new TenantActor(this.db, tenantId);
-			actor.send("claim");
-			actor.send("claimed");
+			applyTenantTransition(this.db, tenantId, existing.status as TenantStatus, "claim");
+			applyTenantTransition(this.db, tenantId, "claiming", "claimed");
 
 			this.db
 				.update(tenants)

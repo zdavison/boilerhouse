@@ -9,7 +9,9 @@ import {
 	exportFilesystem as defaultExportFilesystem,
 	buildImage as defaultBuildImage,
 	createExt4 as defaultCreateExt4,
+	injectInit as defaultInjectInit,
 } from "@boilerhouse/build";
+import type { InjectConfig } from "@boilerhouse/build";
 
 /** Injectable build functions for testing. */
 export interface ImageBuildFns {
@@ -17,6 +19,7 @@ export interface ImageBuildFns {
 	exportFilesystem: (ref: string, tarPath: string) => Promise<void>;
 	buildImage: (dockerfile: string, tarPath: string) => Promise<void>;
 	createExt4: (tarPath: string, outputPath: string, sizeGb: number) => Promise<void>;
+	injectInit: (ext4Path: string, config: InjectConfig) => Promise<void>;
 }
 
 /** Ensures rootfs images exist before VM creation. */
@@ -32,6 +35,12 @@ export interface OciImageBuilderOptions {
 	 * Required when using `image.dockerfile` — Dockerfile paths are resolved relative to this.
 	 */
 	workloadsDir?: string;
+	/**
+	 * Paths to guest-init binaries injected into every rootfs.
+	 * When set, `/opt/boilerhouse/{init,idle-agent,overlay-init.sh}` are
+	 * copied into the ext4 image after creation.
+	 */
+	initConfig?: InjectConfig;
 }
 
 const DEFAULT_FNS: ImageBuildFns = {
@@ -39,6 +48,7 @@ const DEFAULT_FNS: ImageBuildFns = {
 	exportFilesystem: defaultExportFilesystem,
 	buildImage: defaultBuildImage,
 	createExt4: defaultCreateExt4,
+	injectInit: defaultInjectInit,
 };
 
 /**
@@ -51,6 +61,7 @@ const DEFAULT_FNS: ImageBuildFns = {
 export class OciImageBuilder implements ImageBuilder {
 	private readonly fns: ImageBuildFns;
 	private readonly workloadsDir?: string;
+	private readonly initConfig?: InjectConfig;
 
 	constructor(
 		private readonly imagesDir: string,
@@ -58,6 +69,7 @@ export class OciImageBuilder implements ImageBuilder {
 	) {
 		this.fns = options?.fns ?? DEFAULT_FNS;
 		this.workloadsDir = options?.workloadsDir;
+		this.initConfig = options?.initConfig;
 	}
 
 	async ensureRootfs(workload: Workload): Promise<void> {
@@ -89,6 +101,10 @@ export class OciImageBuilder implements ImageBuilder {
 			}
 
 			await this.fns.createExt4(tarPath, rootfsPath, workload.resources.disk_gb);
+
+			if (this.initConfig) {
+				await this.fns.injectInit(rootfsPath, this.initConfig);
+			}
 
 			console.log(`ImageBuilder: rootfs ready at ${rootfsPath}`);
 		} catch (err) {

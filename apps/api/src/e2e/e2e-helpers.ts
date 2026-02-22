@@ -115,6 +115,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		db,
 		activityLog,
 		nodeId,
+		eventBus,
 	);
 	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
 		healthChecker: async () => {},
@@ -125,7 +126,6 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		snapshotManager,
 		db,
 		activityLog,
-		runtime,
 		nodeId,
 		tenantDataStore,
 	);

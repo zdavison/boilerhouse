@@ -306,6 +306,84 @@ describe("recoverState", () => {
 		expect(report.orphanedJailsCleaned).toBe(0);
 	});
 
+	test("recovers 'destroying' instances to 'destroyed'", async () => {
+		const id = generateInstanceId();
+		insertInstance(id, "destroying" as InstanceStatus);
+
+		const report = await recoverState(runtime, db, nodeId, log);
+
+		expect(report.destroyed).toBeGreaterThanOrEqual(1);
+		const row = db.select().from(instances).where(eq(instances.instanceId, id)).get();
+		expect(row!.status).toBe("destroyed");
+	});
+
+	test("resets 'claiming' tenants to 'idle'", async () => {
+		const tenantId = generateTenantId();
+		const instanceId = generateInstanceId();
+		insertInstance(instanceId, "active");
+		await addToRuntime(instanceId);
+		db.insert(tenants)
+			.values({
+				tenantId,
+				workloadId,
+				instanceId,
+				status: "claiming",
+				createdAt: new Date(),
+			})
+			.run();
+
+		const report = await recoverState(runtime, db, nodeId, log);
+
+		expect(report.tenantsReset).toBe(1);
+		const tenantRow = db.select().from(tenants).where(eq(tenants.tenantId, tenantId)).get();
+		expect(tenantRow!.status).toBe("idle");
+		expect(tenantRow!.instanceId).toBeNull();
+	});
+
+	test("resets 'releasing' tenants with missing instance to 'idle'", async () => {
+		const tenantId = generateTenantId();
+		const instanceId = generateInstanceId();
+		insertInstance(instanceId, "destroyed");
+		db.insert(tenants)
+			.values({
+				tenantId,
+				workloadId,
+				instanceId,
+				status: "releasing",
+				createdAt: new Date(),
+			})
+			.run();
+
+		const report = await recoverState(runtime, db, nodeId, log);
+
+		expect(report.tenantsReset).toBe(1);
+		const tenantRow = db.select().from(tenants).where(eq(tenants.tenantId, tenantId)).get();
+		expect(tenantRow!.status).toBe("idle");
+		expect(tenantRow!.instanceId).toBeNull();
+	});
+
+	test("reverts 'releasing' tenants with live instance to 'active'", async () => {
+		const tenantId = generateTenantId();
+		const instanceId = generateInstanceId();
+		insertInstance(instanceId, "active", tenantId);
+		await addToRuntime(instanceId);
+		db.insert(tenants)
+			.values({
+				tenantId,
+				workloadId,
+				instanceId,
+				status: "releasing",
+				createdAt: new Date(),
+			})
+			.run();
+
+		const report = await recoverState(runtime, db, nodeId, log);
+
+		expect(report.tenantsReset).toBe(1);
+		const tenantRow = db.select().from(tenants).where(eq(tenants.tenantId, tenantId)).get();
+		expect(tenantRow!.status).toBe("active");
+	});
+
 	test("logs activity for each destroyed instance", async () => {
 		const id1 = generateInstanceId();
 		const id2 = generateInstanceId();

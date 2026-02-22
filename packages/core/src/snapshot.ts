@@ -31,6 +31,11 @@ export const SnapshotMetadataSchema = Type.Object({
 	 * @example "x86_64"
 	 */
 	architecture: Type.String({ minLength: 1 }),
+	/**
+	 * Guest ports exposed by the workload.
+	 * @example [8080, 9090]
+	 */
+	exposedPorts: Type.Optional(Type.Array(Type.Integer({ exclusiveMinimum: 0 }))),
 });
 
 export const SnapshotRefSchema = Type.Object({

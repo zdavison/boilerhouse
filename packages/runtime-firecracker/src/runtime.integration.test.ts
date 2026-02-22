@@ -178,7 +178,7 @@ describe.skipIf(!INTEGRATION)("FirecrackerRuntime integration", () => {
 
 		const endpoint = await runtime.getEndpoint(handle);
 		expect(endpoint.host).toMatch(/^172\.16\./);
-		expect(endpoint.port).toBeGreaterThan(0);
+		expect(endpoint.ports.length).toBeGreaterThan(0);
 	});
 
 	test("create() sets up overlay rootfs", async () => {
@@ -284,7 +284,7 @@ describe.skipIf(!INTEGRATION)("FirecrackerRuntime integration", () => {
 
 		const endpoint = await runtime.getEndpoint(restored);
 		expect(endpoint.host).toMatch(/^172\.16\./);
-		expect(endpoint.port).toBeGreaterThan(0);
+		expect(endpoint.ports.length).toBeGreaterThan(0);
 	});
 
 	test("restore() allocates a new TAP device", async () => {

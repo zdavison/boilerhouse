@@ -55,8 +55,8 @@ for (const rt of availableRuntimes()) {
 
 			// Step 5: Verify instance reachable (skip if no networking)
 			if (rt.capabilities.networking) {
-				const { host, port } = claim1Body.endpoint;
-				const resp = await fetch(`http://${host}:${port}`);
+				const { host, ports } = claim1Body.endpoint;
+				const resp = await fetch(`http://${host}:${ports[0]}`);
 				expect(resp.ok).toBe(true);
 			}
 

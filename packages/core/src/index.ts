@@ -35,6 +35,7 @@ export {
 	INSTANCE_STATUSES,
 	INSTANCE_EVENTS,
 	transition,
+	canTransition,
 } from "./instance-state";
 
 export {
@@ -100,6 +101,7 @@ export {
 	TENANT_STATUSES,
 	TENANT_EVENTS,
 	tenantTransition,
+	canTenantTransition,
 } from "./tenant-state";
 
 export {
@@ -110,6 +112,7 @@ export {
 	SNAPSHOT_STATUSES,
 	SNAPSHOT_EVENTS,
 	snapshotTransition,
+	canSnapshotTransition,
 } from "./snapshot-state";
 
 export {
@@ -120,6 +123,7 @@ export {
 	WORKLOAD_STATUSES,
 	WORKLOAD_EVENTS,
 	workloadTransition,
+	canWorkloadTransition,
 } from "./workload-state";
 
 export { resolveImagePath } from "./image-path";

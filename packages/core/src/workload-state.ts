@@ -55,3 +55,11 @@ export function workloadTransition(
 ): WorkloadStatus {
 	return workloadMachine.transition(current, event);
 }
+
+/** Checks whether the given event is valid for the current workload status. */
+export function canWorkloadTransition(
+	current: WorkloadStatus,
+	event: WorkloadEvent,
+): boolean {
+	return workloadMachine.can(current, event);
+}

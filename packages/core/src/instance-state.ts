@@ -72,3 +72,11 @@ export function transition(
 ): InstanceStatus {
 	return instanceMachine.transition(current, event);
 }
+
+/** Checks whether the given event is valid for the current instance status. */
+export function canTransition(
+	current: InstanceStatus,
+	event: InstanceEvent,
+): boolean {
+	return instanceMachine.can(current, event);
+}

@@ -38,6 +38,8 @@ interface ManagedInstance {
 	overlayPaths: OverlayPaths;
 	workloadId: WorkloadId;
 	running: boolean;
+	/** Guest ports exposed by the workload (from `network.expose[*].guest`). */
+	exposedPorts: number[];
 	// Dev mode
 	tapDevice?: TapDevice;
 	// Jailer mode
@@ -258,16 +260,21 @@ export class FirecrackerRuntime implements Runtime {
 
 	async getEndpoint(handle: InstanceHandle): Promise<Endpoint> {
 		const managed = this.requireInstance(handle.instanceId);
-		const port = 8080;
+
+		if (managed.exposedPorts.length === 0) {
+			throw new FirecrackerError(
+				`Instance ${handle.instanceId} has no exposed ports — workload must define network.expose`,
+			);
+		}
 
 		if (this.isJailerMode && managed.netnsHandle) {
-			return { host: managed.netnsHandle.guestIp, port };
+			return { host: managed.netnsHandle.guestIp, ports: managed.exposedPorts };
 		}
 
 		// Dev mode: derive guest IP from TAP device IP (host is .1, guest is .2 in /30 subnet)
 		const guestIp = deriveGuestIp(managed.tapDevice!.ip);
 
-		return { host: guestIp, port };
+		return { host: guestIp, ports: managed.exposedPorts };
 	}
 
 	async list(): Promise<InstanceId[]> {
@@ -347,6 +354,7 @@ export class FirecrackerRuntime implements Runtime {
 			overlayPaths,
 			workloadId,
 			running: false,
+			exposedPorts: (workload.network.expose ?? []).map((e) => e.guest),
 		};
 		this.instances.set(instanceId, managed);
 
@@ -413,6 +421,7 @@ export class FirecrackerRuntime implements Runtime {
 				runtimeVersion: info.vmm_version,
 				cpuTemplate: this.config.cpuTemplate ?? "None",
 				architecture: "x86_64",
+				exposedPorts: managed.exposedPorts,
 			},
 		};
 	}
@@ -483,6 +492,7 @@ export class FirecrackerRuntime implements Runtime {
 			overlayPaths: { rootfs: instanceRootfs, instanceDir },
 			workloadId: ref.workloadId,
 			running: true,
+			exposedPorts: ref.runtimeMeta.exposedPorts ?? [],
 		};
 		this.instances.set(instanceId, managed);
 
@@ -578,6 +588,7 @@ export class FirecrackerRuntime implements Runtime {
 			overlayPaths,
 			workloadId,
 			running: false,
+			exposedPorts: (workload.network.expose ?? []).map((e) => e.guest),
 			netnsHandle,
 			jailPaths,
 			uid,
@@ -639,6 +650,7 @@ export class FirecrackerRuntime implements Runtime {
 				runtimeVersion: info.vmm_version,
 				cpuTemplate: this.config.cpuTemplate ?? "None",
 				architecture: "x86_64",
+				exposedPorts: managed.exposedPorts,
 			},
 		};
 	}
@@ -713,6 +725,7 @@ export class FirecrackerRuntime implements Runtime {
 			overlayPaths: { rootfs: instanceRootfs, instanceDir },
 			workloadId: ref.workloadId,
 			running: true,
+			exposedPorts: ref.runtimeMeta.exposedPorts ?? [],
 			netnsHandle,
 			jailPaths,
 			uid,

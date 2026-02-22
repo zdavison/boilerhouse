@@ -99,7 +99,7 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		expect(res.status).toBe(404);
 	});
 
-	test("returns 400 when workload field is missing", async () => {
+	test("returns 422 when workload field is missing", async () => {
 		const ctx = createTestApp();
 		const tenantId = generateTenantId();
 
@@ -113,7 +113,7 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 			},
 		);
 
-		expect(res.status).toBe(400);
+		expect(res.status).toBe(422);
 	});
 
 	test("full multi-tenant lifecycle: claim, release, re-claim, new tenant from golden", async () => {
@@ -323,8 +323,9 @@ describe("POST /api/v1/tenants/:id/release", () => {
 		const body = await res.json();
 		expect(body.released).toBe(true);
 
-		expect(events).toHaveLength(1);
-		expect(events[0]!.type).toBe("tenant.released");
+		expect(events).toHaveLength(2);
+		expect(events[0]!.type).toBe("instance.state");
+		expect(events[1]!.type).toBe("tenant.released");
 	});
 
 	test("returns 404 for nonexistent tenant", async () => {

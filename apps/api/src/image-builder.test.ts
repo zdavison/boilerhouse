@@ -36,17 +36,20 @@ function createMockFns(): ImageBuildFns & {
 	exportCalls: Array<{ ref: string; tarPath: string }>;
 	buildImageCalls: Array<{ dockerfile: string; tarPath: string }>;
 	createExt4Calls: Array<{ tarPath: string; outputPath: string; sizeGb: number }>;
+	injectInitCalls: Array<{ ext4Path: string }>;
 } {
 	const pullCalls: string[] = [];
 	const exportCalls: Array<{ ref: string; tarPath: string }> = [];
 	const buildImageCalls: Array<{ dockerfile: string; tarPath: string }> = [];
 	const createExt4Calls: Array<{ tarPath: string; outputPath: string; sizeGb: number }> = [];
+	const injectInitCalls: Array<{ ext4Path: string }> = [];
 
 	return {
 		pullCalls,
 		exportCalls,
 		buildImageCalls,
 		createExt4Calls,
+		injectInitCalls,
 		pullImage: async (ref) => {
 			pullCalls.push(ref);
 		},
@@ -60,6 +63,9 @@ function createMockFns(): ImageBuildFns & {
 			createExt4Calls.push({ tarPath, outputPath, sizeGb });
 			mkdirSync(join(outputPath, ".."), { recursive: true });
 			writeFileSync(outputPath, "fake-ext4");
+		},
+		injectInit: async (ext4Path) => {
+			injectInitCalls.push({ ext4Path });
 		},
 	};
 }
@@ -200,6 +206,51 @@ describe("OciImageBuilder", () => {
 
 			const rootfsPath = join(imagesDir, "_builds", "minimal", "0.1.0", "rootfs.ext4");
 			expect(existsSync(rootfsPath)).toBe(false);
+		});
+	});
+
+	describe("init injection", () => {
+		const INIT_CONFIG = {
+			initBinaryPath: "/opt/guest-init/init",
+			idleAgentPath: "/opt/guest-init/idle-agent",
+			overlayInitPath: "/opt/guest-init/overlay-init.sh",
+		};
+
+		test("injects init binaries when initConfig is provided", async () => {
+			const imagesDir = join(tmpDir, "images");
+			const fns = createMockFns();
+			const builder = new OciImageBuilder(imagesDir, { fns, initConfig: INIT_CONFIG });
+
+			await builder.ensureRootfs(WORKLOAD);
+
+			expect(fns.injectInitCalls).toHaveLength(1);
+			expect(fns.injectInitCalls[0]!.ext4Path).toBe(
+				join(imagesDir, "alpine", "latest", "rootfs.ext4"),
+			);
+		});
+
+		test("skips init injection when initConfig is not provided", async () => {
+			const imagesDir = join(tmpDir, "images");
+			const fns = createMockFns();
+			const builder = new OciImageBuilder(imagesDir, { fns });
+
+			await builder.ensureRootfs(WORKLOAD);
+
+			expect(fns.injectInitCalls).toHaveLength(0);
+		});
+
+		test("skips init injection when rootfs already exists", async () => {
+			const imagesDir = join(tmpDir, "images");
+			const rootfsDir = join(imagesDir, "alpine", "latest");
+			mkdirSync(rootfsDir, { recursive: true });
+			writeFileSync(join(rootfsDir, "rootfs.ext4"), "existing");
+
+			const fns = createMockFns();
+			const builder = new OciImageBuilder(imagesDir, { fns, initConfig: INIT_CONFIG });
+
+			await builder.ensureRootfs(WORKLOAD);
+
+			expect(fns.injectInitCalls).toHaveLength(0);
 		});
 	});
 });

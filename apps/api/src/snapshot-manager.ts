@@ -6,13 +6,12 @@ import type {
 	WorkloadId,
 	NodeId,
 	SnapshotRef,
-	SnapshotMetadata,
 	Workload,
 } from "@boilerhouse/core";
 import { generateInstanceId } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
-import { snapshots } from "@boilerhouse/db";
-import { SnapshotActor } from "./actors";
+import { snapshots, snapshotRefFrom } from "@boilerhouse/db";
+import { applySnapshotTransition } from "./transitions";
 import { pollHealth, createHttpCheck, createExecCheck } from "./health-check";
 import type { HealthConfig, HealthCheckFn } from "./health-check";
 
@@ -69,7 +68,7 @@ export class SnapshotManager {
 
 				if (workload.health.http_get) {
 					const endpoint = await this.runtime.getEndpoint(handle);
-					const port = workload.health.http_get.port ?? endpoint.port;
+					const port = workload.health.http_get.port ?? endpoint.ports[0]!;
 					const url = `http://${endpoint.host}:${port}${workload.health.http_get.path}`;
 					check = createHttpCheck(url);
 				} else {
@@ -131,8 +130,7 @@ export class SnapshotManager {
 				})
 				.run();
 
-			const snapActor = new SnapshotActor(this.db, goldenRef.id);
-			snapActor.send("created");
+			applySnapshotTransition(this.db, goldenRef.id, "creating", "created");
 
 			// Destroy the bootstrap VM
 			await this.runtime.destroy(handle);
@@ -170,28 +168,7 @@ export class SnapshotManager {
 
 		if (!row) return null;
 
-		// Validate runtime metadata is present and well-formed
-		const meta = row.runtimeMeta as Record<string, unknown> | null;
-		if (
-			!meta ||
-			typeof meta.runtimeVersion !== "string" ||
-			typeof meta.cpuTemplate !== "string" ||
-			typeof meta.architecture !== "string"
-		) {
-			return null;
-		}
-
-		return {
-			id: row.snapshotId,
-			type: "golden",
-			paths: {
-				memory: row.memoryPath ?? "",
-				vmstate: row.vmstatePath,
-			},
-			workloadId: row.workloadId,
-			nodeId: row.nodeId,
-			runtimeMeta: meta as unknown as SnapshotMetadata,
-		};
+		return snapshotRefFrom(row);
 	}
 
 	/** Fast boolean check for whether a golden snapshot exists. */

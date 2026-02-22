@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { readdirSync } from "node:fs";
+import { eq } from "drizzle-orm";
 import { generateNodeId } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
 import {
@@ -13,7 +14,7 @@ import type {
 	JailerConfig,
 } from "@boilerhouse/runtime-firecracker";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
-import { workloads as workloadsTable } from "@boilerhouse/db";
+import { workloads as workloadsTable, tenants } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
 import { InstanceManager } from "./instance-manager";
 import { SnapshotManager } from "./snapshot-manager";
@@ -28,7 +29,7 @@ import { recoverState } from "./recovery";
 import type { RecoveryOptions } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { TapManager } from "./network/tap";
-import { WorkloadActor } from "./actors";
+import { applyWorkloadTransition, forceWorkloadStatus } from "./transitions";
 
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
@@ -40,6 +41,7 @@ const kernelPath = process.env.KERNEL_PATH ?? "/var/lib/boilerhouse/vmlinux";
 const snapshotDir = process.env.SNAPSHOT_DIR ?? join(storagePath, "snapshots");
 const instanceDir = process.env.INSTANCE_DIR ?? join(storagePath, "instances");
 const imagesDir = process.env.IMAGES_DIR ?? join(storagePath, "images");
+const guestInitDir = process.env.GUEST_INIT_DIR ?? join(import.meta.dir, "../../../packages/guest-init");
 
 // Jailer configuration — enabled when JAILER_BIN is set
 const jailerBin = process.env.JAILER_BIN;
@@ -49,13 +51,29 @@ const jailerGid = Number(process.env.JAILER_GID ?? 100000);
 
 const useJailer = !!jailerBin;
 
-// Build FirecrackerConfig
+const db = initDatabase(dbPath);
+const existingNode = db.select().from(nodes).get();
+const nodeId = existingNode ? existingNode.nodeId : generateNodeId();
+
+if (!existingNode) {
+	db.insert(nodes)
+		.values({
+			nodeId,
+			runtimeType: "firecracker",
+			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
+			status: "online",
+			lastHeartbeat: new Date(),
+			createdAt: new Date(),
+		})
+		.run();
+}
+
 const runtimeConfig: FirecrackerConfig = {
 	binaryPath: firecrackerBinary,
 	kernelPath,
 	snapshotDir,
 	instanceDir,
-	nodeId: undefined!, // Set after nodeId generation below
+	nodeId,
 	imagesDir,
 };
 
@@ -75,28 +93,9 @@ if (useJailer) {
 	runtimeConfig.tapManager = new TapManager();
 }
 
-const db = initDatabase(dbPath);
-const nodeId = generateNodeId();
-runtimeConfig.nodeId = nodeId;
-
 const runtime = new FirecrackerRuntime(runtimeConfig);
 const activityLog = new ActivityLog(db);
 const eventBus = new EventBus();
-
-// Ensure this node exists in the database
-const existingNode = db.select().from(nodes).get();
-if (!existingNode) {
-	db.insert(nodes)
-		.values({
-			nodeId,
-			runtimeType: "firecracker",
-			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
-			status: "online",
-			lastHeartbeat: new Date(),
-			createdAt: new Date(),
-		})
-		.run();
-}
 
 // Load workload definitions from disk if configured
 if (workloadsDir) {
@@ -109,7 +108,7 @@ if (workloadsDir) {
 	}
 }
 
-const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId);
+const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId, eventBus);
 const snapshotManager = new SnapshotManager(runtime, db, nodeId);
 const tenantDataStore = new TenantDataStore(storagePath, db);
 const idleMonitor = new IdleMonitor({ defaultPollIntervalMs: 5000 });
@@ -118,7 +117,6 @@ const tenantManager = new TenantManager(
 	snapshotManager,
 	db,
 	activityLog,
-	runtime,
 	nodeId,
 	tenantDataStore,
 	idleMonitor,
@@ -136,31 +134,51 @@ eventBus.on((event) => {
 	}
 });
 
-// Wire idle monitor to release tenants
 idleMonitor.onIdle(async (instanceId, action) => {
-	console.log(`Idle timeout: instance=${instanceId} action=${action}`);
+	const tenantRow = db
+		.select({ tenantId: tenants.tenantId })
+		.from(tenants)
+		.where(eq(tenants.instanceId, instanceId))
+		.get();
+
+	if (!tenantRow) {
+		console.log(`Idle timeout: instance=${instanceId} has no tenant — skipping`);
+		return;
+	}
+
+	console.log(`Idle timeout: instance=${instanceId} tenant=${tenantRow.tenantId} action=${action}`);
+	await tenantManager.release(tenantRow.tenantId);
 });
 
 // Build recovery options with cleanup callbacks
 const recoveryOptions: RecoveryOptions = {};
+const tapManager = useJailer ? null : (runtimeConfig.tapManager as TapManager);
+
+if (!useJailer && tapManager) {
+	recoveryOptions.listTaps = async () => {
+		const proc = Bun.spawn(["ip", "-o", "link", "show", "type", "tuntap"], {
+			stdout: "pipe",
+			stderr: "pipe",
+		});
+		const output = await new Response(proc.stdout).text();
+		await proc.exited;
+		// Each line: "N: tap-XXXXXXXX: ..."
+		return output
+			.split("\n")
+			.map((line) => line.match(/^\d+:\s+(tap-[0-9a-f]+)/)?.[1])
+			.filter((name): name is string => !!name);
+	};
+	recoveryOptions.destroyTap = async (tapName) => {
+		await tapManager.destroy({ name: tapName, ip: "", mac: "" });
+	};
+}
 
 if (useJailer) {
 	const netnsManager = new NetnsManagerImpl();
 	const jailPreparer = new JailPreparer();
 
 	recoveryOptions.listNetns = () => netnsManager.list();
-	recoveryOptions.destroyNetns = async (nsName) => {
-		await netnsManager.destroy({
-			nsName,
-			nsPath: `/var/run/netns/${nsName}`,
-			tapName: "tap0",
-			tapIp: "",
-			tapMac: "",
-			vethHostIp: "",
-			guestIp: "",
-			vethHostName: "",
-		});
-	};
+	recoveryOptions.destroyNetns = (nsName) => netnsManager.destroyByName(nsName);
 	recoveryOptions.deriveNsName = (id) => deriveNetnsConfig(id).nsName;
 	recoveryOptions.listJails = async (chrootBaseDir) => {
 		const jailsDir = join(chrootBaseDir, "firecracker");
@@ -181,13 +199,21 @@ const report = await recoverState(runtime, db, nodeId, activityLog, recoveryOpti
 const recoverySummary = [
 	`${report.recovered} recovered`,
 	`${report.destroyed} destroyed`,
+	`${report.tenantsReset} tenants reset`,
 	`${report.orphanedTapsCleaned} orphaned TAPs`,
 	`${report.orphanedNetnsCleaned} orphaned netns`,
 	`${report.orphanedJailsCleaned} orphaned jails`,
 ].join(", ");
 console.log(`Recovery: ${recoverySummary}`);
 
-const imageBuilder = new OciImageBuilder(imagesDir, { workloadsDir });
+const imageBuilder = new OciImageBuilder(imagesDir, {
+	workloadsDir,
+	initConfig: {
+		initBinaryPath: join(guestInitDir, "build/x86_64/init"),
+		idleAgentPath: join(guestInitDir, "build/x86_64/idle-agent"),
+		overlayInitPath: join(guestInitDir, "overlay-init.sh"),
+	},
+});
 const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, imageBuilder);
 
 // Enqueue golden snapshot creation for workloads that need it
@@ -197,11 +223,10 @@ const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, imageBuil
 	for (const row of allWorkloads) {
 		if (!snapshotManager.goldenExists(row.workloadId, nodeId)) {
 			// Set status to creating (new workloads already are; error workloads need retry)
-			const actor = new WorkloadActor(db, row.workloadId);
 			if (row.status === "error") {
-				actor.send("retry");
+				applyWorkloadTransition(db, row.workloadId, "error", "retry");
 			} else if (row.status !== "creating") {
-				actor.forceStatus("creating");
+				forceWorkloadStatus(db, row.workloadId, "creating");
 			}
 
 			goldenCreator.enqueue(row.workloadId, row.config as Workload);

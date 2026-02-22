@@ -50,6 +50,13 @@ export interface Machine<S extends string, E extends string, Ctx> {
 /**
  * Creates a pure state machine for the given entity.
  *
+ * Event naming convention used throughout:
+ * - **Commands** (imperative): trigger an operation — `hibernate`, `destroy`, `restore`, `claim`, `release`, `expire`, `delete`, `retry`
+ * - **Results** (past tense): signal that an operation completed — `started`, `destroyed`, `created`, `failed`, `claimed`, `claim_failed`, `hibernated`
+ *
+ * This two-phase pattern (`command` → intermediate state → `result`) models
+ * async operations: the command begins the work and the result confirms it.
+ *
  * @param entity - Name used in error messages (e.g. "instance", "node")
  * @param config - Transition map and optional guards
  */

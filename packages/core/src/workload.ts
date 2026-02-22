@@ -19,12 +19,12 @@ const NetworkAccessSchema = Type.Union([
 	Type.Literal("none"),
 	Type.Literal("outbound"),
 	Type.Literal("restricted"),
-]);
+], { default: "none" });
 
 const IdleActionSchema = Type.Union([
 	Type.Literal("hibernate"),
 	Type.Literal("destroy"),
-]);
+], { default: "hibernate" });
 
 const HttpGetProbeSchema = Type.Object({
 	/** Path to probe. */
@@ -61,8 +61,9 @@ export const WorkloadSchema = Type.Object({
 		vcpus: Type.Number({ exclusiveMinimum: 0 }),
 		memory_mb: Type.Number({ exclusiveMinimum: 0 }),
 		/** @default 2 */
-		disk_gb: Type.Number({ exclusiveMinimum: 0 }),
+		disk_gb: Type.Number({ exclusiveMinimum: 0, default: 2 }),
 	}),
+	/** @default { access: "none" } */
 	network: Type.Object({
 		/**
 		 * Network access policy.
@@ -71,13 +72,14 @@ export const WorkloadSchema = Type.Object({
 		access: NetworkAccessSchema,
 		allowlist: Type.Optional(Type.Array(Type.String())),
 		expose: Type.Optional(Type.Array(PortExposeSchema)),
-	}),
+	}, { default: { access: "none" } }),
 	filesystem: Type.Optional(
 		Type.Object({
 			overlay_dirs: Type.Optional(Type.Array(Type.String())),
 			bind_mounts: Type.Optional(Type.Array(BindMountSchema)),
 		}),
 	),
+	/** @default { action: "hibernate" } */
 	idle: Type.Object({
 		watch_dirs: Type.Optional(Type.Array(Type.String())),
 		timeout_seconds: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
@@ -86,7 +88,7 @@ export const WorkloadSchema = Type.Object({
 		 * @default "hibernate"
 		 */
 		action: IdleActionSchema,
-	}),
+	}, { default: { action: "hibernate" } }),
 	health: Type.Optional(
 		Type.Object({
 			interval_seconds: Type.Number({ exclusiveMinimum: 0 }),
@@ -141,7 +143,7 @@ export function parseWorkload(toml: string): Workload {
 		);
 	}
 
-	applyDefaults(raw);
+	Value.Default(WorkloadSchema, raw);
 	checkImageMutualExclusivity(raw);
 	checkHealthProbeMutualExclusivity(raw);
 
@@ -159,34 +161,6 @@ export function parseWorkload(toml: string): Workload {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function applyDefaults(raw: Record<string, unknown>): void {
-	// resources.disk_gb defaults to 2
-	const resources = raw.resources as Record<string, unknown> | undefined;
-	if (resources && resources.disk_gb === undefined) {
-		resources.disk_gb = 2;
-	}
-
-	// network defaults to { access: "none" }
-	if (raw.network === undefined) {
-		raw.network = { access: "none" };
-	} else {
-		const network = raw.network as Record<string, unknown>;
-		if (network.access === undefined) {
-			network.access = "none";
-		}
-	}
-
-	// idle defaults to { action: "hibernate" }
-	if (raw.idle === undefined) {
-		raw.idle = { action: "hibernate" };
-	} else {
-		const idle = raw.idle as Record<string, unknown>;
-		if (idle.action === undefined) {
-			idle.action = "hibernate";
-		}
-	}
-}
 
 function checkHealthProbeMutualExclusivity(raw: Record<string, unknown>): void {
 	const health = raw.health as Record<string, unknown> | undefined;

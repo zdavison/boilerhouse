@@ -125,14 +125,14 @@ describe("TenantDataStore", () => {
 			writeFileSync(srcPath, "fake-overlay-data");
 			store.saveOverlay(tenantId, workloadId, srcPath);
 
-			const result = store.restoreOverlay(tenantId, workloadId);
+			const result = store.restoreOverlay(tenantId);
 
 			const expectedPath = join(storagePath, tenantId, workloadId, "overlay.ext4");
 			expect(result).toBe(expectedPath);
 		});
 
 		test("returns null when no overlay exists", () => {
-			const result = store.restoreOverlay(tenantId, workloadId);
+			const result = store.restoreOverlay(tenantId);
 			expect(result).toBeNull();
 		});
 	});

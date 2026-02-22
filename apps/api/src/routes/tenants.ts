@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { eq } from "drizzle-orm";
 import type { TenantId } from "@boilerhouse/core";
 import { InvalidTransitionError } from "@boilerhouse/core";
@@ -12,12 +12,7 @@ export function tenantRoutes(deps: RouteDeps) {
 	return new Elysia({ name: "tenants" })
 		.post("/tenants/:id/claim", async ({ params, body, set }) => {
 			const tenantId = params.id as TenantId;
-			const { workload: workloadName } = body as { workload: string };
-
-			if (!workloadName) {
-				set.status = 400;
-				return { error: "Missing 'workload' in request body" };
-			}
+			const { workload: workloadName } = body;
 
 			if (deps.resourceLimiter && !deps.resourceLimiter.canCreate(deps.nodeId)) {
 				set.status = 503;
@@ -77,6 +72,10 @@ export function tenantRoutes(deps: RouteDeps) {
 				source: result.source,
 				latencyMs: result.latencyMs,
 			};
+		}, {
+			body: t.Object({
+				workload: t.String({ minLength: 1 }),
+			}),
 		})
 		.post("/tenants/:id/release", async ({ params, set }) => {
 			const tenantId = params.id as TenantId;

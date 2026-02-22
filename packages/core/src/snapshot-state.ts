@@ -60,3 +60,11 @@ export function snapshotTransition(
 ): SnapshotStatus {
 	return snapshotMachine.transition(current, event);
 }
+
+/** Checks whether the given event is valid for the current snapshot status. */
+export function canSnapshotTransition(
+	current: SnapshotStatus,
+	event: SnapshotEvent,
+): boolean {
+	return snapshotMachine.can(current, event);
+}

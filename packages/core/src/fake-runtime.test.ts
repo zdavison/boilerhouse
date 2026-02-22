@@ -100,8 +100,8 @@ describe("FakeRuntime", () => {
 		const endpoint = await runtime.getEndpoint(handle);
 
 		expect(endpoint.host).toBe("127.0.0.1");
-		expect(typeof endpoint.port).toBe("number");
-		expect(endpoint.port).toBeGreaterThan(0);
+		expect(endpoint.ports.length).toBeGreaterThan(0);
+		expect(endpoint.ports[0]).toBeGreaterThan(0);
 	});
 
 	test("available() returns true", async () => {

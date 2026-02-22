@@ -56,7 +56,7 @@ for (const rt of availableRuntimes()) {
 			if (rt.capabilities.networking) {
 				const endpoints = claimResults.map((r) => r.body.endpoint);
 				const endpointKeys = endpoints.map(
-					(e: { host: string; port: number }) => `${e.host}:${e.port}`,
+					(e: { host: string; ports: number[] }) => `${e.host}:${e.ports.join(",")}`,
 				);
 				const uniqueEndpoints = new Set(endpointKeys);
 				expect(uniqueEndpoints.size).toBe(3);

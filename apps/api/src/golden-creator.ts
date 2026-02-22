@@ -5,15 +5,11 @@ import { workloads } from "@boilerhouse/db";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { EventBus } from "./event-bus";
 import type { ImageBuilder } from "./image-builder";
-import { WorkloadActor } from "./actors";
-
-interface QueueItem {
-	workloadId: WorkloadId;
-	workload: Workload;
-}
+import { applyWorkloadTransition } from "./transitions";
 
 export class GoldenCreator {
-	private readonly queue: QueueItem[] = [];
+	/** Insertion-ordered map acts as both FIFO queue and dedup set. */
+	private readonly queue = new Map<WorkloadId, Workload>();
 	private processing = false;
 
 	constructor(
@@ -25,7 +21,8 @@ export class GoldenCreator {
 
 	/** Enqueue a workload for background golden snapshot creation. */
 	enqueue(workloadId: WorkloadId, workload: Workload): void {
-		this.queue.push({ workloadId, workload });
+		if (this.queue.has(workloadId)) return;
+		this.queue.set(workloadId, workload);
 		if (!this.processing) {
 			this.processQueue();
 		}
@@ -33,7 +30,7 @@ export class GoldenCreator {
 
 	/** Number of items waiting in the queue (not including the current one). */
 	get pending(): number {
-		return this.queue.length;
+		return this.queue.size;
 	}
 
 	/** Whether the creator is currently processing an item. */
@@ -53,45 +50,44 @@ export class GoldenCreator {
 		this.processing = true;
 
 		try {
-			while (this.queue.length > 0) {
-				const item = this.queue.shift()!;
-				await this.processItem(item);
+			while (this.queue.size > 0) {
+				const [workloadId, workload] = this.queue.entries().next().value!;
+				this.queue.delete(workloadId);
+				await this.processItem(workloadId, workload);
 			}
 		} finally {
 			this.processing = false;
 		}
 	}
 
-	private async processItem(item: QueueItem): Promise<void> {
-		const actor = new WorkloadActor(this.db, item.workloadId);
-
+	private async processItem(workloadId: WorkloadId, workload: Workload): Promise<void> {
 		try {
 			if (this.imageBuilder) {
-				await this.imageBuilder.ensureRootfs(item.workload);
+				await this.imageBuilder.ensureRootfs(workload);
 			}
 
-			await this.snapshotManager.createGolden(item.workloadId, item.workload);
-			actor.send("created");
+			await this.snapshotManager.createGolden(workloadId, workload);
+			applyWorkloadTransition(this.db, workloadId, "creating", "created");
 
 			this.eventBus.emit({
 				type: "workload.state",
-				workloadId: item.workloadId,
+				workloadId,
 				status: "ready",
 			});
 
-			console.log(`GoldenCreator: golden snapshot ready for workload ${item.workloadId}`);
+			console.log(`GoldenCreator: golden snapshot ready for workload ${workloadId}`);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			console.error(
-				`GoldenCreator: failed to create golden snapshot for workload ${item.workloadId}: ${message}`,
+				`GoldenCreator: failed to create golden snapshot for workload ${workloadId}: ${message}`,
 			);
 
 			try {
-				actor.send("failed");
+				applyWorkloadTransition(this.db, workloadId, "creating", "failed");
 				this.db
 					.update(workloads)
 					.set({ statusDetail: message })
-					.where(eq(workloads.workloadId, item.workloadId))
+					.where(eq(workloads.workloadId, workloadId))
 					.run();
 			} catch {
 				// Workload may have been deleted while processing
@@ -99,7 +95,7 @@ export class GoldenCreator {
 
 			this.eventBus.emit({
 				type: "workload.state",
-				workloadId: item.workloadId,
+				workloadId,
 				status: "error",
 			});
 		}

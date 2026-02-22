@@ -66,3 +66,11 @@ export function tenantTransition(
 ): TenantStatus {
 	return tenantMachine.transition(current, event);
 }
+
+/** Checks whether the given event is valid for the current tenant status. */
+export function canTenantTransition(
+	current: TenantStatus,
+	event: TenantEvent,
+): boolean {
+	return tenantMachine.can(current, event);
+}

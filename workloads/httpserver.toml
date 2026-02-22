@@ -3,7 +3,7 @@ name = "httpserver"
 version = "0.1.0"
 
 [image]
-ref = "firecracker-httpserver:latest"
+dockerfile = "httpserver/Dockerfile"
 
 [resources]
 vcpus = 1

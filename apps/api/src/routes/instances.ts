@@ -1,16 +1,17 @@
-import { Elysia } from "elysia";
+import { Elysia, t } from "elysia";
 import { eq } from "drizzle-orm";
-import type { InstanceId, InstanceStatus } from "@boilerhouse/core";
-import { InvalidTransitionError } from "@boilerhouse/core";
+import type { InstanceId } from "@boilerhouse/core";
+import { InvalidTransitionError, InstanceStatusSchema } from "@boilerhouse/core";
 import { instances } from "@boilerhouse/db";
+import { instanceHandleFrom } from "../instance-manager";
 import type { RouteDeps } from "./deps";
 
 export function instanceRoutes(deps: RouteDeps) {
-	const { db, instanceManager, eventBus } = deps;
+	const { db, instanceManager } = deps;
 
 	return new Elysia({ name: "instances" })
 		.get("/instances", ({ query }) => {
-			const status = query.status as InstanceStatus | undefined;
+			const { status } = query;
 			let rows;
 
 			if (status) {
@@ -32,6 +33,10 @@ export function instanceRoutes(deps: RouteDeps) {
 				statusDetail: r.statusDetail,
 				createdAt: r.createdAt.toISOString(),
 			}));
+		}, {
+			query: t.Object({
+				status: t.Optional(InstanceStatusSchema),
+			}),
 		})
 		.get("/instances/:id", ({ params, set }) => {
 			const row = db
@@ -75,7 +80,7 @@ export function instanceRoutes(deps: RouteDeps) {
 				return { error: `Instance '${params.id}' is ${row.status}` };
 			}
 
-			const handle = { instanceId, running: true };
+			const handle = instanceHandleFrom(instanceId, row.status);
 			const endpoint = await deps.runtime.getEndpoint(handle);
 
 			return {
@@ -108,14 +113,6 @@ export function instanceRoutes(deps: RouteDeps) {
 				throw err;
 			}
 
-			eventBus.emit({
-				type: "instance.state",
-				instanceId,
-				status: "hibernated",
-				workloadId: row.workloadId,
-				tenantId: row.tenantId ?? undefined,
-			});
-
 			return {
 				instanceId,
 				status: "hibernated",
@@ -144,14 +141,6 @@ export function instanceRoutes(deps: RouteDeps) {
 				}
 				throw err;
 			}
-
-			eventBus.emit({
-				type: "instance.state",
-				instanceId,
-				status: "destroyed",
-				workloadId: row.workloadId,
-				tenantId: row.tenantId ?? undefined,
-			});
 
 			return { instanceId, status: "destroyed" };
 		});

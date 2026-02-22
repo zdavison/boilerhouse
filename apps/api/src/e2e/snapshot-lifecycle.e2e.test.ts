@@ -77,8 +77,8 @@ for (const rt of availableRuntimes()) {
 			// Step 9: Verify reachable (skip if no networking)
 			if (rt.capabilities.networking) {
 				const endpoint2Body = await endpoint2Res.json();
-				const { host, port } = endpoint2Body.endpoint;
-				const resp = await fetch(`http://${host}:${port}`);
+				const { host, ports } = endpoint2Body.endpoint;
+				const resp = await fetch(`http://${host}:${ports[0]}`);
 				expect(resp.ok).toBe(true);
 			}
 

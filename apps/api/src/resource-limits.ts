@@ -1,4 +1,4 @@
-import { eq, and, notInArray } from "drizzle-orm";
+import { eq, and, notInArray, count } from "drizzle-orm";
 import type { NodeId, InstanceStatus } from "@boilerhouse/core";
 import { instances } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
@@ -101,8 +101,8 @@ export class ResourceLimiter {
 	}
 
 	private countActive(nodeId: NodeId): number {
-		const rows = this.db
-			.select()
+		const [row] = this.db
+			.select({ count: count() })
 			.from(instances)
 			.where(
 				and(
@@ -111,6 +111,6 @@ export class ResourceLimiter {
 				),
 			)
 			.all();
-		return rows.length;
+		return row?.count ?? 0;
 	}
 }

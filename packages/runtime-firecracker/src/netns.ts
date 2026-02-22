@@ -241,6 +241,25 @@ export class NetnsManagerImpl {
 		);
 	}
 
+	/**
+	 * Best-effort cleanup of a namespace by name only.
+	 *
+	 * Deleting the namespace destroys all interfaces inside it (including the
+	 * guest-side veth), which causes the kernel to auto-remove the host-side
+	 * veth peer as well. Iptables rules referencing the now-gone veth become
+	 * inert (they match nothing) and are harmless until manually pruned.
+	 */
+	async destroyByName(nsName: string): Promise<void> {
+		try {
+			await sudoExec(
+				["ip", "netns", "delete", nsName],
+				`Failed to delete namespace ${nsName}`,
+			);
+		} catch {
+			// Namespace may already be gone
+		}
+	}
+
 	/** Lists all fc-* network namespaces. */
 	async list(): Promise<string[]> {
 		const proc = Bun.spawn(["ip", "netns", "list"], {

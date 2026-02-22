@@ -1,14 +1,17 @@
 import { eq } from "drizzle-orm";
-import type { Runtime, NodeId, InstanceId, InstanceStatus } from "@boilerhouse/core";
+import type { Runtime, NodeId, InstanceId, InstanceStatus, TenantStatus } from "@boilerhouse/core";
 import { instances, tenants } from "@boilerhouse/db";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { TapManager } from "./network/tap";
+import { forceInstanceStatus, forceTenantStatus } from "./transitions";
 
 export interface RecoveryReport {
 	/** VMs confirmed alive in the runtime. */
 	recovered: number;
 	/** DB rows marked destroyed (VM gone from runtime). */
 	destroyed: number;
+	/** Tenants reset from intermediate states (claiming/releasing). */
+	tenantsReset: number;
 	/** Orphaned TAP devices cleaned up. */
 	orphanedTapsCleaned: number;
 	/** Orphaned network namespaces cleaned up. */
@@ -63,6 +66,7 @@ export async function recoverState(
 	const report: RecoveryReport = {
 		recovered: 0,
 		destroyed: 0,
+		tenantsReset: 0,
 		orphanedTapsCleaned: 0,
 		orphanedNetnsCleaned: 0,
 		orphanedJailsCleaned: 0,
@@ -76,15 +80,6 @@ export async function recoverState(
 		.all()
 		.filter((row) => LIVE_STATUSES.includes(row.status!));
 
-	const hasCleanupCallbacks =
-		options?.listTaps ||
-		options?.listNetns ||
-		options?.listJails;
-
-	if (dbInstances.length === 0 && !hasCleanupCallbacks) {
-		return report;
-	}
-
 	// 2. Get live VM set from runtime
 	const liveVMs = new Set<string>(await runtime.list());
 
@@ -94,10 +89,7 @@ export async function recoverState(
 			report.recovered++;
 		} else {
 			// VM is gone — mark destroyed
-			db.update(instances)
-				.set({ status: "destroyed" as InstanceStatus })
-				.where(eq(instances.instanceId, row.instanceId))
-				.run();
+			forceInstanceStatus(db, row.instanceId, "destroyed");
 
 			// Clear tenant's instanceId if assigned
 			if (row.tenantId) {
@@ -119,6 +111,78 @@ export async function recoverState(
 
 			report.destroyed++;
 		}
+	}
+
+	// 3b. Recover instances stuck in "destroying" — VM cleanup already happened or failed
+	const destroyingInstances = db
+		.select()
+		.from(instances)
+		.where(eq(instances.nodeId, nodeId))
+		.all()
+		.filter((row) => row.status === "destroying");
+
+	for (const row of destroyingInstances) {
+		forceInstanceStatus(db, row.instanceId, "destroyed");
+
+		activityLog.log({
+			instanceId: row.instanceId,
+			workloadId: row.workloadId,
+			nodeId,
+			event: "recovery.destroyed",
+			metadata: { previousStatus: "destroying" },
+		});
+
+		report.destroyed++;
+	}
+
+	// 3c. Recover tenants stuck in intermediate states
+	const stuckTenants = db
+		.select()
+		.from(tenants)
+		.all()
+		.filter((row) =>
+			row.status === "claiming" || row.status === "releasing",
+		);
+
+	for (const row of stuckTenants) {
+		if (row.status === "claiming") {
+			// Claim never completed — reset to idle and clear instanceId
+			forceTenantStatus(db, row.tenantId, "idle");
+			db.update(tenants)
+				.set({ instanceId: null })
+				.where(eq(tenants.tenantId, row.tenantId))
+				.run();
+		} else if (row.status === "releasing") {
+			// Check if the instance is still active
+			const instanceActive = row.instanceId
+				? db.select({ status: instances.status })
+						.from(instances)
+						.where(eq(instances.instanceId, row.instanceId))
+						.get()
+				: null;
+
+			if (instanceActive && LIVE_STATUSES.includes(instanceActive.status!)) {
+				// Instance still alive — release didn't complete, revert to active
+				forceTenantStatus(db, row.tenantId, "active" as TenantStatus);
+			} else {
+				// Instance destroyed/missing — reset to idle and clear instanceId
+				forceTenantStatus(db, row.tenantId, "idle");
+				db.update(tenants)
+					.set({ instanceId: null })
+					.where(eq(tenants.tenantId, row.tenantId))
+					.run();
+			}
+		}
+
+		activityLog.log({
+			tenantId: row.tenantId,
+			workloadId: row.workloadId,
+			nodeId,
+			event: "recovery.tenant_reset",
+			metadata: { previousStatus: row.status },
+		});
+
+		report.tenantsReset++;
 	}
 
 	// Re-query active instances after reconciliation for cleanup checks

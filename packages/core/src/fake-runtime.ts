@@ -37,7 +37,7 @@ interface FakeInstance {
 	workload: Workload;
 	running: boolean;
 	destroyed: boolean;
-	port: number;
+	ports: number[];
 }
 
 export class FakeRuntime implements Runtime {
@@ -59,13 +59,14 @@ export class FakeRuntime implements Runtime {
 		instanceId: InstanceId,
 	): Promise<InstanceHandle> {
 		await this.maybeDelay("create");
-		const port = this.nextPort++;
+		const ports = (workload.network.expose ?? []).map((e) => e.guest);
+		if (ports.length === 0) ports.push(this.nextPort++);
 		const instance: FakeInstance = {
 			instanceId,
 			workload,
 			running: false,
 			destroyed: false,
-			port,
+			ports,
 		};
 		this.instances.set(instanceId, instance);
 		return { instanceId, running: false };
@@ -118,7 +119,7 @@ export class FakeRuntime implements Runtime {
 		if (!this.snapshots.has(ref.id)) {
 			throw new Error(`Snapshot not found: ${ref.id}`);
 		}
-		const port = this.nextPort++;
+		const ports = ref.runtimeMeta.exposedPorts ?? [this.nextPort++];
 		const instance: FakeInstance = {
 			instanceId,
 			workload: {
@@ -130,7 +131,7 @@ export class FakeRuntime implements Runtime {
 			},
 			running: true,
 			destroyed: false,
-			port,
+			ports,
 		};
 		this.instances.set(instanceId, instance);
 		return { instanceId, running: true };
@@ -145,7 +146,7 @@ export class FakeRuntime implements Runtime {
 	async getEndpoint(handle: InstanceHandle): Promise<Endpoint> {
 		await this.maybeDelay("getEndpoint");
 		const instance = this.requireInstance(handle.instanceId);
-		return { host: "127.0.0.1", port: instance.port };
+		return { host: "127.0.0.1", ports: instance.ports };
 	}
 
 	async list(): Promise<InstanceId[]> {

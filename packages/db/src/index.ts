@@ -32,6 +32,8 @@ export {
 
 export { ActivityLog } from "./activity-log";
 
+export { snapshotRefFrom } from "./snapshot-helpers";
+
 export {
 	loadWorkloadsFromDir,
 	type WorkloadLoaderResult,

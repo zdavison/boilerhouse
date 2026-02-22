@@ -36,7 +36,7 @@ export function createTestApp(): TestContext {
 		createdAt: new Date(),
 	}).run();
 
-	const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId);
+	const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId, eventBus);
 	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
 		healthChecker: async () => {},
 	});
@@ -46,7 +46,6 @@ export function createTestApp(): TestContext {
 		snapshotManager,
 		db,
 		activityLog,
-		runtime,
 		nodeId,
 		tenantDataStore,
 	);

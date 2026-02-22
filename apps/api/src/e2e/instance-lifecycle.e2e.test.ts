@@ -54,12 +54,12 @@ for (const rt of availableRuntimes()) {
 			const endpointBody = await endpointRes.json();
 			expect(endpointBody.endpoint).toBeDefined();
 			expect(endpointBody.endpoint.host).toBeDefined();
-			expect(endpointBody.endpoint.port).toBeGreaterThan(0);
+			expect(endpointBody.endpoint.ports.length).toBeGreaterThan(0);
 
 			// Step 5: Verify instance is reachable (skip if no networking capability)
 			if (rt.capabilities.networking) {
-				const { host, port } = endpointBody.endpoint;
-				const instanceResponse = await fetch(`http://${host}:${port}`);
+				const { host, ports } = endpointBody.endpoint;
+				const instanceResponse = await fetch(`http://${host}:${ports[0]}`);
 				expect(instanceResponse.ok).toBe(true);
 			}
 
