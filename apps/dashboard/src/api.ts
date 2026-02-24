@@ -152,7 +152,7 @@ export interface ActivityLogEntry {
 	createdAt: string;
 }
 
-export interface BuildLogEntry {
+export interface BootstrapLogEntry {
 	/** @example "2026-02-22T12:00:00.000Z" */
 	timestamp: string;
 	text: string;
@@ -184,8 +184,8 @@ export const api = {
 	fetchWorkloadSnapshots: (name: string) =>
 		get<SnapshotSummary[]>(`/workloads/${encodeURIComponent(name)}/snapshots`),
 
-	fetchBuildLogs: (name: string) =>
-		get<BuildLogEntry[]>(`/workloads/${encodeURIComponent(name)}/logs`),
+	fetchBootstrapLogs: (name: string) =>
+		get<BootstrapLogEntry[]>(`/workloads/${encodeURIComponent(name)}/logs`),
 
 	fetchInstances: (status?: string) => {
 		const qs = status ? `?status=${encodeURIComponent(status)}` : "";

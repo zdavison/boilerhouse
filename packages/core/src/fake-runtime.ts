@@ -69,7 +69,7 @@ export class FakeRuntime implements Runtime {
 			ports,
 		};
 		this.instances.set(instanceId, instance);
-		return { instanceId, running: false, meta: { vsockUdsPath: `/tmp/fake-vsock-${instanceId}.sock` } };
+		return { instanceId, running: false };
 	}
 
 	async start(handle: InstanceHandle): Promise<void> {
@@ -96,14 +96,13 @@ export class FakeRuntime implements Runtime {
 			id,
 			type: "tenant",
 			paths: {
-				memory: `/fake-snapshots/${id}/memory`,
-				vmstate: `/fake-snapshots/${id}/vmstate`,
+				memory: `/fake-snapshots/${id}/snapshot`,
+				vmstate: `/fake-snapshots/${id}/snapshot`,
 			},
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			runtimeMeta: {
 				runtimeVersion: "fake-1.0.0",
-				cpuTemplate: "none",
 				architecture: "x86_64",
 			},
 		};

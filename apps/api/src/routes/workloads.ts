@@ -5,7 +5,7 @@ import { workloads, instances, snapshots } from "@boilerhouse/db";
 import type { RouteDeps } from "./deps";
 
 export function workloadRoutes(deps: RouteDeps) {
-	const { db, goldenCreator, buildLogStore } = deps;
+	const { db, goldenCreator, bootstrapLogStore } = deps;
 
 	return new Elysia({ name: "workloads" })
 		.post("/workloads", async ({ request, set }) => {
@@ -149,7 +149,7 @@ export function workloadRoutes(deps: RouteDeps) {
 				return { error: `Workload '${params.name}' not found` };
 			}
 
-			return buildLogStore.getLines(row.workloadId);
+			return bootstrapLogStore.getLines(row.workloadId);
 		})
 		.delete("/workloads/:name", ({ params, set }) => {
 			const row = db

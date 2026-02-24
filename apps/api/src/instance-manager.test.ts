@@ -50,7 +50,7 @@ beforeEach(() => {
 	db.insert(nodes)
 		.values({
 			nodeId,
-			runtimeType: "firecracker",
+			runtimeType: "podman",
 			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 			status: "online",
 			lastHeartbeat: new Date(),
@@ -431,12 +431,11 @@ describe("InstanceManager", () => {
 			const fakeRef: SnapshotRef = {
 				id: generateSnapshotId(),
 				type: "tenant",
-				paths: { memory: "/fake/mem", vmstate: "/fake/vm" },
+				paths: { memory: "/fake/snapshot", vmstate: "/fake/snapshot" },
 				workloadId,
 				nodeId,
 				runtimeMeta: {
 					runtimeVersion: "fake-1.0.0",
-					cpuTemplate: "none",
 					architecture: "x86_64",
 				},
 			};

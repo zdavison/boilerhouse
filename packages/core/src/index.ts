@@ -125,5 +125,3 @@ export {
 	workloadTransition,
 	canWorkloadTransition,
 } from "./workload-state";
-
-export { resolveImagePath } from "./image-path";

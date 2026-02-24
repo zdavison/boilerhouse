@@ -22,7 +22,7 @@ function App() {
 
 	useWebSocket((event: unknown) => {
 		const e = event as { type?: string };
-		if (e.type !== "build.log") refetch();
+		if (e.type !== "bootstrap.log") refetch();
 	});
 
 	let content: React.ReactNode;

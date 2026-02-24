@@ -18,8 +18,7 @@ import {
 import { SnapshotManager } from "./snapshot-manager";
 import { EventBus, type DomainEvent } from "./event-bus";
 import { GoldenCreator } from "./golden-creator";
-import type { ImageBuilder } from "./image-builder";
-import { BuildLogStore } from "./build-log-store";
+import { BootstrapLogStore } from "./bootstrap-log-store";
 
 const MINIMAL_WORKLOAD: Workload = {
 	workload: { name: "test", version: "1.0.0" },
@@ -59,7 +58,7 @@ beforeEach(() => {
 	db.insert(nodes)
 		.values({
 			nodeId,
-			runtimeType: "firecracker",
+			runtimeType: "podman",
 			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 			status: "online",
 			lastHeartbeat: new Date(),
@@ -195,52 +194,31 @@ describe("GoldenCreator", () => {
 		expect(creator.isProcessing).toBe(false);
 	});
 
-	test("calls imageBuilder.ensureRootfs before creating golden snapshot", async () => {
-		const calls: Workload[] = [];
-		const imageBuilder: ImageBuilder = {
-			ensureRootfs: async (workload) => {
-				calls.push(workload);
-			},
-		};
-		const creator = new GoldenCreator(db, snapshotManager, eventBus, imageBuilder);
-		const workloadId = seedWorkload();
-
-		creator.enqueue(workloadId, MINIMAL_WORKLOAD);
-		await waitForIdle(creator);
-
-		expect(calls).toHaveLength(1);
-		expect(calls[0]!.image.ref).toBe("test:latest");
-
-		// Snapshot should still be created
-		const snapshotRows = db.select().from(snapshots).all();
-		expect(snapshotRows.length).toBe(1);
-	});
-
 	test("emits build log events during processing", async () => {
-		const buildLogStore = new BuildLogStore(db);
-		const creator = new GoldenCreator(db, snapshotManager, eventBus, undefined, buildLogStore);
+		const bootstrapLogStore = new BootstrapLogStore(db);
+		const creator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
 		const workloadId = seedWorkload();
 
 		creator.enqueue(workloadId, MINIMAL_WORKLOAD);
 		await waitForIdle(creator);
 
-		const lines = buildLogStore.getLines(workloadId);
+		const lines = bootstrapLogStore.getLines(workloadId);
 		expect(lines.length).toBeGreaterThan(0);
 		// Should include snapshot creation messages
 		expect(lines.some((l) => l.text.includes("golden snapshot"))).toBe(true);
 
-		// build.log events should have been emitted
-		const buildLogEvents = events.filter((e) => e.type === "build.log");
+		// bootstrap.log events should have been emitted
+		const buildLogEvents = events.filter((e) => e.type === "bootstrap.log");
 		expect(buildLogEvents.length).toBeGreaterThan(0);
 	});
 
 	test("clears build log store on re-enqueue", async () => {
-		const buildLogStore = new BuildLogStore(db);
-		const creator = new GoldenCreator(db, snapshotManager, eventBus, undefined, buildLogStore);
+		const bootstrapLogStore = new BootstrapLogStore(db);
+		const creator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
 		const workloadId = seedWorkload();
 
-		buildLogStore.append(workloadId, "stale log line");
-		expect(buildLogStore.getLines(workloadId)).toHaveLength(1);
+		bootstrapLogStore.append(workloadId, "stale log line");
+		expect(bootstrapLogStore.getLines(workloadId)).toHaveLength(1);
 
 		creator.enqueue(workloadId, MINIMAL_WORKLOAD);
 
@@ -248,35 +226,10 @@ describe("GoldenCreator", () => {
 		// (new lines will be added during processing, but old ones are gone)
 		await waitForIdle(creator);
 
-		const lines = buildLogStore.getLines(workloadId);
+		const lines = bootstrapLogStore.getLines(workloadId);
 		expect(lines.every((l) => l.text !== "stale log line")).toBe(true);
 	});
 
-	test("transitions to error when imageBuilder.ensureRootfs fails", async () => {
-		const imageBuilder: ImageBuilder = {
-			ensureRootfs: async () => {
-				throw new Error("docker pull failed");
-			},
-		};
-		const creator = new GoldenCreator(db, snapshotManager, eventBus, imageBuilder);
-		const workloadId = seedWorkload();
-
-		creator.enqueue(workloadId, MINIMAL_WORKLOAD);
-		await waitForIdle(creator);
-
-		const row = db
-			.select()
-			.from(workloads)
-			.where(eq(workloads.workloadId, workloadId))
-			.get();
-		expect(row!.status).toBe("error");
-		expect(row!.statusDetail).toBe("docker pull failed");
-
-		expect(events).toHaveLength(1);
-		if (events[0]!.type === "workload.state") {
-			expect(events[0]!.status).toBe("error");
-		}
-	});
 });
 
 async function waitForIdle(creator: GoldenCreator, timeoutMs = 5000): Promise<void> {

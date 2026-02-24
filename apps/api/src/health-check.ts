@@ -1,5 +1,3 @@
-import { createServer } from "node:net";
-import { unlinkSync } from "node:fs";
 import type { Runtime, InstanceHandle } from "@boilerhouse/core";
 
 export interface HealthConfig {
@@ -80,65 +78,7 @@ export function createHttpCheck(url: string, onLog?: (line: string) => void): He
 	};
 }
 
-export interface VsockCheckHandle {
-	/** Health check function that returns the latest health status. */
-	check: HealthCheckFn;
-	/** Cleans up the Unix socket server. */
-	cleanup: () => void;
-}
-
-/**
- * Creates a health check that listens on a Unix socket for vsock-proxied
- * health reports from the guest agent.
- *
- * Firecracker proxies vsock connections from the guest to a Unix domain
- * socket at `<vsockUdsPath>_<port>`. The guest health-agent connects to
- * the host (CID 2) on the given port, which Firecracker maps to this socket.
- *
- * Protocol: the guest sends `HEALTH OK\n` or `HEALTH FAIL <code>\n`.
- */
-export function createVsockCheck(
-	vsockUdsPath: string,
-	port: number,
-	onLog?: (line: string) => void,
-): VsockCheckHandle {
-	const socketPath = `${vsockUdsPath}_${port}`;
-	let healthy = false;
-
-	const server = createServer((conn) => {
-		let buffer = "";
-		conn.on("data", (data) => {
-			buffer += data.toString();
-			const lines = buffer.split("\n");
-			buffer = lines.pop()!;
-			for (const line of lines) {
-				if (line === "HEALTH OK") {
-					healthy = true;
-				} else if (line.startsWith("HEALTH FAIL")) {
-					healthy = false;
-					onLog?.(`Vsock health report: ${line}`);
-				}
-			}
-		});
-	});
-
-	server.listen(socketPath);
-
-	const check: HealthCheckFn = async () => healthy;
-
-	const cleanup = () => {
-		server.close();
-		try {
-			unlinkSync(socketPath);
-		} catch {
-			// Socket file may already be cleaned up
-		}
-	};
-
-	return { check, cleanup };
-}
-
-/** Creates a health check that executes a command in the guest VM. Exit code 0 = healthy. */
+/** Creates a health check that executes a command in the instance. Exit code 0 = healthy. */
 export function createExecCheck(
 	runtime: Runtime,
 	handle: InstanceHandle,

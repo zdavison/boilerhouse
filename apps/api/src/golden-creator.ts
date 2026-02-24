@@ -4,8 +4,7 @@ import type { DrizzleDb } from "@boilerhouse/db";
 import { workloads } from "@boilerhouse/db";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { EventBus } from "./event-bus";
-import type { ImageBuilder } from "./image-builder";
-import type { BuildLogStore } from "./build-log-store";
+import type { BootstrapLogStore } from "./bootstrap-log-store";
 import { applyWorkloadTransition } from "./transitions";
 
 export class GoldenCreator {
@@ -17,14 +16,13 @@ export class GoldenCreator {
 		private readonly db: DrizzleDb,
 		private readonly snapshotManager: SnapshotManager,
 		private readonly eventBus: EventBus,
-		private readonly imageBuilder?: ImageBuilder,
-		private readonly buildLogStore?: BuildLogStore,
+		private readonly bootstrapLogStore?: BootstrapLogStore,
 	) {}
 
 	/** Enqueue a workload for background golden snapshot creation. */
 	enqueue(workloadId: WorkloadId, workload: Workload): void {
 		if (this.queue.has(workloadId)) return;
-		this.buildLogStore?.clear(workloadId);
+		this.bootstrapLogStore?.clear(workloadId);
 		this.queue.set(workloadId, workload);
 		if (!this.processing) {
 			this.processQueue();
@@ -65,10 +63,10 @@ export class GoldenCreator {
 
 	private async processItem(workloadId: WorkloadId, workload: Workload): Promise<void> {
 		const onLog = (line: string): void => {
-			if (this.buildLogStore) {
-				const entry = this.buildLogStore.append(workloadId, line);
+			if (this.bootstrapLogStore) {
+				const entry = this.bootstrapLogStore.append(workloadId, line);
 				this.eventBus.emit({
-					type: "build.log",
+					type: "bootstrap.log",
 					workloadId,
 					line,
 					timestamp: entry.timestamp,
@@ -77,10 +75,6 @@ export class GoldenCreator {
 		};
 
 		try {
-			if (this.imageBuilder) {
-				await this.imageBuilder.ensureRootfs(workload, onLog);
-			}
-
 			onLog("Creating golden snapshot...");
 			await this.snapshotManager.createGolden(workloadId, workload, onLog);
 			applyWorkloadTransition(this.db, workloadId, "creating", "created");

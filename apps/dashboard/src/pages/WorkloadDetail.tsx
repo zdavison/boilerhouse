@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useApi, useWebSocket } from "../hooks";
-import { api, type ClaimResult, type BuildLogEntry } from "../api";
+import { api, type ClaimResult, type BootstrapLogEntry } from "../api";
 import { LoadingState, ErrorState, PageHeader, InfoCard, BackLink, ActionButton, StatusIndicator } from "../components";
 import { JsonSyntax } from "../json-syntax";
 
@@ -18,27 +18,27 @@ export function WorkloadDetail({
 	const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
 	const [claimError, setClaimError] = useState<string | null>(null);
 
-	const [buildLogs, setBuildLogs] = useState<BuildLogEntry[]>([]);
+	const [bootstrapLogs, setBootstrapLogs] = useState<BootstrapLogEntry[]>([]);
 	const [logCopied, setLogCopied] = useState(false);
 	const logContainerRef = useRef<HTMLDivElement>(null);
 
-	// Fetch logs for any workload that has been through the build pipeline
+	// Fetch logs for any workload that has been through the bootstrap pipeline
 	useEffect(() => {
 		if (!data) return;
-		api.fetchBuildLogs(name).then(setBuildLogs).catch(() => {});
+		api.fetchBootstrapLogs(name).then(setBootstrapLogs).catch(() => {});
 	}, [data?.status, name]);
 
-	// Listen for build.log WS events for this workload
+	// Listen for bootstrap.log WS events for this workload
 	useWebSocket((event: unknown) => {
 		const e = event as { type?: string; workloadId?: string; line?: string; timestamp?: string };
 		if (
-			e.type === "build.log" &&
+			e.type === "bootstrap.log" &&
 			data &&
 			e.workloadId === data.workloadId &&
 			e.line !== undefined &&
 			e.timestamp !== undefined
 		) {
-			setBuildLogs((prev) => [...prev, { text: e.line!, timestamp: e.timestamp! }]);
+			setBootstrapLogs((prev) => [...prev, { text: e.line!, timestamp: e.timestamp! }]);
 		}
 	});
 
@@ -47,7 +47,7 @@ export function WorkloadDetail({
 		if (logContainerRef.current) {
 			logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
 		}
-	}, [buildLogs]);
+	}, [bootstrapLogs]);
 
 	async function handleClaim() {
 		if (!tenantId.trim() || !data) return;
@@ -89,16 +89,16 @@ export function WorkloadDetail({
 			</div>
 
 			{/* Build log panel */}
-			{(data.status === "creating" || buildLogs.length > 0) && (
+			{(data.status === "creating" || bootstrapLogs.length > 0) && (
 				<div className="mb-6">
 					<h3 className="text-sm font-tight uppercase tracking-wider text-muted mb-3">
-						Build Log
+						Bootstrap Log
 					</h3>
 					<div className="bg-surface-2 rounded-md relative">
-						{buildLogs.length > 0 && (
+						{bootstrapLogs.length > 0 && (
 							<button
 								onClick={() => {
-									const text = buildLogs
+									const text = bootstrapLogs
 										.map((e) => `${new Date(e.timestamp).toISOString()} ${e.text}`)
 										.join("\n");
 									navigator.clipboard.writeText(text).then(() => {
@@ -134,10 +134,10 @@ export function WorkloadDetail({
 							ref={logContainerRef}
 							className="p-4 max-h-80 overflow-y-auto"
 						>
-							{buildLogs.length === 0 ? (
-								<p className="text-xs font-mono text-muted">Waiting for build output...</p>
+							{bootstrapLogs.length === 0 ? (
+								<p className="text-xs font-mono text-muted">Waiting for bootstrap output...</p>
 							) : (
-								buildLogs.map((entry, i) => {
+								bootstrapLogs.map((entry, i) => {
 									const isError = entry.text.startsWith("ERROR:");
 									return (
 										<div key={i} className="flex gap-2 text-xs font-mono leading-5">

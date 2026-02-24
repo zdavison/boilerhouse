@@ -1,13 +1,8 @@
 import { describe, test, expect, afterEach } from "bun:test";
-import { connect } from "node:net";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { mkdtempSync, rmSync } from "node:fs";
 import {
 	pollHealth,
 	createHttpCheck,
 	createExecCheck,
-	createVsockCheck,
 	HealthCheckTimeoutError,
 } from "./health-check";
 import type { HealthConfig, HealthCheckFn } from "./health-check";
@@ -249,123 +244,6 @@ describe("createHttpCheck", () => {
 	});
 });
 
-describe("createVsockCheck", () => {
-	let tmpDir: string;
-
-	afterEach(() => {
-		if (tmpDir) {
-			rmSync(tmpDir, { recursive: true, force: true });
-		}
-	});
-
-	function sendMessage(socketPath: string, message: string): Promise<void> {
-		return new Promise((resolve, reject) => {
-			const client = connect(socketPath, () => {
-				client.write(message);
-				client.end();
-				resolve();
-			});
-			client.on("error", reject);
-		});
-	}
-
-	test("returns false before any report", async () => {
-		tmpDir = mkdtempSync(join(tmpdir(), "vsock-test-"));
-		const vsockPath = join(tmpDir, "vsock.sock");
-
-		const handle = createVsockCheck(vsockPath, 52);
-		try {
-			const result = await handle.check();
-			expect(result).toBe(false);
-		} finally {
-			handle.cleanup();
-		}
-	});
-
-	test("returns true after HEALTH OK message", async () => {
-		tmpDir = mkdtempSync(join(tmpdir(), "vsock-test-"));
-		const vsockPath = join(tmpDir, "vsock.sock");
-		const socketPath = `${vsockPath}_52`;
-
-		const handle = createVsockCheck(vsockPath, 52);
-		try {
-			// Wait for server to be listening
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			await sendMessage(socketPath, "HEALTH OK\n");
-
-			// Allow data processing
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			const result = await handle.check();
-			expect(result).toBe(true);
-		} finally {
-			handle.cleanup();
-		}
-	});
-
-	test("returns false after HEALTH FAIL message", async () => {
-		tmpDir = mkdtempSync(join(tmpdir(), "vsock-test-"));
-		const vsockPath = join(tmpDir, "vsock.sock");
-		const socketPath = `${vsockPath}_52`;
-
-		const handle = createVsockCheck(vsockPath, 52);
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			// First send OK, then FAIL
-			await sendMessage(socketPath, "HEALTH OK\n");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			expect(await handle.check()).toBe(true);
-
-			await sendMessage(socketPath, "HEALTH FAIL 1\n");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			expect(await handle.check()).toBe(false);
-		} finally {
-			handle.cleanup();
-		}
-	});
-
-	test("calls onLog on HEALTH FAIL", async () => {
-		tmpDir = mkdtempSync(join(tmpdir(), "vsock-test-"));
-		const vsockPath = join(tmpDir, "vsock.sock");
-		const socketPath = `${vsockPath}_52`;
-
-		const logs: string[] = [];
-		const handle = createVsockCheck(vsockPath, 52, (line) => logs.push(line));
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			await sendMessage(socketPath, "HEALTH FAIL 127\n");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			expect(logs.length).toBe(1);
-			expect(logs[0]).toContain("HEALTH FAIL 127");
-		} finally {
-			handle.cleanup();
-		}
-	});
-
-	test("does not call onLog on HEALTH OK", async () => {
-		tmpDir = mkdtempSync(join(tmpdir(), "vsock-test-"));
-		const vsockPath = join(tmpDir, "vsock.sock");
-		const socketPath = `${vsockPath}_52`;
-
-		const logs: string[] = [];
-		const handle = createVsockCheck(vsockPath, 52, (line) => logs.push(line));
-		try {
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			await sendMessage(socketPath, "HEALTH OK\n");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			expect(logs.length).toBe(0);
-		} finally {
-			handle.cleanup();
-		}
-	});
-});
-
 describe("pollHealth onLog", () => {
 	test("logs attempt info on each failure", async () => {
 		let calls = 0;
@@ -392,10 +270,8 @@ describe("pollHealth onLog", () => {
 	});
 
 	test("logs thrown error message when check throws", async () => {
-		let calls = 0;
 		const check: HealthCheckFn = async () => {
-			calls++;
-			throw new Error("exec requires a guest agent — not yet implemented");
+			throw new Error("connection refused");
 		};
 
 		const config: HealthConfig = {
@@ -412,7 +288,7 @@ describe("pollHealth onLog", () => {
 		// Each attempt should produce two log lines: the thrown error + the attempt summary
 		const thrownLogs = logs.filter((l) => l.includes("threw:"));
 		expect(thrownLogs.length).toBe(2);
-		expect(thrownLogs[0]).toContain("guest agent");
+		expect(thrownLogs[0]).toContain("connection refused");
 	});
 
 	test("does not log on successful attempts", async () => {

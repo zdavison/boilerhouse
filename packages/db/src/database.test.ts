@@ -14,7 +14,7 @@ describe("createTestDatabase", () => {
 		db.insert(nodes)
 			.values({
 				nodeId: "node-1" as NodeId,
-				runtimeType: "firecracker",
+				runtimeType: "podman",
 				capacity: { vcpus: 4, memoryMb: 1024, diskGb: 10 } satisfies NodeCapacity,
 				lastHeartbeat: now,
 				createdAt: now,
@@ -34,7 +34,7 @@ describe("createTestDatabase", () => {
 		db1.insert(nodes)
 			.values({
 				nodeId: "node-a" as NodeId,
-				runtimeType: "firecracker",
+				runtimeType: "podman",
 				capacity: { vcpus: 2, memoryMb: 512, diskGb: 5 } satisfies NodeCapacity,
 				lastHeartbeat: now,
 				createdAt: now,

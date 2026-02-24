@@ -9,7 +9,7 @@ export interface RuntimeEntry {
 		networking: boolean;
 		/**
 		 * Whether concurrent snapshot restores from the same golden are
-		 * supported. Requires per-instance network isolation (jailer mode).
+		 * supported.
 		 * @default true
 		 */
 		concurrentRestore: boolean;
@@ -21,7 +21,7 @@ export interface RuntimeEntry {
 	 * Used by error-recovery tests. Mechanism is runtime-specific:
 	 * - fake: server started with failOn config
 	 * - docker: workload references a nonexistent image
-	 * - firecracker: workload references a missing kernel/rootfs
+	 * - podman: workload references a nonexistent image
 	 */
 	brokenWorkloadFixture: string;
 	/** Verify no orphaned resources exist via runtime CLI. No-op for fake. */
@@ -89,43 +89,16 @@ const dockerEntry: RuntimeEntry = {
 	},
 };
 
-const firecrackerEntry: RuntimeEntry = {
-	name: "firecracker",
-	capabilities: {
-		snapshot: true,
-		exec: false,
-		networking: true,
-		concurrentRestore: false,
-	},
-	workloadFixture: fixturePath("workload-firecracker.toml"),
-	brokenWorkloadFixture: fixturePath("workload-firecracker-broken.toml"),
-	verifyCleanup: async () => {
-		// In dev mode (TapManager, no jailer), system-wide TAP checks
-		// are unreliable since TAPs from other tests/runs may persist.
-		// Per-instance cleanup is handled by the E2E server cleanup handler
-		// which calls runtime.destroy() for each instance.
-	},
-	isInstanceRunning: async (instanceId: string) => {
-		const result = Bun.spawnSync([
-			"pgrep",
-			"-f",
-			instanceId,
-		]);
-		return result.exitCode === 0;
-	},
-};
-
 const ALL_ENTRIES: Record<string, RuntimeEntry> = {
 	fake: fakeEntry,
 	docker: dockerEntry,
-	firecracker: firecrackerEntry,
 };
 
 /**
  * Runtimes that have a working Runtime implementation wired into startE2EServer.
- * Docker and Firecracker entries are defined above for when their runtimes are added.
+ * Add "podman" here once PodmanRuntime is implemented.
  */
-const IMPLEMENTED_RUNTIMES = new Set(["fake", "firecracker"]);
+const IMPLEMENTED_RUNTIMES = new Set(["fake"]);
 
 /**
  * Returns runtime entries filtered to only those available on this system.
@@ -164,5 +137,5 @@ export function availableRuntimes(): RuntimeEntry[] {
 export const E2E_TIMEOUTS = {
 	fake: { operation: 2_000, connect: 1_000 },
 	docker: { operation: 30_000, connect: 10_000 },
-	firecracker: { operation: 60_000, connect: 15_000 },
+	podman: { operation: 30_000, connect: 10_000 },
 } as const;

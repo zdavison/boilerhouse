@@ -9,7 +9,7 @@ import type { Workload } from "./workload";
 export const InstanceHandleSchema = Type.Object({
 	/** The unique instance identifier. */
 	instanceId: InstanceIdSchema,
-	/** Whether the VM is currently running. */
+	/** Whether the instance is currently running. */
 	running: Type.Boolean(),
 	/** Runtime-specific metadata exposed to consumers. */
 	meta: Type.Optional(Type.Record(Type.String(), Type.String())),
@@ -32,12 +32,9 @@ export interface ExecResult {
 export interface InstanceHandle {
 	/** The unique instance identifier. */
 	instanceId: InstanceId;
-	/** Whether the VM is currently running. */
+	/** Whether the instance is currently running. */
 	running: boolean;
-	/**
-	 * Runtime-specific metadata exposed to consumers.
-	 * @example { vsockUdsPath: "/var/run/fc/inst-abc/vsock.sock" }
-	 */
+	/** Runtime-specific metadata exposed to consumers. */
 	meta?: Record<string, string>;
 }
 
@@ -46,7 +43,7 @@ export type Endpoint = Static<typeof EndpointSchema>;
 // ── Runtime interface ────────────────────────────────────────────────────────
 
 export interface Runtime {
-	/** Create a new microVM from a workload definition (cold boot). */
+	/** Create a new instance from a workload definition (cold boot). */
 	create(workload: Workload, instanceId: InstanceId): Promise<InstanceHandle>;
 
 	/** Start a stopped/created instance. */
@@ -67,10 +64,10 @@ export interface Runtime {
 	 */
 	restore(ref: SnapshotRef, instanceId: InstanceId): Promise<InstanceHandle>;
 
-	/** Execute a command inside the guest VM. */
+	/** Execute a command inside the instance. */
 	exec(handle: InstanceHandle, command: string[]): Promise<ExecResult>;
 
-	/** Get the guest IP / connectivity info for reaching the instance. */
+	/** Get the connectivity info for reaching the instance. */
 	getEndpoint(handle: InstanceHandle): Promise<Endpoint>;
 
 	/** List all instance IDs currently known to the runtime. */

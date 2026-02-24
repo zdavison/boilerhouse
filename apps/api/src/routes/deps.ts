@@ -6,7 +6,7 @@ import type { SnapshotManager } from "../snapshot-manager";
 import type { EventBus } from "../event-bus";
 import type { ResourceLimiter } from "../resource-limits";
 import type { GoldenCreator } from "../golden-creator";
-import type { BuildLogStore } from "../build-log-store";
+import type { BootstrapLogStore } from "../bootstrap-log-store";
 
 export interface RouteDeps {
 	db: DrizzleDb;
@@ -18,6 +18,6 @@ export interface RouteDeps {
 	snapshotManager: SnapshotManager;
 	eventBus: EventBus;
 	goldenCreator: GoldenCreator;
-	buildLogStore: BuildLogStore;
+	bootstrapLogStore: BootstrapLogStore;
 	resourceLimiter?: ResourceLimiter;
 }

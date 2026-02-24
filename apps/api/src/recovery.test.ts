@@ -106,7 +106,7 @@ beforeEach(() => {
 	db.insert(nodes)
 		.values({
 			nodeId,
-			runtimeType: "firecracker",
+			runtimeType: "podman",
 			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 			status: "online",
 			lastHeartbeat: new Date(),
@@ -134,10 +134,10 @@ describe("recoverState", () => {
 		expect(row!.status).toBe("active");
 	});
 
-	test("marks missing VMs as destroyed", async () => {
+	test("marks missing instances as destroyed", async () => {
 		const id = generateInstanceId();
 		insertInstance(id, "active");
-		// Not adding to runtime — VM is gone
+		// Not adding to runtime — instance is gone
 
 		const report = await recoverState(runtime, db, nodeId, log);
 
@@ -148,7 +148,7 @@ describe("recoverState", () => {
 		expect(row!.status).toBe("destroyed");
 	});
 
-	test("handles status='starting' instances with no VM", async () => {
+	test("handles status='starting' instances with no runtime instance", async () => {
 		const id = generateInstanceId();
 		insertInstance(id, "starting");
 
@@ -159,7 +159,7 @@ describe("recoverState", () => {
 		expect(row!.status).toBe("destroyed");
 	});
 
-	test("clears tenants.instanceId when VM is gone", async () => {
+	test("clears tenants.instanceId when instance is gone", async () => {
 		const instanceId = generateInstanceId();
 		const tenantId = generateTenantId();
 		insertTenant(tenantId, instanceId);
@@ -191,119 +191,16 @@ describe("recoverState", () => {
 		expect(dRow!.status).toBe("destroyed");
 	});
 
-	test("orphaned TAP devices are cleaned up", async () => {
-		const liveId = generateInstanceId();
-		insertInstance(liveId, "active");
-		await addToRuntime(liveId);
-
-		// Simulate orphaned TAP: a device name that doesn't match any active instance
-		const destroyedTaps: string[] = [];
-
-		const report = await recoverState(runtime, db, nodeId, log, {
-			listTaps: async () => ["tap-deadbeef", "tap-00000000"],
-			destroyTap: async (name) => {
-				destroyedTaps.push(name);
-			},
-		});
-
-		expect(report.orphanedTapsCleaned).toBe(2);
-		expect(destroyedTaps).toContain("tap-deadbeef");
-		expect(destroyedTaps).toContain("tap-00000000");
-	});
-
-	test("orphaned network namespaces are cleaned up", async () => {
-		const liveId = generateInstanceId();
-		insertInstance(liveId, "active");
-		await addToRuntime(liveId);
-
-		const destroyedNetns: string[] = [];
-
-		const report = await recoverState(runtime, db, nodeId, log, {
-			listNetns: async () => ["fc-orphaned1", "fc-orphaned2"],
-			destroyNetns: async (name) => {
-				destroyedNetns.push(name);
-			},
-			deriveNsName: () => "fc-expected",
-		});
-
-		expect(report.orphanedNetnsCleaned).toBe(2);
-		expect(destroyedNetns).toContain("fc-orphaned1");
-		expect(destroyedNetns).toContain("fc-orphaned2");
-	});
-
-	test("keeps network namespaces matching active instances", async () => {
-		const liveId = generateInstanceId();
-		insertInstance(liveId, "active");
-		await addToRuntime(liveId);
-
-		const destroyedNetns: string[] = [];
-
-		const report = await recoverState(runtime, db, nodeId, log, {
-			listNetns: async () => ["fc-matching", "fc-orphaned"],
-			destroyNetns: async (name) => {
-				destroyedNetns.push(name);
-			},
-			deriveNsName: () => "fc-matching",
-		});
-
-		expect(report.orphanedNetnsCleaned).toBe(1);
-		expect(destroyedNetns).toContain("fc-orphaned");
-		expect(destroyedNetns).not.toContain("fc-matching");
-	});
-
-	test("orphaned jail directories are cleaned up", async () => {
-		const liveId = generateInstanceId();
-		insertInstance(liveId, "active");
-		await addToRuntime(liveId);
-
-		const cleanedJails: string[] = [];
-
-		const report = await recoverState(runtime, db, nodeId, log, {
-			listJails: async () => ["orphan-inst-1", "orphan-inst-2"],
-			cleanJail: async (instanceId) => {
-				cleanedJails.push(instanceId);
-			},
-			chrootBaseDir: "/srv/jailer",
-		});
-
-		expect(report.orphanedJailsCleaned).toBe(2);
-		expect(cleanedJails).toContain("orphan-inst-1");
-		expect(cleanedJails).toContain("orphan-inst-2");
-	});
-
-	test("keeps jail directories matching active instances", async () => {
-		const liveId = generateInstanceId();
-		insertInstance(liveId, "active");
-		await addToRuntime(liveId);
-
-		const cleanedJails: string[] = [];
-
-		const report = await recoverState(runtime, db, nodeId, log, {
-			listJails: async () => [liveId, "orphan-inst"],
-			cleanJail: async (instanceId) => {
-				cleanedJails.push(instanceId);
-			},
-			chrootBaseDir: "/srv/jailer",
-		});
-
-		expect(report.orphanedJailsCleaned).toBe(1);
-		expect(cleanedJails).toContain("orphan-inst");
-		expect(cleanedJails).not.toContain(liveId);
-	});
-
 	test("idempotent — second run returns all zeros", async () => {
 		const id = generateInstanceId();
 		insertInstance(id, "active");
-		// No VM — will be destroyed on first run
+		// No instance — will be destroyed on first run
 
 		await recoverState(runtime, db, nodeId, log);
 		const report = await recoverState(runtime, db, nodeId, log);
 
 		expect(report.recovered).toBe(0);
 		expect(report.destroyed).toBe(0);
-		expect(report.orphanedTapsCleaned).toBe(0);
-		expect(report.orphanedNetnsCleaned).toBe(0);
-		expect(report.orphanedJailsCleaned).toBe(0);
 	});
 
 	test("recovers 'destroying' instances to 'destroyed'", async () => {

@@ -1,12 +1,10 @@
-import { existsSync } from "node:fs";
-
 export interface RuntimeAvailability {
 	/** Always available */
 	fake: true;
 	/** `docker info` succeeds */
 	docker: boolean;
-	/** `firecracker --version` succeeds and /dev/kvm exists */
-	firecracker: boolean;
+	/** `podman info` succeeds */
+	podman: boolean;
 }
 
 function commandSucceeds(cmd: string, args: string[]): boolean {
@@ -22,17 +20,12 @@ function commandSucceeds(cmd: string, args: string[]): boolean {
 }
 
 export function detectRuntimes(): RuntimeAvailability {
-	const docker =
-		commandSucceeds("docker", ["info"]);
-
-	const firecracker =
-		process.platform === "linux" &&
-		existsSync("/dev/kvm") &&
-		commandSucceeds("firecracker", ["--version"]);
+	const docker = commandSucceeds("docker", ["info"]);
+	const podman = commandSucceeds("podman", ["info"]);
 
 	return {
 		fake: true,
 		docker,
-		firecracker,
+		podman,
 	};
 }

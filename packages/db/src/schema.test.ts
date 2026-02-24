@@ -45,7 +45,7 @@ function insertNode(id = "node-1" as NodeId) {
 	db.insert(nodes)
 		.values({
 			nodeId: id,
-			runtimeType: "firecracker",
+			runtimeType: "podman",
 			capacity: sampleCapacity,
 			lastHeartbeat: now,
 			createdAt: now,
@@ -92,7 +92,7 @@ describe("nodes table", () => {
 		const rows = db.select().from(nodes).all();
 		expect(rows).toHaveLength(1);
 		expect(rows[0]!.nodeId).toBe("node-1" as NodeId);
-		expect(rows[0]!.runtimeType).toBe("firecracker");
+		expect(rows[0]!.runtimeType).toBe("podman");
 		expect(rows[0]!.status).toBe("online");
 	});
 

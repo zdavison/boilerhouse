@@ -13,7 +13,6 @@ export function snapshotRefFrom(row: SnapshotRow): SnapshotRef | null {
 	if (
 		!meta ||
 		typeof meta.runtimeVersion !== "string" ||
-		typeof meta.cpuTemplate !== "string" ||
 		typeof meta.architecture !== "string"
 	) {
 		return null;

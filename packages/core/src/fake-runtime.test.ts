@@ -52,8 +52,8 @@ describe("FakeRuntime", () => {
 
 		expect(ref.id).toBeDefined();
 		expect(ref.type).toBe("tenant");
-		expect(ref.paths.memory).toContain("memory");
-		expect(ref.paths.vmstate).toContain("vmstate");
+		expect(ref.paths.memory).toContain("snapshot");
+		expect(ref.paths.vmstate).toContain("snapshot");
 		expect(ref.workloadId).toBeDefined();
 		expect(ref.nodeId).toBeDefined();
 		expect(ref.runtimeMeta.runtimeVersion).toBeDefined();
@@ -77,12 +77,11 @@ describe("FakeRuntime", () => {
 		const invalidRef: SnapshotRef = {
 			id: generateSnapshotId(),
 			type: "golden",
-			paths: { memory: "/nonexistent/memory", vmstate: "/nonexistent/vmstate" },
+			paths: { memory: "/nonexistent/snapshot", vmstate: "/nonexistent/snapshot" },
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			runtimeMeta: {
 				runtimeVersion: "fake-1.0.0",
-				cpuTemplate: "none",
 				architecture: "x86_64",
 			},
 		};

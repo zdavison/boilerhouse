@@ -15,17 +15,15 @@ export const SnapshotTypeSchema = Type.Union([
 ]);
 
 export const SnapshotPathsSchema = Type.Object({
-	/** Path to the memory dump file. */
+	/** Primary snapshot data path (e.g. checkpoint archive). */
 	memory: Type.String({ minLength: 1 }),
-	/** Path to the VM state file. */
+	/** Secondary snapshot data path, or same as `memory` for single-file formats. */
 	vmstate: Type.String({ minLength: 1 }),
 });
 
 export const SnapshotMetadataSchema = Type.Object({
-	/** Runtime version (e.g. Firecracker version). */
+	/** Runtime version (e.g. podman version). */
 	runtimeVersion: Type.String({ minLength: 1 }),
-	/** CPU template used when the snapshot was taken. */
-	cpuTemplate: Type.String(),
 	/**
 	 * Architecture of the snapshot.
 	 * @example "x86_64"

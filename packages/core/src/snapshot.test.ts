@@ -19,14 +19,13 @@ describe("snapshot types", () => {
 			id: generateSnapshotId(),
 			type: "golden",
 			paths: {
-				memory: "/snapshots/abc/memory",
-				vmstate: "/snapshots/abc/vmstate",
+				memory: "/snapshots/abc/checkpoint.tar.gz",
+				vmstate: "/snapshots/abc/checkpoint.tar.gz",
 			},
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			runtimeMeta: {
-				runtimeVersion: "1.6.0",
-				cpuTemplate: "T2",
+				runtimeVersion: "5.4.2",
 				architecture: "x86_64",
 			},
 		});
@@ -41,8 +40,7 @@ describe("snapshot types", () => {
 		expect(deserialized.workloadId).toBe(ref.workloadId);
 		expect(deserialized.nodeId).toBe(ref.nodeId);
 		expect(deserialized.tenantId).toBeUndefined();
-		expect(deserialized.runtimeMeta.runtimeVersion).toBe("1.6.0");
-		expect(deserialized.runtimeMeta.cpuTemplate).toBe("T2");
+		expect(deserialized.runtimeMeta.runtimeVersion).toBe("5.4.2");
 		expect(deserialized.runtimeMeta.architecture).toBe("x86_64");
 	});
 
@@ -50,12 +48,11 @@ describe("snapshot types", () => {
 		const goldenRef = createSnapshotRef({
 			id: generateSnapshotId(),
 			type: "golden",
-			paths: { memory: "/snap/golden/mem", vmstate: "/snap/golden/vm" },
+			paths: { memory: "/snap/golden/checkpoint.tar.gz", vmstate: "/snap/golden/checkpoint.tar.gz" },
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			runtimeMeta: {
-				runtimeVersion: "1.6.0",
-				cpuTemplate: "T2",
+				runtimeVersion: "5.4.2",
 				architecture: "x86_64",
 			},
 		});
@@ -63,13 +60,12 @@ describe("snapshot types", () => {
 		const tenantRef = createSnapshotRef({
 			id: generateSnapshotId(),
 			type: "tenant",
-			paths: { memory: "/snap/tenant/mem", vmstate: "/snap/tenant/vm" },
+			paths: { memory: "/snap/tenant/checkpoint.tar.gz", vmstate: "/snap/tenant/checkpoint.tar.gz" },
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			tenantId: generateTenantId(),
 			runtimeMeta: {
-				runtimeVersion: "1.6.0",
-				cpuTemplate: "T2",
+				runtimeVersion: "5.4.2",
 				architecture: "arm64",
 			},
 		});
@@ -85,23 +81,21 @@ describe("snapshot types", () => {
 
 	test("snapshot metadata includes runtimeMeta", () => {
 		const meta: SnapshotMetadata = {
-			runtimeVersion: "1.6.0",
-			cpuTemplate: "T2",
+			runtimeVersion: "5.4.2",
 			architecture: "x86_64",
 		};
 
 		const ref = createSnapshotRef({
 			id: generateSnapshotId(),
 			type: "golden",
-			paths: { memory: "/snap/mem", vmstate: "/snap/vm" },
+			paths: { memory: "/snap/checkpoint.tar.gz", vmstate: "/snap/checkpoint.tar.gz" },
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			runtimeMeta: meta,
 		});
 
 		expect(ref.runtimeMeta).toEqual(meta);
-		expect(ref.runtimeMeta.runtimeVersion).toBe("1.6.0");
-		expect(ref.runtimeMeta.cpuTemplate).toBe("T2");
+		expect(ref.runtimeMeta.runtimeVersion).toBe("5.4.2");
 		expect(ref.runtimeMeta.architecture).toBe("x86_64");
 	});
 });

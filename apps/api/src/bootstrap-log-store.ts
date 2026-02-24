@@ -3,14 +3,14 @@ import type { WorkloadId } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { buildLogs } from "@boilerhouse/db";
 
-export interface BuildLogEntry {
+export interface BootstrapLogEntry {
 	timestamp: string;
 	text: string;
 }
 
 const DEFAULT_MAX_LINES = 5000;
 
-export class BuildLogStore {
+export class BootstrapLogStore {
 	private readonly maxLines: number;
 
 	constructor(
@@ -21,7 +21,7 @@ export class BuildLogStore {
 	}
 
 	/** Append a log line for a workload. Returns the created entry. */
-	append(workloadId: WorkloadId, text: string): BuildLogEntry {
+	append(workloadId: WorkloadId, text: string): BootstrapLogEntry {
 		const now = new Date();
 
 		this.db
@@ -55,7 +55,7 @@ export class BuildLogStore {
 	}
 
 	/** Get all log lines for a workload, or empty array if none. */
-	getLines(workloadId: WorkloadId): BuildLogEntry[] {
+	getLines(workloadId: WorkloadId): BootstrapLogEntry[] {
 		const rows = this.db
 			.select()
 			.from(buildLogs)

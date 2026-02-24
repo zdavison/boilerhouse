@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import type { WorkloadId } from "@boilerhouse/core";
 import { createTestDatabase, type DrizzleDb } from "@boilerhouse/db";
-import { BuildLogStore } from "./build-log-store";
+import { BootstrapLogStore } from "./bootstrap-log-store";
 
 const WID = "wkl-test-1" as WorkloadId;
 const WID2 = "wkl-test-2" as WorkloadId;
@@ -12,9 +12,9 @@ beforeEach(() => {
 	db = createTestDatabase();
 });
 
-describe("BuildLogStore", () => {
+describe("BootstrapLogStore", () => {
 	test("append stores lines with timestamps", () => {
-		const store = new BuildLogStore(db);
+		const store = new BootstrapLogStore(db);
 
 		const entry = store.append(WID, "Pulling image...");
 
@@ -25,13 +25,13 @@ describe("BuildLogStore", () => {
 	});
 
 	test("getLines returns empty array for unknown workload", () => {
-		const store = new BuildLogStore(db);
+		const store = new BootstrapLogStore(db);
 
 		expect(store.getLines(WID)).toEqual([]);
 	});
 
 	test("getLines returns all appended lines in order", () => {
-		const store = new BuildLogStore(db);
+		const store = new BootstrapLogStore(db);
 
 		store.append(WID, "line 1");
 		store.append(WID, "line 2");
@@ -45,7 +45,7 @@ describe("BuildLogStore", () => {
 	});
 
 	test("keeps workloads separate", () => {
-		const store = new BuildLogStore(db);
+		const store = new BootstrapLogStore(db);
 
 		store.append(WID, "from wid1");
 		store.append(WID2, "from wid2");
@@ -57,7 +57,7 @@ describe("BuildLogStore", () => {
 	});
 
 	test("clear removes all lines", () => {
-		const store = new BuildLogStore(db);
+		const store = new BootstrapLogStore(db);
 
 		store.append(WID, "line 1");
 		store.append(WID, "line 2");
@@ -68,7 +68,7 @@ describe("BuildLogStore", () => {
 	});
 
 	test("clear does not affect other workloads", () => {
-		const store = new BuildLogStore(db);
+		const store = new BootstrapLogStore(db);
 
 		store.append(WID, "keep me");
 		store.append(WID2, "delete me");
@@ -80,7 +80,7 @@ describe("BuildLogStore", () => {
 	});
 
 	test("maxLines eviction retains only tail", () => {
-		const store = new BuildLogStore(db, 3);
+		const store = new BootstrapLogStore(db, 3);
 
 		store.append(WID, "line 1");
 		store.append(WID, "line 2");

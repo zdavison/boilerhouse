@@ -111,7 +111,7 @@ beforeEach(() => {
 	db.insert(nodes)
 		.values({
 			nodeId,
-			runtimeType: "firecracker",
+			runtimeType: "podman",
 			capacity: { vcpus: 4, memoryMb: 8192, diskGb: 50 },
 			status: "online",
 			lastHeartbeat: new Date(),

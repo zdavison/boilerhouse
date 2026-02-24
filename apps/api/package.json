@@ -9,10 +9,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@boilerhouse/build": "workspace:*",
 		"@boilerhouse/core": "workspace:*",
 		"@boilerhouse/db": "workspace:*",
-		"@boilerhouse/runtime-firecracker": "workspace:*",
 		"drizzle-orm": "0.44.7",
 		"elysia": "^1.4.25"
 	}

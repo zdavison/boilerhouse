@@ -19,7 +19,7 @@ describe("node types", () => {
 	});
 
 	test("runtime types are exhaustive", () => {
-		expect(RUNTIME_TYPES).toContain("firecracker");
+		expect(RUNTIME_TYPES).toContain("podman");
 		expect(RUNTIME_TYPES).toContain("vz");
 		expect(RUNTIME_TYPES).toHaveLength(2);
 	});

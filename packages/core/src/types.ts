@@ -23,7 +23,7 @@ export const SnapshotIdSchema = Type.String({ minLength: 1 });
 
 // ── Branded ID types ─────────────────────────────────────────────────────────
 
-/** Unique identifier for an instance (running microVM). */
+/** Unique identifier for an instance. */
 export type InstanceId = Brand<Static<typeof InstanceIdSchema>, "InstanceId">;
 
 /** Unique identifier for a tenant. */

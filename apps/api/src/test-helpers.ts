@@ -8,7 +8,7 @@ import { TenantDataStore } from "./tenant-data";
 import { EventBus } from "./event-bus";
 import { ResourceLimiter } from "./resource-limits";
 import { GoldenCreator } from "./golden-creator";
-import { BuildLogStore } from "./build-log-store";
+import { BootstrapLogStore } from "./bootstrap-log-store";
 import { createApp } from "./app";
 import type { RouteDeps } from "./routes/deps";
 
@@ -30,7 +30,7 @@ export function createTestApp(): TestContext {
 	// Insert a node row so FK constraints pass
 	db.insert(nodes).values({
 		nodeId,
-		runtimeType: "firecracker",
+		runtimeType: "podman",
 		capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 		status: "online",
 		lastHeartbeat: new Date(),
@@ -52,8 +52,8 @@ export function createTestApp(): TestContext {
 	);
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
-	const buildLogStore = new BuildLogStore(db);
-	const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, undefined, buildLogStore);
+	const bootstrapLogStore = new BootstrapLogStore(db);
+	const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
 
 	const deps: RouteDeps = {
 		db,
@@ -65,7 +65,7 @@ export function createTestApp(): TestContext {
 		snapshotManager,
 		eventBus,
 		goldenCreator,
-		buildLogStore,
+		bootstrapLogStore,
 		resourceLimiter,
 	};
 

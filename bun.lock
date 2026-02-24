@@ -14,10 +14,8 @@
       "name": "@boilerhouse/api",
       "version": "0.0.1",
       "dependencies": {
-        "@boilerhouse/build": "workspace:*",
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/db": "workspace:*",
-        "@boilerhouse/runtime-firecracker": "workspace:*",
         "drizzle-orm": "0.44.7",
         "elysia": "^1.4.25",
       },
@@ -35,13 +33,6 @@
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
         "@types/react-syntax-highlighter": "^15.5.13",
-      },
-    },
-    "packages/build": {
-      "name": "@boilerhouse/build",
-      "version": "0.0.1",
-      "dependencies": {
-        "@boilerhouse/core": "workspace:*",
       },
     },
     "packages/core": {
@@ -63,17 +54,6 @@
         "drizzle-kit": "^0.31.0",
       },
     },
-    "packages/guest-init": {
-      "name": "@boilerhouse/guest-init",
-      "version": "0.0.1",
-    },
-    "packages/runtime-firecracker": {
-      "name": "@boilerhouse/runtime-firecracker",
-      "version": "0.0.1",
-      "dependencies": {
-        "@boilerhouse/core": "workspace:*",
-      },
-    },
     "packages/runtime-vz": {
       "name": "@boilerhouse/runtime-vz",
       "version": "0.0.1",
@@ -87,17 +67,11 @@
 
     "@boilerhouse/api": ["@boilerhouse/api@workspace:apps/api"],
 
-    "@boilerhouse/build": ["@boilerhouse/build@workspace:packages/build"],
-
     "@boilerhouse/core": ["@boilerhouse/core@workspace:packages/core"],
 
     "@boilerhouse/dashboard": ["@boilerhouse/dashboard@workspace:apps/dashboard"],
 
     "@boilerhouse/db": ["@boilerhouse/db@workspace:packages/db"],
-
-    "@boilerhouse/guest-init": ["@boilerhouse/guest-init@workspace:packages/guest-init"],
-
-    "@boilerhouse/runtime-firecracker": ["@boilerhouse/runtime-firecracker@workspace:packages/runtime-firecracker"],
 
     "@boilerhouse/runtime-vz": ["@boilerhouse/runtime-vz@workspace:packages/runtime-vz"],
 

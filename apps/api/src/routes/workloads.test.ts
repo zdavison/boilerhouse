@@ -262,8 +262,8 @@ describe("GET /api/v1/workloads/:name/logs", () => {
 		expect(res.status).toBe(404);
 	});
 
-	test("returns log entries from build log store", async () => {
-		const { app, db, buildLogStore } = createTestApp();
+	test("returns log entries from bootstrap log store", async () => {
+		const { app, db, bootstrapLogStore } = createTestApp();
 
 		const workloadId = generateWorkloadId();
 		db.insert(workloads)
@@ -277,8 +277,8 @@ describe("GET /api/v1/workloads/:name/logs", () => {
 			})
 			.run();
 
-		buildLogStore.append(workloadId, "Pulling image...");
-		buildLogStore.append(workloadId, "Creating ext4 image...");
+		bootstrapLogStore.append(workloadId, "Pulling image...");
+		bootstrapLogStore.append(workloadId, "Creating ext4 image...");
 
 		const res = await apiRequest(app, "/api/v1/workloads/has-logs/logs");
 		expect(res.status).toBe(200);

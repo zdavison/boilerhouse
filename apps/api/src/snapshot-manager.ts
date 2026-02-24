@@ -1,4 +1,4 @@
-import { statSync, readFileSync } from "node:fs";
+import { statSync } from "node:fs";
 import { eq, and } from "drizzle-orm";
 import type {
 	Runtime,
@@ -12,8 +12,8 @@ import { generateInstanceId } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { snapshots, snapshotRefFrom } from "@boilerhouse/db";
 import { applySnapshotTransition } from "./transitions";
-import { pollHealth, createVsockCheck } from "./health-check";
-import type { HealthConfig, HealthCheckFn, VsockCheckHandle } from "./health-check";
+import { pollHealth, createExecCheck, createHttpCheck } from "./health-check";
+import type { HealthConfig, HealthCheckFn } from "./health-check";
 
 export type HealthChecker = (check: HealthCheckFn, config: HealthConfig, onLog?: (line: string) => void) => Promise<void>;
 
@@ -48,8 +48,8 @@ export class SnapshotManager {
 	/**
 	 * Creates a golden snapshot for a workload on this node.
 	 *
-	 * Cold boots a VM, waits for it to become healthy, takes a snapshot,
-	 * then destroys the bootstrap VM. Uses upsert semantics — only one
+	 * Cold boots an instance, waits for it to become healthy, takes a snapshot,
+	 * then destroys the bootstrap instance. Uses upsert semantics — only one
 	 * golden snapshot per workload+node combination is kept.
 	 */
 	async createGolden(
@@ -60,37 +60,31 @@ export class SnapshotManager {
 		const log = onLog ?? (() => {});
 		const instanceId: InstanceId = generateInstanceId();
 
-		log("Creating bootstrap VM...");
+		log("Creating bootstrap instance...");
 		const handle = await this.runtime.create(workload, instanceId);
 
-		log("Starting bootstrap VM...");
+		log("Starting bootstrap instance...");
 		await this.runtime.start(handle);
 
-		let vsockHandle: VsockCheckHandle | undefined;
 		try {
 			// Poll health probe if the workload defines one.
-			// Both http_get and exec probes run inside the guest VM and
-			// report back via vsock (like Docker HEALTHCHECK).
 			if (workload.health) {
 				const intervalMs = workload.health.interval_seconds * 1000;
 
-				const vsockUdsPath = handle.meta?.vsockUdsPath;
-				if (!vsockUdsPath) {
-					throw new Error(
-						"health check requires vsock — handle.meta.vsockUdsPath is missing",
-					);
-				}
+				let check: HealthCheckFn;
 
-				if (workload.health.http_get) {
-					const port = workload.health.http_get.port
-						?? (await this.runtime.getEndpoint(handle)).ports[0]!;
-					log(`Health check: http via guest agent [GET localhost:${port}${workload.health.http_get.path}]...`);
+				if (workload.health.exec) {
+					log(`Health check: exec [${workload.health.exec.command.join(" ")}]...`);
+					check = createExecCheck(this.runtime, handle, workload.health.exec.command, log);
+				} else if (workload.health.http_get) {
+					const endpoint = await this.runtime.getEndpoint(handle);
+					const port = workload.health.http_get.port ?? endpoint.ports[0]!;
+					const url = `http://${endpoint.host}:${port}${workload.health.http_get.path}`;
+					log(`Health check: http [GET ${url}]...`);
+					check = createHttpCheck(url, log);
 				} else {
-					log(`Health check: exec via guest agent [${workload.health.exec!.command.join(" ")}]...`);
+					throw new Error("Workload health config has no exec or http_get probe defined");
 				}
-
-				vsockHandle = createVsockCheck(vsockUdsPath, 52, log);
-				const check = vsockHandle.check;
 
 				const config: HealthConfig = {
 					interval: intervalMs,
@@ -150,38 +144,19 @@ export class SnapshotManager {
 
 			applySnapshotTransition(this.db, goldenRef.id, "creating", "created");
 
-			log("Destroying bootstrap VM...");
-			// Destroy the bootstrap VM
+			log("Destroying bootstrap instance...");
+			// Destroy the bootstrap instance
 			await this.runtime.destroy(handle);
 
 			return goldenRef;
 		} catch (err) {
-			// Dump the guest console log on failure for debugging
-			const consolePath = handle.meta?.consolePath;
-			if (consolePath) {
-				try {
-					const consoleOutput = readFileSync(consolePath, "utf-8");
-					const lines = consoleOutput.split("\n").filter(Boolean);
-					const tail = lines.slice(-100);
-					log("--- Guest console (last 100 lines) ---");
-					for (const line of tail) {
-						log(line);
-					}
-					log("--- End guest console ---");
-				} catch {
-					// Console log may not exist
-				}
-			}
-
-			// Clean up the bootstrap VM on any failure
+			// Clean up the bootstrap instance on any failure
 			try {
 				await this.runtime.destroy(handle);
 			} catch {
 				// Ignore cleanup errors
 			}
 			throw err;
-		} finally {
-			vsockHandle?.cleanup();
 		}
 	}
 
@@ -214,7 +189,7 @@ export class SnapshotManager {
 		return this.getGolden(workloadId, nodeId) !== null;
 	}
 
-	/** Computes total size of snapshot files (vmstate + memory). */
+	/** Computes total size of snapshot files. */
 	private computeSnapshotSize(ref: SnapshotRef): number {
 		let total = 0;
 		try {
@@ -222,7 +197,7 @@ export class SnapshotManager {
 		} catch {
 			// File may not exist yet or be inaccessible
 		}
-		if (ref.paths.memory) {
+		if (ref.paths.memory && ref.paths.memory !== ref.paths.vmstate) {
 			try {
 				total += statSync(ref.paths.memory).size;
 			} catch {
