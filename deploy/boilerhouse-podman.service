@@ -1,0 +1,15 @@
+[Unit]
+Description=Rootful Podman API for Boilerhouse
+Documentation=https://docs.podman.io/en/latest/markdown/podman-system-service.1.html
+After=network.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/mkdir -p /run/boilerhouse
+ExecStart=/usr/bin/podman system service --time=0 unix:///run/boilerhouse/podman.sock
+ExecStartPost=/bin/sh -c 'until [ -S /run/boilerhouse/podman.sock ]; do sleep 0.1; done; chmod 660 /run/boilerhouse/podman.sock; chgrp %i /run/boilerhouse/podman.sock'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

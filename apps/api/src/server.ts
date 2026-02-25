@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
-import type { Workload } from "@boilerhouse/core";
+import type { Runtime, RuntimeType, Workload } from "@boilerhouse/core";
+import { PodmanRuntime } from "@boilerhouse/runtime-podman";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
 import { workloads as workloadsTable, tenants } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
@@ -20,8 +21,11 @@ import { applyWorkloadTransition, forceWorkloadStatus } from "./transitions";
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
 const storagePath = process.env.STORAGE_PATH ?? "./data";
+const snapshotDir = process.env.SNAPSHOT_DIR ?? "./data/snapshots";
+const runtimeType = (process.env.RUNTIME_TYPE ?? "podman") as RuntimeType;
 const maxInstances = Number(process.env.MAX_INSTANCES ?? 100);
 const workloadsDir = process.env.WORKLOADS_DIR;
+const podmanSocket = process.env.PODMAN_SOCKET ?? "/run/boilerhouse/podman.sock";
 
 const db = initDatabase(dbPath);
 const existingNode = db.select().from(nodes).get();
@@ -31,8 +35,7 @@ if (!existingNode) {
 	db.insert(nodes)
 		.values({
 			nodeId,
-			// TODO: Replace with actual runtime type once PodmanRuntime is implemented
-			runtimeType: "podman",
+			runtimeType,
 			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 			status: "online",
 			lastHeartbeat: new Date(),
@@ -41,8 +44,12 @@ if (!existingNode) {
 		.run();
 }
 
-// TODO: Replace FakeRuntime with PodmanRuntime once implemented
-const runtime = new FakeRuntime();
+let runtime: Runtime;
+if (runtimeType === "podman") {
+	runtime = new PodmanRuntime({ snapshotDir, socketPath: podmanSocket });
+} else {
+	runtime = new FakeRuntime();
+}
 const activityLog = new ActivityLog(db);
 const eventBus = new EventBus();
 

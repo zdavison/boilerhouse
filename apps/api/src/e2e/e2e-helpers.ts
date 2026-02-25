@@ -1,5 +1,9 @@
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import type { Runtime } from "@boilerhouse/core";
+import { PodmanRuntime } from "@boilerhouse/runtime-podman";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createTestDatabase, ActivityLog, nodes } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { InstanceManager } from "../instance-manager";
@@ -62,10 +66,15 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 
 	let runtime: Runtime;
 	let fakeFailOn: Set<RuntimeOperation> | undefined;
+	let snapshotDir: string | undefined;
 
 	if (runtimeName === "fake") {
 		fakeFailOn = new Set<RuntimeOperation>();
 		runtime = new FakeRuntime({ failOn: fakeFailOn });
+	} else if (runtimeName === "podman") {
+		snapshotDir = mkdtempSync(join(tmpdir(), "bh-e2e-snap-"));
+		const socketPath = process.env.PODMAN_SOCKET ?? "/run/boilerhouse/podman.sock";
+		runtime = new PodmanRuntime({ snapshotDir, socketPath });
 	} else {
 		throw new Error(`Runtime '${runtimeName}' not implemented for E2E`);
 	}
@@ -77,9 +86,9 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		nodeId,
 		eventBus,
 	);
-	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-		healthChecker: async () => {},
-	});
+	const snapshotManager = new SnapshotManager(runtime, db, nodeId,
+		runtimeName === "fake" ? { healthChecker: async () => {} } : undefined,
+	);
 	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-e2e", db);
 	const tenantManager = new TenantManager(
 		instanceManager,
@@ -119,6 +128,13 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		cleanup: async () => {
 			server.stop();
 			resourceLimiter.dispose();
+			// Destroy any remaining containers for real runtimes
+			if (runtimeName !== "fake") {
+				const remaining = await runtime.list();
+				for (const id of remaining) {
+					await runtime.destroy({ instanceId: id, running: false }).catch(() => {});
+				}
+			}
 		},
 	};
 }

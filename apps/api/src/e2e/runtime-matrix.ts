@@ -89,16 +89,53 @@ const dockerEntry: RuntimeEntry = {
 	},
 };
 
+const podmanEntry: RuntimeEntry = {
+	name: "podman",
+	capabilities: {
+		snapshot: true,
+		exec: true,
+		networking: true,
+		concurrentRestore: true,
+	},
+	workloadFixture: fixturePath("workload-podman.toml"),
+	brokenWorkloadFixture: fixturePath("workload-podman-broken.toml"),
+	verifyCleanup: async () => {
+		const result = Bun.spawnSync([
+			"podman",
+			"ps",
+			"-q",
+			"--filter",
+			"label=boilerhouse",
+		]);
+		const output = result.stdout.toString().trim();
+		if (output.length > 0) {
+			throw new Error(
+				`Orphaned Podman containers found: ${output}`,
+			);
+		}
+	},
+	isInstanceRunning: async (instanceId: string) => {
+		const result = Bun.spawnSync([
+			"podman",
+			"inspect",
+			"--format",
+			"{{.State.Running}}",
+			instanceId,
+		]);
+		return result.stdout.toString().trim() === "true";
+	},
+};
+
 const ALL_ENTRIES: Record<string, RuntimeEntry> = {
 	fake: fakeEntry,
 	docker: dockerEntry,
+	podman: podmanEntry,
 };
 
 /**
  * Runtimes that have a working Runtime implementation wired into startE2EServer.
- * Add "podman" here once PodmanRuntime is implemented.
  */
-const IMPLEMENTED_RUNTIMES = new Set(["fake"]);
+const IMPLEMENTED_RUNTIMES = new Set(["fake", "podman"]);
 
 /**
  * Returns runtime entries filtered to only those available on this system.
