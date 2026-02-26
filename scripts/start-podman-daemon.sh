@@ -14,12 +14,16 @@ set -euo pipefail
 
 SOCKET_PATH="/run/boilerhouse/podman.sock"
 DRY_RUN=false
+BACKGROUND=false
 CALLER_GROUP="${SUDO_GID:-$(id -g)}"
 
 for arg in "$@"; do
 	case "$arg" in
 		--dry-run)
 			DRY_RUN=true
+			;;
+		--background)
+			BACKGROUND=true
 			;;
 	esac
 done
@@ -52,7 +56,11 @@ if [ "$DRY_RUN" = true ]; then
 	echo "[dry-run] chmod 660 $SOCKET_PATH"
 	echo "[dry-run] chgrp $CALLER_GROUP $SOCKET_PATH"
 else
-	podman system service --time=0 "unix://$SOCKET_PATH" &
+	if [ "$BACKGROUND" = true ]; then
+		podman system service --time=0 "unix://$SOCKET_PATH" >/dev/null 2>&1 &
+	else
+		podman system service --time=0 "unix://$SOCKET_PATH" &
+	fi
 	PODMAN_PID=$!
 
 	# Wait for socket to appear
@@ -75,8 +83,13 @@ else
 	echo "Podman API listening on $SOCKET_PATH (PID $PODMAN_PID)"
 	echo "Socket is accessible to GID $CALLER_GROUP"
 	echo ""
-	echo "To stop: kill $PODMAN_PID"
+	echo "To stop: sudo kill $PODMAN_PID"
 
-	# Wait for the podman process so the script stays alive
-	wait "$PODMAN_PID"
+	if [ "$BACKGROUND" = true ]; then
+		disown "$PODMAN_PID"
+	else
+		# Wait for the podman process so the script stays alive
+		# (allows Ctrl+C to stop both this script and the daemon)
+		wait "$PODMAN_PID"
+	fi
 fi
