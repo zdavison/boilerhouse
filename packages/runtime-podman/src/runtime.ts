@@ -13,6 +13,18 @@ import type { ContainerCreateSpec } from "./client";
 
 const DEFAULT_SOCKET_PATH = "/run/boilerhouse/podman.sock";
 
+/**
+ * Resolves `${VAR}` references in env values from the host process environment.
+ * Unresolved references are replaced with an empty string.
+ */
+export function resolveEnvVars(env: Record<string, string>): Record<string, string> {
+	const resolved: Record<string, string> = {};
+	for (const [key, value] of Object.entries(env)) {
+		resolved[key] = value.replace(/\$\{(\w+)\}/g, (_, name: string) => process.env[name] ?? "");
+	}
+	return resolved;
+}
+
 interface ManagedContainer {
 	instanceId: InstanceId;
 	running: boolean;
@@ -50,6 +62,10 @@ export class PodmanRuntime implements Runtime {
 		const spec: ContainerCreateSpec = {
 			name: instanceId,
 			image: imageRef,
+			labels: {
+				"boilerhouse.workload": workload.workload.name,
+				"boilerhouse.version": workload.workload.version,
+			},
 			resource_limits: {
 				cpu: {
 					quota: workload.resources.vcpus * 100_000,
@@ -84,7 +100,7 @@ export class PodmanRuntime implements Runtime {
 			spec.mounts = workload.filesystem.overlay_dirs.map((dir) => ({
 				destination: dir,
 				type: "tmpfs" as const,
-				options: ["size=256m"],
+				options: ["size=256m", "mode=1777"],
 			}));
 		}
 
@@ -97,7 +113,7 @@ export class PodmanRuntime implements Runtime {
 				spec.command = workload.entrypoint.args;
 			}
 			if (workload.entrypoint.env) {
-				spec.env = workload.entrypoint.env;
+				spec.env = resolveEnvVars(workload.entrypoint.env);
 			}
 			if (workload.entrypoint.workdir) {
 				spec.work_dir = workload.entrypoint.workdir;

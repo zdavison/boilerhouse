@@ -266,26 +266,36 @@ export function Modal({
 
 export function ConnectionModal({
 	instanceId,
+	workloadName,
 	onClose,
 }: {
 	instanceId: string;
+	workloadName: string;
 	onClose: () => void;
 }) {
 	const [endpointData, setEndpointData] = useState<InstanceEndpoint | null>(null);
+	const [connectUrl, setConnectUrl] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		api.fetchInstanceEndpoint(instanceId)
-			.then((data) => {
-				setEndpointData(data);
+		Promise.all([
+			api.fetchInstanceEndpoint(instanceId),
+			api.fetchWorkload(workloadName),
+		])
+			.then(([endpoint, workload]) => {
+				setEndpointData(endpoint);
+				const meta = (workload.config as { metadata?: { connect_url?: string } })?.metadata;
+				if (meta?.connect_url) {
+					setConnectUrl(meta.connect_url);
+				}
 				setLoading(false);
 			})
 			.catch((err: unknown) => {
 				setError(err instanceof Error ? err.message : "Failed to fetch endpoint");
 				setLoading(false);
 			});
-	}, [instanceId]);
+	}, [instanceId, workloadName]);
 
 	return (
 		<Modal title="Connection Details" onClose={onClose}>
@@ -303,12 +313,23 @@ export function ConnectionModal({
 					</div>
 					<InfoCard label="Instance" value={endpointData.instanceId} />
 					<InfoCard label="Status" value={endpointData.status} />
+					{connectUrl && endpointData.endpoint.ports.length > 0 && (
+						<a
+							href={`http://${endpointData.endpoint.host}:${endpointData.endpoint.ports[0]}${connectUrl}`}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="block w-full text-center py-2 px-4 bg-accent/20 text-accent hover:bg-accent/30 rounded-md text-sm font-medium transition-colors"
+						>
+							Open {workloadName}
+						</a>
+					)}
 					<div className="bg-surface-2 rounded-md p-3">
 						<p className="text-xs font-tight uppercase tracking-wider text-muted mb-2">Connect via</p>
 						{endpointData.endpoint.ports.map((port: number) => {
-							const url = `http://${endpointData.endpoint.host}:${port}/`;
+							const base = `http://${endpointData.endpoint.host}:${port}`;
+							const url = connectUrl ? `${base}${connectUrl}` : `${base}/`;
 							return (
-								<pre key={port} className="text-xs font-mono text-muted-light select-all mt-1">
+								<pre key={port} className="text-xs font-mono text-muted-light select-all mt-1 whitespace-pre-wrap break-all">
 									curl <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{url}</a>
 								</pre>
 							);

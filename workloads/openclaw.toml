@@ -39,6 +39,11 @@ workdir = "/app"
 cmd = "node"
 args = ["--disable-warning=ExperimentalWarning", "openclaw.mjs", "gateway", "--allow-unconfigured", "--bind", "lan"]
 
+[entrypoint.env]
+OPENCLAW_GATEWAY_TOKEN = "73307c8aab2b025f959a53f5095c0addec0be76fe4b5d470"
+ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY}"
+
 [metadata]
 description = "OpenClaw autonomous AI agent"
 homepage = "https://github.com/openclaw/openclaw"
+connect_url = "/?token=73307c8aab2b025f959a53f5095c0addec0be76fe4b5d470"

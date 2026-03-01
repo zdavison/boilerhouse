@@ -1,11 +1,11 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, beforeEach } from "bun:test";
 import * as http from "node:http";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateInstanceId } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
-import { PodmanRuntime, hasEstablishedConnections } from "./runtime";
+import { PodmanRuntime, hasEstablishedConnections, resolveEnvVars } from "./runtime";
 
 /**
  * Creates a mock HTTP server on a temporary Unix socket.
@@ -107,10 +107,55 @@ describe("PodmanRuntime", () => {
 		await runtime.create(workload, generateInstanceId());
 
 		expect(createBody?.mounts).toEqual([
-			{ destination: "/home/node/.openclaw", type: "tmpfs", options: ["size=256m"] },
-			{ destination: "/var/data", type: "tmpfs", options: ["size=256m"] },
+			{ destination: "/home/node/.openclaw", type: "tmpfs", options: ["size=256m", "mode=1777"] },
+			{ destination: "/var/data", type: "tmpfs", options: ["size=256m", "mode=1777"] },
 		]);
 
+		rmSync(snapshotDir, { recursive: true, force: true });
+	});
+
+	test("create() resolves ${VAR} in entrypoint env values", async () => {
+		process.env.TEST_SECRET_KEY = "sk-test-12345";
+		let createBody: Record<string, unknown> | undefined;
+
+		mockServer = createMockServer((req, body) => {
+			const url = req.url ?? "";
+			if (url.includes("/images/") && url.includes("/exists")) {
+				return { status: 204 };
+			}
+			if (url.includes("/containers/create")) {
+				createBody = JSON.parse(body.toString());
+				return { status: 201, body: { Id: "ctr-env" } };
+			}
+			return { status: 404 };
+		});
+
+		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-snap-"));
+		const runtime = new PodmanRuntime({
+			snapshotDir,
+			socketPath: mockServer.socketPath,
+		});
+
+		const workload: Workload = {
+			...BASE_WORKLOAD,
+			entrypoint: {
+				cmd: "node",
+				args: ["server.js"],
+				env: {
+					API_KEY: "${TEST_SECRET_KEY}",
+					FIXED_VAL: "literal",
+				},
+			},
+		};
+
+		await runtime.create(workload, generateInstanceId());
+
+		expect(createBody?.env).toEqual({
+			API_KEY: "sk-test-12345",
+			FIXED_VAL: "literal",
+		});
+
+		delete process.env.TEST_SECRET_KEY;
 		rmSync(snapshotDir, { recursive: true, force: true });
 	});
 
@@ -140,6 +185,50 @@ describe("PodmanRuntime", () => {
 		expect(createBody?.mounts).toBeUndefined();
 
 		rmSync(snapshotDir, { recursive: true, force: true });
+	});
+});
+
+describe("resolveEnvVars", () => {
+	const originalEnv = { ...process.env };
+
+	afterEach(() => {
+		// Restore original env
+		for (const key of Object.keys(process.env)) {
+			if (!(key in originalEnv)) {
+				delete process.env[key];
+			}
+		}
+		Object.assign(process.env, originalEnv);
+	});
+
+	test("substitutes ${VAR} with host process.env value", () => {
+		process.env.MY_SECRET = "hunter2";
+		const result = resolveEnvVars({ API_KEY: "${MY_SECRET}" });
+		expect(result).toEqual({ API_KEY: "hunter2" });
+	});
+
+	test("replaces unset variables with empty string", () => {
+		delete process.env.DOES_NOT_EXIST;
+		const result = resolveEnvVars({ TOKEN: "${DOES_NOT_EXIST}" });
+		expect(result).toEqual({ TOKEN: "" });
+	});
+
+	test("passes through literal values unchanged", () => {
+		const result = resolveEnvVars({ FIXED: "some-literal-value" });
+		expect(result).toEqual({ FIXED: "some-literal-value" });
+	});
+
+	test("handles mixed literal and variable values", () => {
+		process.env.HOST = "localhost";
+		const result = resolveEnvVars({ URL: "http://${HOST}:8080/api" });
+		expect(result).toEqual({ URL: "http://localhost:8080/api" });
+	});
+
+	test("handles multiple variables in same value", () => {
+		process.env.USER_A = "alice";
+		process.env.USER_B = "bob";
+		const result = resolveEnvVars({ USERS: "${USER_A},${USER_B}" });
+		expect(result).toEqual({ USERS: "alice,bob" });
 	});
 });
 

@@ -15,6 +15,11 @@ export interface ContainerCreateSpec {
 	entrypoint?: string[];
 	env?: Record<string, string>;
 	work_dir?: string;
+	/**
+	 * Arbitrary key-value labels attached to the container.
+	 * @example { "boilerhouse.workload": "openclaw", "boilerhouse.version": "0.1.0" }
+	 */
+	labels?: Record<string, string>;
 	resource_limits?: {
 		cpu?: { quota?: number; period?: number };
 		memory?: { limit?: number };
@@ -387,6 +392,9 @@ export class PodmanClient {
 		}
 		if (spec.work_dir) {
 			body.work_dir = spec.work_dir;
+		}
+		if (spec.labels) {
+			body.labels = spec.labels;
 		}
 		if (spec.portmappings) {
 			body.portmappings = spec.portmappings;

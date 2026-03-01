@@ -302,11 +302,13 @@ function InstanceRow({
 	instance,
 	onAction,
 	onConnect,
+	workloadName,
 	busy,
 }: {
 	instance: InstanceSummary;
 	onAction: (id: string, action: "hibernate" | "destroy") => void;
-	onConnect: (id: string) => void;
+	onConnect: (id: string, workloadName: string) => void;
+	workloadName: string;
 	/** When true, action buttons are replaced with a spinner. */
 	busy?: boolean;
 }) {
@@ -333,7 +335,7 @@ function InstanceRow({
 					<div className="flex items-center gap-0.5">
 						{instance.status === "active" && (
 							<>
-								<IconButton icon={Plug} title="Connect" variant="info" onClick={() => onConnect(instance.instanceId)} />
+								<IconButton icon={Plug} title="Connect" variant="info" onClick={() => onConnect(instance.instanceId, workloadName)} />
 								<IconButton icon={Moon} title="Hibernate" variant="info" onClick={() => onAction(instance.instanceId, "hibernate")} />
 							</>
 						)}
@@ -364,7 +366,7 @@ function WorkloadGroup({
 	expanded: boolean;
 	onToggle: () => void;
 	onAction: (id: string, action: "hibernate" | "destroy") => void;
-	onConnect: (id: string) => void;
+	onConnect: (id: string, workloadName: string) => void;
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
 }) {
@@ -417,6 +419,7 @@ function WorkloadGroup({
 									instance={inst.instance}
 									onAction={onAction}
 									onConnect={onConnect}
+									workloadName={workload.name}
 									busy={busyInstances.has(inst.instance.instanceId)}
 								/>
 							))}
@@ -429,6 +432,7 @@ function WorkloadGroup({
 											instance={inst.instance}
 											onAction={onAction}
 											onConnect={onConnect}
+											workloadName={workload.name}
 											busy={busyInstances.has(inst.instance.instanceId)}
 										/>
 									))}
@@ -442,6 +446,7 @@ function WorkloadGroup({
 							instance={inst.instance}
 							onAction={onAction}
 							onConnect={onConnect}
+							workloadName={workload.name}
 							busy={busyInstances.has(inst.instance.instanceId)}
 						/>
 					))}
@@ -460,7 +465,7 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 	const [initialized, setInitialized] = useState(false);
-	const [connectInstanceId, setConnectInstanceId] = useState<string | null>(null);
+	const [connectTarget, setConnectTarget] = useState<{ instanceId: string; workloadName: string } | null>(null);
 	const [busyInstances, setBusyInstances] = useState<Set<string>>(new Set());
 
 	const loading = workloadsApi.loading || snapshotsApi.loading || instancesApi.loading;
@@ -528,7 +533,7 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 							expanded={expanded.has(node.workload.workloadId)}
 							onToggle={() => toggleExpanded(node.workload.workloadId)}
 							onAction={handleAction}
-							onConnect={setConnectInstanceId}
+							onConnect={(id, name) => setConnectTarget({ instanceId: id, workloadName: name })}
 							navigate={navigate}
 							busyInstances={busyInstances}
 						/>
@@ -536,10 +541,11 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 				</div>
 			)}
 
-			{connectInstanceId && (
+			{connectTarget && (
 				<ConnectionModal
-					instanceId={connectInstanceId}
-					onClose={() => setConnectInstanceId(null)}
+					instanceId={connectTarget.instanceId}
+					workloadName={connectTarget.workloadName}
+					onClose={() => setConnectTarget(null)}
 				/>
 			)}
 		</div>
