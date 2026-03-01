@@ -6,6 +6,7 @@ import { PodmanRuntime } from "@boilerhouse/runtime-podman";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
 import { workloads as workloadsTable, tenants } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
+import { createLogger } from "@boilerhouse/logger";
 import { InstanceManager } from "./instance-manager";
 import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";
@@ -18,6 +19,8 @@ import { createApp } from "./app";
 import { recoverState } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { applyWorkloadTransition, forceWorkloadStatus } from "./transitions";
+
+const log = createLogger("server");
 
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
@@ -65,15 +68,19 @@ const eventBus = new EventBus();
 // Load workload definitions from disk if configured
 if (workloadsDir) {
 	const result = loadWorkloadsFromDir(db, workloadsDir);
-	console.log(
-		`Workloads: ${result.loaded} loaded, ${result.updated} updated, ${result.unchanged} unchanged, ${result.errors.length} error(s)`,
+	log.info(
+		{ loaded: result.loaded, updated: result.updated, unchanged: result.unchanged, errors: result.errors.length },
+		"Workloads loaded from disk",
 	);
 	for (const { file, error } of result.errors) {
-		console.error(`  ${file}: ${error}`);
+		log.error({ file, error }, "Failed to load workload");
 	}
 }
 
-const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId, eventBus);
+const instanceManager = new InstanceManager(
+	runtime, db, activityLog, nodeId, eventBus,
+	createLogger("InstanceManager"),
+);
 const snapshotManager = new SnapshotManager(runtime, db, nodeId);
 const tenantDataStore = new TenantDataStore(storagePath, db);
 const idleMonitor = new IdleMonitor({ defaultPollIntervalMs: 5000 });
@@ -85,6 +92,8 @@ const tenantManager = new TenantManager(
 	nodeId,
 	tenantDataStore,
 	idleMonitor,
+	createLogger("TenantManager"),
+	eventBus,
 );
 
 const resourceLimiter = new ResourceLimiter(db, { maxInstances });
@@ -107,26 +116,27 @@ idleMonitor.onIdle(async (instanceId, action) => {
 		.get();
 
 	if (!tenantRow) {
-		console.log(`Idle timeout: instance=${instanceId} has no tenant — skipping`);
+		log.warn({ instanceId }, "Idle timeout: instance has no tenant — skipping");
 		return;
 	}
 
-	console.log(`Idle timeout: instance=${instanceId} tenant=${tenantRow.tenantId} action=${action}`);
+	log.info({ instanceId, tenantId: tenantRow.tenantId, action }, "Idle timeout: releasing tenant");
 	await tenantManager.release(tenantRow.tenantId);
 });
 
 // Recover state before accepting requests
 const report = await recoverState(runtime, db, nodeId, activityLog);
 
-const recoverySummary = [
-	`${report.recovered} recovered`,
-	`${report.destroyed} destroyed`,
-	`${report.tenantsReset} tenants reset`,
-].join(", ");
-console.log(`Recovery: ${recoverySummary}`);
+log.info(
+	{ recovered: report.recovered, destroyed: report.destroyed, tenantsReset: report.tenantsReset },
+	"Recovery complete",
+);
 
 const bootstrapLogStore = new BootstrapLogStore(db);
-const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
+const goldenCreator = new GoldenCreator(
+	db, snapshotManager, eventBus, bootstrapLogStore,
+	createLogger("GoldenCreator"),
+);
 
 // Enqueue golden snapshot creation for workloads that need it
 {
@@ -146,7 +156,7 @@ const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, bootstrap
 		}
 	}
 	if (enqueued > 0) {
-		console.log(`Golden snapshots: ${enqueued} enqueued for background creation`);
+		log.info({ count: enqueued }, "Golden snapshots enqueued for background creation");
 	}
 }
 
@@ -162,8 +172,9 @@ const app = createApp({
 	goldenCreator,
 	bootstrapLogStore,
 	resourceLimiter,
+	log: createLogger("routes"),
 });
 
 app.listen(port);
 
-console.log(`Boilerhouse API listening on http://localhost:${port}`);
+log.info({ port }, "Boilerhouse API listening");

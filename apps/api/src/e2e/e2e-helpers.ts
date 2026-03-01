@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createTestDatabase, ActivityLog, nodes } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
+import { createLogger } from "@boilerhouse/logger";
 import { InstanceManager } from "../instance-manager";
 import { SnapshotManager } from "../snapshot-manager";
 import { TenantManager } from "../tenant-manager";
@@ -79,12 +80,14 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		throw new Error(`Runtime '${runtimeName}' not implemented for E2E`);
 	}
 
+	const log = createLogger("e2e");
 	const instanceManager = new InstanceManager(
 		runtime,
 		db,
 		activityLog,
 		nodeId,
 		eventBus,
+		log,
 	);
 	const snapshotManager = new SnapshotManager(runtime, db, nodeId,
 		runtimeName === "fake" ? { healthChecker: async () => {} } : undefined,
@@ -97,6 +100,9 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		activityLog,
 		nodeId,
 		tenantDataStore,
+		undefined,
+		log,
+		eventBus,
 	);
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
@@ -115,6 +121,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		goldenCreator,
 		bootstrapLogStore,
 		resourceLimiter,
+		log,
 	});
 
 	const server = app.listen(0);

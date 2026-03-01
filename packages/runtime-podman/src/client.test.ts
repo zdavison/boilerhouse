@@ -192,6 +192,45 @@ describe("PodmanClient", () => {
 		expect(receivedBody?.work_dir).toBe("/app");
 	});
 
+	test("createContainer() passes mounts to API body", async () => {
+		let receivedBody: Record<string, unknown> | undefined;
+
+		setupMock((_req, body) => {
+			receivedBody = JSON.parse(body.toString());
+			return { status: 201, body: { Id: "mnt-123" } };
+		});
+
+		await client.createContainer({
+			name: "with-mounts",
+			image: "alpine:3.21",
+			mounts: [
+				{ destination: "/home/node/.openclaw", type: "tmpfs", options: ["size=256m"] },
+				{ destination: "/var/data", type: "tmpfs" },
+			],
+		});
+
+		expect(receivedBody?.mounts).toEqual([
+			{ destination: "/home/node/.openclaw", type: "tmpfs", options: ["size=256m"] },
+			{ destination: "/var/data", type: "tmpfs" },
+		]);
+	});
+
+	test("createContainer() omits mounts when empty", async () => {
+		let receivedBody: Record<string, unknown> | undefined;
+
+		setupMock((_req, body) => {
+			receivedBody = JSON.parse(body.toString());
+			return { status: 201, body: { Id: "no-mnt" } };
+		});
+
+		await client.createContainer({
+			name: "no-mounts",
+			image: "alpine:3.21",
+		});
+
+		expect(receivedBody?.mounts).toBeUndefined();
+	});
+
 	test("createContainer() throws on non-201", async () => {
 		setupMock(() => ({
 			status: 409,
@@ -294,7 +333,9 @@ describe("PodmanClient", () => {
 			expect(req.method).toBe("POST");
 			expect(req.url).toContain("/restore");
 			expect(req.url).toContain("import=true");
+			expect(req.url).toContain("tcpClose=true");
 			expect(req.url).toContain("name=");
+			expect(req.url).not.toContain("new=true");
 			expect(req.headers["content-type"]).toBe("application/x-tar");
 			receivedBody = body;
 			return { status: 200, body: { Id: "restored-123" } };

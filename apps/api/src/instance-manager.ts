@@ -18,6 +18,7 @@ import {
 	applySnapshotTransition,
 	applyTenantTransition,
 } from "./transitions";
+import type { Logger } from "@boilerhouse/logger";
 import type { EventBus } from "./event-bus";
 
 /** Derives an InstanceHandle from a DB row's status. */
@@ -39,6 +40,7 @@ export class InstanceManager {
 		private readonly activityLog: ActivityLog,
 		private readonly nodeId: NodeId,
 		private readonly eventBus?: EventBus,
+		private readonly log?: Logger,
 	) {}
 
 	async create(
@@ -263,6 +265,11 @@ export class InstanceManager {
 
 		const instanceId = generateInstanceId();
 
+		this.log?.info(
+			{ snapshotId: ref.id, snapshotType: ref.type, instanceId, tenantId },
+			"Restoring instance from snapshot",
+		);
+
 		this.db
 			.insert(instances)
 			.values({
@@ -275,9 +282,23 @@ export class InstanceManager {
 			})
 			.run();
 
-		const handle = await this.runtime.restore(ref, instanceId);
+		let handle: InstanceHandle;
+		try {
+			handle = await this.runtime.restore(ref, instanceId);
+		} catch (err) {
+			this.log?.error(
+				{ snapshotId: ref.id, instanceId, tenantId, err },
+				"Failed to restore instance from snapshot",
+			);
+			throw err;
+		}
 
 		applyInstanceTransition(this.db, instanceId, "starting", "started");
+
+		this.log?.info(
+			{ instanceId, tenantId, snapshotId: ref.id },
+			"Instance restored successfully",
+		);
 
 		this.activityLog.log({
 			event: "instance.restored",

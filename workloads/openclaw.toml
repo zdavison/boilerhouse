@@ -3,7 +3,7 @@ name = "openclaw"
 version = "0.1.0"
 
 [image]
-dockerfile = "openclaw/Dockerfile"
+ref = "localhost/openclaw:latest"
 
 [resources]
 vcpus = 2
@@ -20,7 +20,7 @@ allowlist = [
 expose = [{ guest = 18789, host_range = [30000, 30099] }]
 
 [filesystem]
-overlay_dirs = ["/root/.openclaw"]
+overlay_dirs = ["/home/node/.openclaw"]
 
 [idle]
 timeout_seconds = 600
@@ -31,13 +31,13 @@ interval_seconds = 2
 unhealthy_threshold = 60
 
 [health.http_get]
-path = "/__openclaw__/canvas/"
+path = "/__openclaw/control-ui-config.json"
 port = 18789
 
 [entrypoint]
 workdir = "/app"
 cmd = "node"
-args = ["openclaw.mjs", "gateway", "--allow-unconfigured", "--bind", "lan"]
+args = ["--disable-warning=ExperimentalWarning", "openclaw.mjs", "gateway", "--allow-unconfigured", "--bind", "lan"]
 
 [metadata]
 description = "OpenClaw autonomous AI agent"

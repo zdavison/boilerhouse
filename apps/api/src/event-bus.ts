@@ -36,6 +36,14 @@ export interface WorkloadStateEvent {
 	status: WorkloadStatus;
 }
 
+export interface TenantClaimingEvent {
+	type: "tenant.claiming";
+	tenantId: TenantId;
+	workloadId: WorkloadId;
+	source: ClaimSource;
+	snapshotId: string;
+}
+
 export interface BootstrapLogEvent {
 	type: "bootstrap.log";
 	workloadId: WorkloadId;
@@ -46,6 +54,7 @@ export interface BootstrapLogEvent {
 export type DomainEvent =
 	| InstanceStateEvent
 	| TenantClaimEvent
+	| TenantClaimingEvent
 	| TenantReleaseEvent
 	| WorkloadStateEvent
 	| BootstrapLogEvent;

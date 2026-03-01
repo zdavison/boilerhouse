@@ -24,6 +24,11 @@ export interface ContainerCreateSpec {
 		host_port: number;
 		protocol?: string;
 	}>;
+	mounts?: Array<{
+		destination: string;
+		type: string;
+		options?: string[];
+	}>;
 	netns?: { nsmode: string };
 }
 
@@ -231,6 +236,11 @@ export class PodmanClient {
 	 * Restore a container from a checkpoint archive.
 	 * Returns the new container ID.
 	 *
+	 * Uses `import=true` which creates a fresh container from the archive
+	 * (prevents ID/network collisions when restoring the same snapshot multiple
+	 * times) and `tcpClose=true` to reset any captured TCP state so listening
+	 * sockets rebind cleanly in the new namespace.
+	 *
 	 * @param publishPorts - Container port specs for fresh host port allocation.
 	 *   Podman assigns a random available host port for each.
 	 *   @example `["8080", "9090"]`
@@ -238,7 +248,8 @@ export class PodmanClient {
 	async restoreContainer(archive: Buffer, name: string, publishPorts?: string[]): Promise<string> {
 		let path =
 			`/libpod/containers/${encodeURIComponent(name)}/restore` +
-			`?import=true&name=${encodeURIComponent(name)}`;
+			`?import=true&name=${encodeURIComponent(name)}` +
+			`&tcpClose=true`;
 
 		if (publishPorts && publishPorts.length > 0) {
 			path += `&publishPorts=${encodeURIComponent(publishPorts.join(" "))}`;
@@ -385,6 +396,9 @@ export class PodmanClient {
 		}
 		if (spec.resource_limits) {
 			body.resource_limits = spec.resource_limits;
+		}
+		if (spec.mounts && spec.mounts.length > 0) {
+			body.mounts = spec.mounts;
 		}
 
 		return body;

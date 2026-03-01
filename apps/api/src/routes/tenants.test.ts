@@ -60,8 +60,9 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		expect(body.source).toBe("golden");
 		expect(body.latencyMs).toBeGreaterThanOrEqual(0);
 
-		expect(events).toHaveLength(1);
-		expect(events[0]!.type).toBe("tenant.claimed");
+		expect(events).toHaveLength(2);
+		expect(events[0]!.type).toBe("tenant.claiming");
+		expect(events[1]!.type).toBe("tenant.claimed");
 	});
 
 	test("returns 503 when no golden snapshot exists", async () => {

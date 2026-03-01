@@ -1,6 +1,7 @@
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import { createTestDatabase, ActivityLog } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
+import { createLogger } from "@boilerhouse/logger";
 import { InstanceManager } from "./instance-manager";
 import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";
@@ -37,7 +38,8 @@ export function createTestApp(): TestContext {
 		createdAt: new Date(),
 	}).run();
 
-	const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId, eventBus);
+	const log = createLogger("test");
+	const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId, eventBus, log);
 	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
 		healthChecker: async () => {},
 	});
@@ -49,6 +51,9 @@ export function createTestApp(): TestContext {
 		activityLog,
 		nodeId,
 		tenantDataStore,
+		undefined,
+		log,
+		eventBus,
 	);
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
@@ -67,6 +72,7 @@ export function createTestApp(): TestContext {
 		goldenCreator,
 		bootstrapLogStore,
 		resourceLimiter,
+		log,
 	};
 
 	const app = createApp(deps);

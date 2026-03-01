@@ -69,6 +69,7 @@ export function createHttpCheck(url: string, onLog?: (line: string) => void): He
 	return async () => {
 		const res = await fetch(url, {
 			signal: AbortSignal.timeout(5000),
+			headers: { Connection: "close" },
 		});
 		if (res.status !== 200) {
 			onLog?.(`HTTP health check: status=${res.status} (expected 200)`);

@@ -1,5 +1,6 @@
 import type { NodeId, Runtime } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
+import type { Logger } from "@boilerhouse/logger";
 import type { InstanceManager } from "../instance-manager";
 import type { TenantManager } from "../tenant-manager";
 import type { SnapshotManager } from "../snapshot-manager";
@@ -20,4 +21,5 @@ export interface RouteDeps {
 	goldenCreator: GoldenCreator;
 	bootstrapLogStore: BootstrapLogStore;
 	resourceLimiter?: ResourceLimiter;
+	log?: Logger;
 }

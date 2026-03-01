@@ -305,11 +305,14 @@ export function ConnectionModal({
 					<InfoCard label="Status" value={endpointData.status} />
 					<div className="bg-surface-2 rounded-md p-3">
 						<p className="text-xs font-tight uppercase tracking-wider text-muted mb-2">Connect via</p>
-						{endpointData.endpoint.ports.map((port: number) => (
-							<pre key={port} className="text-xs font-mono text-muted-light select-all mt-1">
-								curl http://{endpointData.endpoint.host}:{port}/
-							</pre>
-						))}
+						{endpointData.endpoint.ports.map((port: number) => {
+							const url = `http://${endpointData.endpoint.host}:${port}/`;
+							return (
+								<pre key={port} className="text-xs font-mono text-muted-light select-all mt-1">
+									curl <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{url}</a>
+								</pre>
+							);
+						})}
 					</div>
 				</div>
 			)}

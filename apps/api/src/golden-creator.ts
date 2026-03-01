@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { WorkloadId, Workload } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { workloads } from "@boilerhouse/db";
+import type { Logger } from "@boilerhouse/logger";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { EventBus } from "./event-bus";
 import type { BootstrapLogStore } from "./bootstrap-log-store";
@@ -17,6 +18,7 @@ export class GoldenCreator {
 		private readonly snapshotManager: SnapshotManager,
 		private readonly eventBus: EventBus,
 		private readonly bootstrapLogStore?: BootstrapLogStore,
+		private readonly log?: Logger,
 	) {}
 
 	/** Enqueue a workload for background golden snapshot creation. */
@@ -42,7 +44,7 @@ export class GoldenCreator {
 	private processQueue(): void {
 		// Fire-and-forget — errors are handled internally per item
 		this.processQueueAsync().catch((err) => {
-			console.error("GoldenCreator: unexpected queue error:", err);
+			this.log?.error({ err }, "Unexpected queue error");
 		});
 	}
 
@@ -86,13 +88,11 @@ export class GoldenCreator {
 				status: "ready",
 			});
 
-			console.log(`GoldenCreator: golden snapshot ready for workload ${workloadId}`);
+			this.log?.info({ workloadId }, "Golden snapshot ready");
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			onLog(`ERROR: ${message}`);
-			console.error(
-				`GoldenCreator: failed to create golden snapshot for workload ${workloadId}: ${message}`,
-			);
+			this.log?.error({ workloadId, err }, "Failed to create golden snapshot");
 
 			try {
 				applyWorkloadTransition(this.db, workloadId, "creating", "failed");

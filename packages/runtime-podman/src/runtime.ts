@@ -79,6 +79,15 @@ export class PodmanRuntime implements Runtime {
 			}
 		}
 
+		// Mount overlay_dirs as tmpfs so CRIU can checkpoint inode handles
+		if (workload.filesystem?.overlay_dirs) {
+			spec.mounts = workload.filesystem.overlay_dirs.map((dir) => ({
+				destination: dir,
+				type: "tmpfs" as const,
+				options: ["size=256m"],
+			}));
+		}
+
 		// Entrypoint overrides
 		if (workload.entrypoint) {
 			if (workload.entrypoint.cmd) {
@@ -138,6 +147,10 @@ export class PodmanRuntime implements Runtime {
 		}
 
 		const archivePath = `${archiveDir}/checkpoint.tar.gz`;
+
+		// Wait for all established TCP connections to close before CRIU checkpoint.
+		// CRIU cannot restore TCP connections when the container's IP changes on restore.
+		await this.waitForTcpDrain(handle.instanceId);
 
 		// Checkpoint streams the archive as the response body
 		const archiveBuffer = await this.client.checkpointContainer(handle.instanceId);
@@ -302,6 +315,60 @@ export class PodmanRuntime implements Runtime {
 		);
 	}
 
+	/**
+	 * Wait for all established TCP connections inside the container to close.
+	 *
+	 * CRIU cannot checkpoint established TCP connections without
+	 * `--tcp-established`. Rather than adding that flag and dealing with
+	 * stale connections on restore, we drain them before checkpoint.
+	 *
+	 * Reads `/proc/net/tcp` via `cat` and parses the output in TypeScript.
+	 * State `01` = TCP_ESTABLISHED.
+	 *
+	 * If the exec fails (e.g. no network namespace, or `/proc/net/tcp`
+	 * doesn't exist), we treat it as "no connections" and return immediately.
+	 *
+	 * @param maxWaitMs - Maximum time to wait for connections to drain.
+	 *   @default 30000
+	 * @param pollIntervalMs - Time between polls.
+	 *   @default 1000
+	 */
+	private async waitForTcpDrain(
+		instanceId: string,
+		maxWaitMs = 30_000,
+		pollIntervalMs = 1_000,
+	): Promise<void> {
+		const deadline = Date.now() + maxWaitMs;
+
+		while (Date.now() < deadline) {
+			let result: { exitCode: number; stdout: string };
+			try {
+				const execId = await this.client.execCreate(instanceId, [
+					"cat", "/proc/net/tcp",
+				]);
+				result = await this.client.execStart(execId);
+			} catch {
+				// Exec failed entirely (container stopped, no network namespace, etc.)
+				return;
+			}
+
+			if (result.exitCode !== 0) {
+				// cat failed — /proc/net/tcp doesn't exist (no network namespace)
+				return;
+			}
+
+			if (!hasEstablishedConnections(result.stdout)) {
+				return;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+		}
+
+		throw new PodmanRuntimeError(
+			`TCP connections in container ${instanceId} did not drain within ${maxWaitMs}ms`,
+		);
+	}
+
 	private requireContainer(instanceId: InstanceId): ManagedContainer {
 		const container = this.containers.get(instanceId);
 		if (!container) {
@@ -342,6 +409,25 @@ export class PodmanRuntime implements Runtime {
 		await proc.exited;
 		return stdout.trim() || "unknown";
 	}
+}
+
+// ── /proc/net/tcp parsing ───────────────────────────────────────────────────
+
+/**
+ * Parses the output of `cat /proc/net/tcp` and returns `true` if any
+ * connection is in ESTABLISHED state (state code `01`).
+ *
+ * /proc/net/tcp format (whitespace-separated columns):
+ *   sl  local_address  rem_address  st  ...
+ * The state field is the 4th column (index 3). `01` = TCP_ESTABLISHED.
+ */
+export function hasEstablishedConnections(procNetTcp: string): boolean {
+	const lines = procNetTcp.split("\n").slice(1); // skip header
+	for (const line of lines) {
+		const fields = line.trim().split(/\s+/);
+		if (fields[3] === "01") return true;
+	}
+	return false;
 }
 
 // ── Checkpoint archive rewriting ────────────────────────────────────────────

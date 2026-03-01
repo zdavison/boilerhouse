@@ -7,7 +7,7 @@ import { NoGoldenSnapshotError } from "../tenant-manager";
 import type { RouteDeps } from "./deps";
 
 export function tenantRoutes(deps: RouteDeps) {
-	const { db, tenantManager, eventBus } = deps;
+	const { db, tenantManager, eventBus, log } = deps;
 
 	return new Elysia({ name: "tenants" })
 		.post("/tenants/:id/claim", async ({ params, body, set }) => {
@@ -54,6 +54,10 @@ export function tenantRoutes(deps: RouteDeps) {
 					set.status = 409;
 					return { error: err.message };
 				}
+				log?.error(
+					{ tenantId, workloadId: workloadRow.workloadId, err },
+					"Unexpected error during claim",
+				);
 				throw err;
 			}
 

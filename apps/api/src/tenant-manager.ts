@@ -12,12 +12,14 @@ import type {
 } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { instances, snapshots, tenants, workloads, snapshotRefFrom } from "@boilerhouse/db";
+import type { Logger } from "@boilerhouse/logger";
 import { applyTenantTransition } from "./transitions";
 import { instanceHandleFrom } from "./instance-manager";
 import type { InstanceManager } from "./instance-manager";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { TenantDataStore } from "./tenant-data";
 import type { IdleMonitor } from "./idle-monitor";
+import type { EventBus } from "./event-bus";
 
 export type ClaimSource = "existing" | "snapshot" | "cold+data" | "golden";
 
@@ -47,6 +49,8 @@ export class TenantManager {
 		private readonly nodeId: NodeId,
 		private readonly tenantDataStore: TenantDataStore,
 		private readonly idleMonitor?: IdleMonitor,
+		private readonly log?: Logger,
+		private readonly eventBus?: EventBus,
 	) {}
 
 	/**
@@ -94,6 +98,7 @@ export class TenantManager {
 		if (tenantRow?.lastSnapshotId) {
 			const snapshotRef = this.getSnapshotRef(tenantRow.lastSnapshotId);
 			if (snapshotRef) {
+				this.log?.info({ tenantId, workloadId, source: "snapshot", snapshotId: snapshotRef.id }, "Claiming via tenant snapshot");
 				return this.restoreAndClaim(snapshotRef, tenantId, workloadId, "snapshot", start);
 			}
 		}
@@ -109,6 +114,7 @@ export class TenantManager {
 				throw new NoGoldenSnapshotError(workloadId, this.nodeId);
 			}
 
+			this.log?.info({ tenantId, workloadId, source: "cold+data", snapshotId: goldenRef.id }, "Claiming via golden + data overlay");
 			return this.restoreAndClaim(goldenRef, tenantId, workloadId, "cold+data", start);
 		}
 
@@ -118,6 +124,7 @@ export class TenantManager {
 			throw new NoGoldenSnapshotError(workloadId, this.nodeId);
 		}
 
+		this.log?.info({ tenantId, workloadId, source: "golden", snapshotId: goldenRef.id }, "Claiming via golden snapshot");
 		return this.restoreAndClaim(goldenRef, tenantId, workloadId, "golden", start);
 	}
 
@@ -184,12 +191,35 @@ export class TenantManager {
 		source: ClaimSource,
 		start: number,
 	): Promise<ClaimResult> {
-		const handle = await this.instanceManager.restoreFromSnapshot(ref, tenantId);
+		this.eventBus?.emit({
+			type: "tenant.claiming",
+			tenantId,
+			workloadId,
+			source,
+			snapshotId: ref.id,
+		});
+
+		let handle;
+		try {
+			handle = await this.instanceManager.restoreFromSnapshot(ref, tenantId);
+		} catch (err) {
+			this.log?.error(
+				{ tenantId, workloadId, source, snapshotId: ref.id, err },
+				"Restore failed during claim",
+			);
+			throw err;
+		}
 
 		this.upsertTenant(tenantId, workloadId, handle.instanceId);
 		this.updateInstanceClaimed(handle.instanceId);
 
 		const endpoint = await this.safeGetEndpoint(handle);
+		const latencyMs = performance.now() - start;
+
+		this.log?.info(
+			{ tenantId, instanceId: handle.instanceId, workloadId, source, endpoint, latencyMs: Math.round(latencyMs) },
+			"Claim completed",
+		);
 
 		this.logClaim(tenantId, handle.instanceId, workloadId, source);
 		this.startIdleWatch(handle.instanceId, workloadId);
@@ -199,7 +229,7 @@ export class TenantManager {
 			instanceId: handle.instanceId,
 			endpoint,
 			source,
-			latencyMs: performance.now() - start,
+			latencyMs,
 		};
 	}
 
