@@ -6,7 +6,14 @@ import { PodmanRuntime } from "@boilerhouse/runtime-podman";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
 import { workloads as workloadsTable, tenants } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
-import { createLogger } from "@boilerhouse/logger";
+import {
+	createLogger,
+	initO11y,
+	instrumentFromEventBus,
+	wrapTenantManager,
+	wrapInstanceManager,
+	wrapSnapshotManager,
+} from "@boilerhouse/o11y";
 import { InstanceManager } from "./instance-manager";
 import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";
@@ -190,22 +197,45 @@ const goldenCreator = new GoldenCreator(
 	}
 }
 
+// Start OTEL providers (metrics + tracing)
+const { meter, tracer } = initO11y({
+	metricsPort: Number(process.env.METRICS_PORT ?? 9464),
+});
+
+// Subscribe EventBus → metrics
+instrumentFromEventBus(meter, {
+	eventBus,
+	db,
+	nodeId,
+	maxInstances,
+	resourceLimiter,
+	goldenCreator,
+});
+
+// Wrap managers with tracing spans
+const tracedTenantManager = wrapTenantManager(tenantManager, tracer);
+const tracedInstanceManager = wrapInstanceManager(instanceManager, tracer);
+const tracedSnapshotManager = wrapSnapshotManager(snapshotManager, tracer);
+
 const app = createApp({
 	db,
 	runtime,
 	nodeId,
 	activityLog,
-	instanceManager,
-	tenantManager,
-	snapshotManager,
+	instanceManager: tracedInstanceManager,
+	tenantManager: tracedTenantManager,
+	snapshotManager: tracedSnapshotManager,
 	eventBus,
 	goldenCreator,
 	bootstrapLogStore,
 	resourceLimiter,
 	secretStore,
 	log: createLogger("routes"),
+	tracer,
+	meter,
 });
 
 app.listen(port);
 
 log.info({ port }, "♨️ Boilerhouse API listening");
+log.info({ metricsPort: Number(process.env.METRICS_PORT ?? 9464) }, "Prometheus metrics endpoint started");

@@ -10,6 +10,6 @@
 	},
 	"dependencies": {
 		"@boilerhouse/runtime-podman": "workspace:*",
-		"@boilerhouse/logger": "workspace:*"
+		"@boilerhouse/o11y": "workspace:*"
 	}
 }

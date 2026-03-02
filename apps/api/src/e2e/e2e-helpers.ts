@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createTestDatabase, ActivityLog, nodes } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
-import { createLogger } from "@boilerhouse/logger";
+import { createLogger } from "@boilerhouse/o11y";
 import { InstanceManager } from "../instance-manager";
 import { SnapshotManager } from "../snapshot-manager";
 import { TenantManager } from "../tenant-manager";

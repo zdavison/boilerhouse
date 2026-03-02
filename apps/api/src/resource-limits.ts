@@ -90,6 +90,11 @@ export class ResourceLimiter {
 		}
 	}
 
+	/** Returns the number of callers waiting for capacity on this node. */
+	queueDepth(nodeId: NodeId): number {
+		return this.queues.get(nodeId)?.length ?? 0;
+	}
+
 	/** Cleans up timers on shutdown. */
 	dispose(): void {
 		for (const [, queue] of this.queues) {

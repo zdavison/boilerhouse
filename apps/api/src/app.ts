@@ -1,4 +1,5 @@
 import { Elysia } from "elysia";
+import { httpTracing } from "@boilerhouse/o11y";
 import type { RouteDeps } from "./routes/deps";
 import { errorHandler } from "./routes/errors";
 import { systemRoutes } from "./routes/system";
@@ -12,10 +13,17 @@ import { secretRoutes } from "./routes/secrets";
 import { wsPlugin } from "./routes/ws";
 
 export function createApp(deps: RouteDeps) {
-	return new Elysia()
-		.use(errorHandler)
-		.group("/api/v1", (app) =>
-			app
+	const app = new Elysia()
+		.use(errorHandler);
+
+	// Add HTTP tracing/metrics if OTEL providers are available
+	if (deps.tracer && deps.meter) {
+		app.use(httpTracing(deps.tracer, deps.meter));
+	}
+
+	return app
+		.group("/api/v1", (group) =>
+			group
 				.use(systemRoutes(deps))
 				.use(workloadRoutes(deps))
 				.use(instanceRoutes(deps))

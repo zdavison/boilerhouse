@@ -92,6 +92,41 @@ export function useApi<T>(fetcher: () => Promise<T>): UseApiResult<T> {
 }
 
 /**
+ * Auto-refresh hook for periodic data fetching.
+ *
+ * @param refetch - Function to call on each interval tick
+ * @param defaultInterval - Initial interval in ms (0 = paused)
+ * @default 10000
+ */
+export function useAutoRefresh(
+	refetch: () => void,
+	defaultInterval = 10000,
+): {
+	interval: number;
+	setInterval: (ms: number) => void;
+	paused: boolean;
+	setPaused: (paused: boolean) => void;
+} {
+	const [interval, setIntervalState] = useState(defaultInterval);
+	const [paused, setPaused] = useState(defaultInterval === 0);
+	const refetchRef = useRef(refetch);
+	refetchRef.current = refetch;
+
+	useEffect(() => {
+		if (paused || interval === 0) return;
+		const timer = setInterval(() => refetchRef.current(), interval);
+		return () => clearInterval(timer);
+	}, [interval, paused]);
+
+	return {
+		interval,
+		setInterval: setIntervalState,
+		paused,
+		setPaused,
+	};
+}
+
+/**
  * Auto-reconnecting WebSocket hook. Connects to the dashboard server's `/ws`
  * endpoint and calls `onEvent` for each parsed JSON message.
  */

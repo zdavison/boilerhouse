@@ -18,7 +18,7 @@ import {
 	applySnapshotTransition,
 	applyTenantTransition,
 } from "./transitions";
-import type { Logger } from "@boilerhouse/logger";
+import type { Logger } from "@boilerhouse/o11y";
 import type { EventBus } from "./event-bus";
 import type { ProxyRegistrar } from "./proxy-registrar";
 

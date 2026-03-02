@@ -1,5 +1,5 @@
 import type { Socket, TCPSocketListener } from "bun";
-import { createLogger } from "@boilerhouse/logger";
+import { createLogger } from "@boilerhouse/o11y";
 import { matchesDomain } from "./matcher";
 
 const log = createLogger("proxy");

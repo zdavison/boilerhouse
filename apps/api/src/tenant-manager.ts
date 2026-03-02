@@ -12,7 +12,7 @@ import type {
 } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { instances, snapshots, tenants, workloads, snapshotRefFrom } from "@boilerhouse/db";
-import type { Logger } from "@boilerhouse/logger";
+import type { Logger } from "@boilerhouse/o11y";
 import { applyTenantTransition } from "./transitions";
 import { instanceHandleFrom } from "./instance-manager";
 import type { InstanceManager } from "./instance-manager";

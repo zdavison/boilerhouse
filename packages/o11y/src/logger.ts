@@ -14,7 +14,6 @@ const baseLogger = pino({
 
 /**
  * Creates a named child logger.
- *
  * @param name - Component name for log context (e.g. "TenantManager", "GoldenCreator")
  */
 export function createLogger(name: string): Logger {

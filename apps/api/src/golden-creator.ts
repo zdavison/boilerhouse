@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import type { WorkloadId, Workload } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { workloads } from "@boilerhouse/db";
-import type { Logger } from "@boilerhouse/logger";
+import type { Logger } from "@boilerhouse/o11y";
 import type { SnapshotManager } from "./snapshot-manager";
 import type { EventBus } from "./event-bus";
 import type { BootstrapLogStore } from "./bootstrap-log-store";

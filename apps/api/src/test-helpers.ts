@@ -1,7 +1,7 @@
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import { createTestDatabase, ActivityLog } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
-import { createLogger } from "@boilerhouse/logger";
+import { createLogger } from "@boilerhouse/o11y";
 import { InstanceManager } from "./instance-manager";
 import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";

@@ -1,6 +1,7 @@
 import index from "./index.html";
 
 const API_URL = process.env.API_URL ?? "http://localhost:3000";
+const METRICS_URL = process.env.METRICS_URL ?? "http://localhost:9464";
 
 interface WsData {
 	upstream: WebSocket;
@@ -23,6 +24,16 @@ const server = Bun.serve<WsData>({
 				return new Response("WebSocket upgrade failed", { status: 400 });
 			}
 			return undefined;
+		}
+
+		// Proxy /metrics to the Prometheus exporter
+		if (url.pathname === "/metrics") {
+			const upstream = new URL("/metrics", METRICS_URL);
+			const headers = new Headers(req.headers);
+			headers.delete("host");
+			return fetch(upstream.toString(), { method: "GET", headers }).catch(
+				() => new Response("Cannot reach metrics endpoint", { status: 502 }),
+			);
 		}
 
 		// Proxy /api/* requests to the API server
