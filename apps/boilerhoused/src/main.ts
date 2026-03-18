@@ -203,6 +203,17 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 				return await handleEnsureImage(req);
 			}
 
+			// GET /images — list images
+			if (method === "GET" && pathname === "/images") {
+				return await handleListImages();
+			}
+
+			// DELETE /images/:ref — remove a single image
+			const imageDeleteMatch = pathname.match(/^\/images\/(.+)$/);
+			if (method === "DELETE" && imageDeleteMatch) {
+				return await handleDeleteImage(decodeURIComponent(imageDeleteMatch[1]!));
+			}
+
 			// GET /containers (list)
 			if (method === "GET" && pathname === "/containers") {
 				return jsonResponse(200, { ids: Array.from(nameToId.keys()) });
@@ -325,6 +336,23 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 		}
 
 		return jsonResponse(400, { error: "Must provide ref or (dockerfile + tag)" });
+	}
+
+	async function handleListImages(): Promise<Response> {
+		const res = await client.get("/libpod/images/json");
+		const images = res.body as Array<{ Id: string; RepoTags?: string[] }>;
+		return jsonResponse(200, images.map((img) => ({
+			id: img.Id,
+			tags: img.RepoTags ?? [],
+		})));
+	}
+
+	async function handleDeleteImage(ref: string): Promise<Response> {
+		const res = await client.del(`/libpod/images/${encodeURIComponent(ref)}?force=true`);
+		if (res.status !== 200 && res.status !== 404) {
+			return jsonResponse(res.status, { error: `Failed to remove image: HTTP ${res.status}` });
+		}
+		return jsonResponse(200, { removed: ref });
 	}
 
 	async function handleCreateContainer(req: Request): Promise<Response> {

@@ -2,7 +2,7 @@ import { defineWorkload, secret } from "@boilerhouse/core";
 
 export default defineWorkload({
 	name: "openclaw",
-	version: "2026.3.7",
+	version: "2026.3.13",
 	image: { dockerfile: "openclaw/Dockerfile" },
 	resources: { vcpus: 2, memory_mb: 2048, disk_gb: 10 },
 	network: {
@@ -34,6 +34,7 @@ export default defineWorkload({
 		],
 		env: {
 			OPENCLAW_GATEWAY_TOKEN: "73307c8aab2b025f959a53f5095c0addec0be76fe4b5d470",
+			OPENCLAW_CONFIG_PATH: "/home/node/.openclaw/openclaw.json",
 			ANTHROPIC_BASE_URL: "http://host.containers.internal:18080",
 			ANTHROPIC_API_KEY: "sk-ant-proxy-managed",
 		},

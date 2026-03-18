@@ -14,7 +14,7 @@ RUN git config --global url."https://github.com/".insteadOf "ssh://git@github.co
 # while still finding its npm dependencies in /app/node_modules/.
 # The package.json must have "type": "module" so Node resolves ESM imports
 # in the dist files correctly (openclaw publishes ESM-only dist).
-RUN npm install openclaw@2026.3.7 && \
+RUN npm install openclaw@2026.3.13 && \
     cp node_modules/openclaw/openclaw.mjs . && \
     cp -r node_modules/openclaw/dist . && \
     npm pkg set type=module

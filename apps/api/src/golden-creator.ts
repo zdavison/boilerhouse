@@ -12,13 +12,21 @@ export class GoldenCreator {
 	/** Insertion-ordered map acts as both FIFO queue and dedup set. */
 	private readonly queue = new Map<WorkloadId, Workload>();
 	private processing = false;
+	private inflight = 0;
+	/** Resolvers waiting for a concurrency slot to free up. */
+	private slotWaiters: Array<() => void> = [];
 
+	/**
+	 * @param maxConcurrency Maximum number of golden snapshots to create in parallel.
+	 *   @default 5
+	 */
 	constructor(
 		private readonly db: DrizzleDb,
 		private readonly snapshotManager: SnapshotManager,
 		private readonly eventBus: EventBus,
 		private readonly bootstrapLogStore?: BootstrapLogStore,
 		private readonly log?: Logger,
+		private readonly maxConcurrency = 5,
 	) {}
 
 	/** Enqueue a workload for background golden snapshot creation. */
@@ -48,16 +56,42 @@ export class GoldenCreator {
 		});
 	}
 
+	private releaseSlot(): void {
+		this.inflight--;
+		const waiter = this.slotWaiters.shift();
+		if (waiter) waiter();
+	}
+
+	private waitForSlot(): Promise<void> {
+		if (this.inflight < this.maxConcurrency) return Promise.resolve();
+		return new Promise<void>((resolve) => this.slotWaiters.push(resolve));
+	}
+
 	private async processQueueAsync(): Promise<void> {
 		if (this.processing) return;
 		this.processing = true;
 
 		try {
+			const running: Promise<void>[] = [];
+
 			while (this.queue.size > 0) {
+				await this.waitForSlot();
+
+				// Queue may have been emptied while waiting
+				if (this.queue.size === 0) break;
+
 				const [workloadId, workload] = this.queue.entries().next().value!;
 				this.queue.delete(workloadId);
-				await this.processItem(workloadId, workload);
+				this.inflight++;
+
+				const task = this.processItem(workloadId, workload).finally(() => {
+					this.releaseSlot();
+				});
+				running.push(task);
 			}
+
+			// Wait for all remaining in-flight items
+			await Promise.all(running);
 		} finally {
 			this.processing = false;
 		}
