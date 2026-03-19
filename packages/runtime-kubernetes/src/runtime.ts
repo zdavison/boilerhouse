@@ -19,6 +19,7 @@ import { workloadToPod, MANAGED_LABEL } from "./translator";
 import { KubernetesRuntimeError } from "./errors";
 import { MinikubeImageProvider } from "./minikube";
 import type { EnsureImageResult } from "./minikube";
+import { isInCluster, resolveInClusterConfig } from "./in-cluster";
 
 /**
  * Tracks a managed pod and its associated workload (needed for restore).
@@ -42,12 +43,23 @@ export class KubernetesRuntime implements Runtime {
 	private readonly pods = new Map<string, ManagedPod>();
 
 	constructor(config: KubernetesConfig) {
-		this.client = new KubeClient({
-			apiUrl: config.apiUrl,
-			token: config.token,
-			caCert: config.caCert,
-		});
-		this.namespace = config.namespace ?? "boilerhouse";
+		if (config.auth === "in-cluster") {
+			const inCluster = resolveInClusterConfig();
+			this.client = new KubeClient({
+				apiUrl: inCluster.apiUrl,
+				token: inCluster.token,
+				caCert: inCluster.caCert,
+			});
+			this.namespace = config.namespace ?? inCluster.namespace;
+		} else {
+			this.client = new KubeClient({
+				apiUrl: config.apiUrl,
+				token: config.token,
+				caCert: config.caCert,
+			});
+			this.namespace = config.namespace ?? "boilerhouse";
+		}
+
 		this.snapshotDir = config.snapshotDir;
 		this.context = config.context;
 
@@ -227,8 +239,12 @@ export class KubernetesRuntime implements Runtime {
 			);
 		}
 
-		// Create a new pod from the workload
-		const { pod, service } = workloadToPod(workload, instanceId, this.namespace);
+		// Ensure image is available and create pod
+		const { imageRef, localBuild } = await this.ensureImage(workload, () => {});
+		const { pod, service } = workloadToPod(workload, instanceId, this.namespace, imageRef);
+		if (localBuild) {
+			pod.spec.containers[0]!.imagePullPolicy = "Never";
+		}
 		await this.client.createPod(this.namespace, pod);
 
 		if (service) {

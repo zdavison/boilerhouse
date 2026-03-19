@@ -143,6 +143,7 @@ describe("KubernetesRuntime", () => {
 	function setup(): void {
 		mockServer = createMockK8sServer();
 		runtime = new KubernetesRuntime({
+			auth: "external",
 			apiUrl: mockServer.baseUrl,
 			token: "test-token",
 			namespace: "boilerhouse",
@@ -167,6 +168,7 @@ describe("KubernetesRuntime", () => {
 
 	test("available() returns false on connection error", async () => {
 		runtime = new KubernetesRuntime({
+			auth: "external",
 			apiUrl: "http://localhost:1",
 			token: "fake",
 			namespace: "boilerhouse",

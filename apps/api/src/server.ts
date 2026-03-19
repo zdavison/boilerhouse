@@ -96,30 +96,31 @@ if (runtimeType === "podman") {
 		proxyAddress: forwardProxy ? `http://host.containers.internal:${forwardProxy.port}` : undefined,
 	});
 } else if (runtimeType === "kubernetes") {
-	const { KubernetesRuntime } = await import("@boilerhouse/runtime-kubernetes");
-	const k8sApiUrl = process.env.K8S_API_URL;
-	const k8sToken = process.env.K8S_TOKEN;
-	const k8sNamespace = process.env.K8S_NAMESPACE ?? "boilerhouse";
-	const k8sCaCert = process.env.K8S_CA_CERT;
+	const { KubernetesRuntime, isInCluster } = await import("@boilerhouse/runtime-kubernetes");
 
-	if (!k8sApiUrl || !k8sToken) {
-		throw new Error("K8S_API_URL and K8S_TOKEN are required when RUNTIME_TYPE=kubernetes");
-	}
-
+	const k8sNamespace = process.env.K8S_NAMESPACE;
 	const k8sContext = process.env.K8S_CONTEXT;
 	const k8sMinikubeProfile = process.env.K8S_MINIKUBE_PROFILE;
+	const common = { namespace: k8sNamespace, snapshotDir, context: k8sContext, minikubeProfile: k8sMinikubeProfile, workloadsDir };
 
-	log.info({ apiUrl: k8sApiUrl, namespace: k8sNamespace }, "Using Kubernetes runtime");
-	runtime = new KubernetesRuntime({
-		apiUrl: k8sApiUrl,
-		token: k8sToken,
-		namespace: k8sNamespace,
-		snapshotDir,
-		caCert: k8sCaCert,
-		context: k8sContext,
-		minikubeProfile: k8sMinikubeProfile,
-		workloadsDir,
-	});
+	if (process.env.K8S_API_URL && process.env.K8S_TOKEN) {
+		log.info({ apiUrl: process.env.K8S_API_URL, namespace: k8sNamespace }, "Using Kubernetes runtime (external auth)");
+		runtime = new KubernetesRuntime({
+			auth: "external",
+			apiUrl: process.env.K8S_API_URL,
+			token: process.env.K8S_TOKEN,
+			caCert: process.env.K8S_CA_CERT,
+			...common,
+		});
+	} else if (isInCluster()) {
+		log.info({ namespace: k8sNamespace }, "Using Kubernetes runtime (in-cluster auth)");
+		runtime = new KubernetesRuntime({ auth: "in-cluster", ...common });
+	} else {
+		throw new Error(
+			"Kubernetes runtime requires either K8S_API_URL + K8S_TOKEN env vars, " +
+			"or to be running inside a K8s pod with a mounted service account.",
+		);
+	}
 } else {
 	runtime = new FakeRuntime();
 }

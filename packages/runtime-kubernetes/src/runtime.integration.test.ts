@@ -41,6 +41,7 @@ function createRuntime(): KubernetesRuntime {
 	const ip = getMinikubeIp();
 	const token = getServiceAccountToken();
 	return new KubernetesRuntime({
+		auth: "external",
 		apiUrl: `https://${ip}:8443`,
 		token,
 		namespace: "boilerhouse",

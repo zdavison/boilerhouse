@@ -1,16 +1,5 @@
-export interface KubernetesConfig {
-	/**
-	 * K8s API server URL.
-	 * @example "https://192.168.49.2:8443"
-	 */
-	apiUrl: string;
-
-	/**
-	 * Bearer token for API authentication.
-	 * @example "eyJhbGciOiJSUzI1NiIs..."
-	 */
-	token: string;
-
+/** Options shared by all K8s auth modes. */
+interface KubernetesCommonConfig {
 	/**
 	 * Namespace for all managed pods.
 	 * @default "boilerhouse"
@@ -23,12 +12,6 @@ export interface KubernetesConfig {
 	 * @example "/var/lib/boilerhouse/snapshots"
 	 */
 	snapshotDir?: string;
-
-	/**
-	 * PEM-encoded CA certificate for the API server.
-	 * When omitted, TLS verification is disabled (suitable for minikube/dev).
-	 */
-	caCert?: string;
 
 	/**
 	 * kubectl context name. Used for exec operations which shell out to kubectl.
@@ -50,6 +33,40 @@ export interface KubernetesConfig {
 	 */
 	workloadsDir?: string;
 }
+
+/** Explicit API URL + bearer token (minikube, external clusters). */
+export interface KubernetesExternalConfig extends KubernetesCommonConfig {
+	auth: "external";
+
+	/**
+	 * K8s API server URL.
+	 * @example "https://192.168.49.2:8443"
+	 */
+	apiUrl: string;
+
+	/**
+	 * Bearer token for API authentication.
+	 * @example "eyJhbGciOiJSUzI1NiIs..."
+	 */
+	token: string;
+
+	/**
+	 * PEM-encoded CA certificate for the API server.
+	 * When omitted, TLS verification is disabled (suitable for minikube/dev).
+	 */
+	caCert?: string;
+}
+
+/**
+ * Auto-detected from the service account mounted into every K8s pod.
+ * Reads token from `/var/run/secrets/kubernetes.io/serviceaccount/token`
+ * and CA from `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`.
+ */
+export interface KubernetesInClusterConfig extends KubernetesCommonConfig {
+	auth: "in-cluster";
+}
+
+export type KubernetesConfig = KubernetesExternalConfig | KubernetesInClusterConfig;
 
 // ── Minimal K8s API types ───────────────────────────────────────────────────
 

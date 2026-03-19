@@ -193,7 +193,12 @@ export class TenantManager {
 
 	/**
 	 * Releases a tenant's instance according to the workload's idle policy.
-	 * Hibernate saves a snapshot; destroy removes the instance entirely.
+	 *
+	 * When `idle.action` is `"hibernate"`, the runtime snapshots the instance
+	 * (CRIU checkpoint on Podman, overlay tar on Kubernetes) and the tenant
+	 * can be restored from it on re-claim. When `"destroy"`, the instance is
+	 * removed entirely.
+	 *
 	 * No-op if the tenant has no active instance.
 	 */
 	async release(tenantId: TenantId): Promise<void> {

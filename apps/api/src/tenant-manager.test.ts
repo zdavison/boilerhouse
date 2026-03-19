@@ -202,7 +202,7 @@ describe("TenantManager", () => {
 			expect(result.tenantId).toBe(tenantId);
 		});
 
-		test("no golden snapshots + tenant snapshot → restores from snapshot", async () => {
+		test("no golden snapshots + idle.action='hibernate' → still hibernates and restores", async () => {
 			const noGoldenRuntime = new FakeRuntime({ goldenSnapshots: false });
 			const noGoldenIM = new InstanceManager(noGoldenRuntime, db, log, nodeId);
 			const noGoldenSM = new SnapshotManager(noGoldenRuntime, db, nodeId, {
@@ -219,14 +219,24 @@ describe("TenantManager", () => {
 
 			const tenantId = generateTenantId();
 
-			// First claim → cold boot
-			await noGoldenTM.claim(tenantId, workloadId);
-			// Release → hibernate creates tenant snapshot
+			// First claim → cold boot (no golden snapshots)
+			const first = await noGoldenTM.claim(tenantId, workloadId);
+			expect(first.source).toBe("cold");
+
+			// Release → hibernates (snapshot overlay data, destroy pod)
 			await noGoldenTM.release(tenantId);
 
-			// Re-claim → should restore from tenant snapshot
-			const result = await noGoldenTM.claim(tenantId, workloadId);
-			expect(result.source).toBe("snapshot");
+			const row = db
+				.select()
+				.from(instances)
+				.where(eq(instances.instanceId, first.instanceId))
+				.get();
+			expect(row!.status).toBe("hibernated");
+
+			// Re-claim → restores from tenant snapshot
+			const second = await noGoldenTM.claim(tenantId, workloadId);
+			expect(second.source).toBe("snapshot");
+			expect(second.instanceId).not.toBe(first.instanceId);
 		});
 
 		test("creates tenant row if none exists", async () => {
@@ -450,5 +460,6 @@ describe("TenantManager", () => {
 			expect(releaseEvent).toBeDefined();
 			expect(releaseEvent!.tenantId).toBe(tenantId);
 		});
+
 	});
 });

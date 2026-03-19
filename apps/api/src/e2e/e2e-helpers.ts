@@ -99,6 +99,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 	} else if (runtimeName === "kubernetes") {
 		const { KubernetesRuntime } = await import("@boilerhouse/runtime-kubernetes");
 
+		snapshotDir = mkdtempSync(join(tmpdir(), "bh-e2e-k8s-snap-"));
 		const ip = Bun.spawnSync(["minikube", "ip", "-p", "boilerhouse-test"], {
 			stdout: "pipe",
 		}).stdout.toString().trim();
@@ -109,11 +110,13 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		).stdout.toString().trim();
 
 		runtime = new KubernetesRuntime({
+			auth: "external",
 			apiUrl: `https://${ip}:8443`,
 			token,
 			namespace: "boilerhouse",
 			context: "boilerhouse-test",
 			minikubeProfile: "boilerhouse-test",
+			snapshotDir,
 		});
 	} else {
 		throw new Error(`Runtime '${runtimeName}' not implemented for E2E`);
