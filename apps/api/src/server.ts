@@ -1,7 +1,7 @@
 import { mkdirSync, chmodSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { FakeRuntime, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
-import type { Runtime, RuntimeType, Workload, TenantId } from "@boilerhouse/core";
+import type { Runtime, RuntimeType, Workload } from "@boilerhouse/core";
 import { PodmanRuntime } from "@boilerhouse/runtime-podman";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
 import { workloads as workloadsTable, tenants } from "@boilerhouse/db";
@@ -27,8 +27,6 @@ import { recoverState } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { applyWorkloadTransition, forceWorkloadStatus } from "./transitions";
 import { SecretStore } from "./secret-store";
-import { ForwardProxy } from "./proxy/proxy";
-import { ProxyRegistrar } from "./proxy-registrar";
 
 const log = createLogger("server");
 
@@ -40,7 +38,6 @@ const runtimeType = (process.env.RUNTIME_TYPE ?? "podman") as RuntimeType;
 const maxInstances = Number(process.env.MAX_INSTANCES ?? 100);
 const workloadsDir = process.env.WORKLOADS_DIR;
 const socketPath = process.env.RUNTIME_SOCKET ?? DEFAULT_RUNTIME_SOCKET;
-const proxyPort = Number(process.env.PROXY_PORT ?? 18080);
 
 // Ensure data directories exist with restrictive permissions
 mkdirSync(snapshotDir, { recursive: true, mode: 0o700 });
@@ -67,24 +64,15 @@ if (!existingNode) {
 const activityLog = new ActivityLog(db);
 const eventBus = new EventBus();
 
-// Optional: secret gateway (proxy + encrypted secret store)
+// Optional: encrypted secret store for credential injection
 const secretKey = process.env.BOILERHOUSE_SECRET_KEY;
 let secretStore: SecretStore | undefined;
-let proxyRegistrar: ProxyRegistrar | undefined;
-let forwardProxy: ForwardProxy | undefined;
 
 if (secretKey) {
 	secretStore = new SecretStore(db, secretKey);
-	forwardProxy = new ForwardProxy({
-		port: proxyPort,
-		secretResolver: (tenantId, template) =>
-			secretStore!.resolveSecretRefs(tenantId as TenantId, template),
-	});
-	await forwardProxy.start();
-	proxyRegistrar = new ProxyRegistrar(forwardProxy, secretStore);
-	log.info({ proxyPort: forwardProxy.port }, "Secret gateway proxy started");
+	log.info("Secret store initialised — proxy level credential injection available.");
 } else {
-	log.warn("BOILERHOUSE_SECRET_KEY not set — secret gateway proxy disabled, credential injection will not work");
+	log.warn("BOILERHOUSE_SECRET_KEY not set — credential injection will not work");
 }
 
 let runtime: Runtime;
@@ -93,7 +81,6 @@ if (runtimeType === "podman") {
 	runtime = new PodmanRuntime({
 		snapshotDir,
 		socketPath,
-		proxyAddress: forwardProxy ? `http://host.containers.internal:${forwardProxy.port}` : undefined,
 	});
 } else if (runtimeType === "kubernetes") {
 	const { KubernetesRuntime, isInCluster } = await import("@boilerhouse/runtime-kubernetes");
@@ -140,10 +127,10 @@ if (workloadsDir) {
 const instanceManager = new InstanceManager(
 	runtime, db, activityLog, nodeId, eventBus,
 	createLogger("InstanceManager"),
-	proxyRegistrar,
+	secretStore,
 );
 const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-	proxyRegistrar,
+	secretStore,
 });
 const tenantDataStore = new TenantDataStore(storagePath, db);
 const idleMonitor = new IdleMonitor({ defaultPollIntervalMs: 5000 });

@@ -51,12 +51,25 @@ export interface RuntimeCapabilities {
 	goldenSnapshots: boolean;
 }
 
+// ── Create options ──────────────────────────────────────────────────────────
+
+export interface CreateOptions {
+	/**
+	 * Serialised Envoy bootstrap config JSON. When provided, the runtime
+	 * creates an Envoy sidecar proxy alongside the workload container.
+	 * The sidecar enforces domain allowlisting and injects credential headers.
+	 */
+	proxyConfig?: string;
+	/** Optional log callback for progress messages during creation. */
+	onLog?: (line: string) => void;
+}
+
 // ── Runtime interface ────────────────────────────────────────────────────────
 
 export interface Runtime {
 	readonly capabilities: RuntimeCapabilities;
 	/** Create a new instance from a workload definition (cold boot). */
-	create(workload: Workload, instanceId: InstanceId, onLog?: (line: string) => void): Promise<InstanceHandle>;
+	create(workload: Workload, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle>;
 
 	/** Start a stopped/created instance. */
 	start(handle: InstanceHandle): Promise<void>;
@@ -73,8 +86,10 @@ export interface Runtime {
 	/**
 	 * Restore an instance from a snapshot.
 	 * Returns a running instance handle.
+	 *
+	 * @param options - Optional create options (e.g. proxyConfig for sidecar).
 	 */
-	restore(ref: SnapshotRef, instanceId: InstanceId): Promise<InstanceHandle>;
+	restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle>;
 
 	/** Execute a command inside the instance. */
 	exec(handle: InstanceHandle, command: string[]): Promise<ExecResult>;
@@ -84,13 +99,6 @@ export interface Runtime {
 
 	/** List all instance IDs currently known to the runtime. */
 	list(): Promise<InstanceId[]>;
-
-	/**
-	 * Get the container's IP address in the runtime network.
-	 * Returns null if the runtime doesn't support container networking
-	 * or the container has no IP assigned.
-	 */
-	getContainerIp?(handle: InstanceHandle): Promise<string | null>;
 
 	/**
 	 * Fetch recent stdout/stderr logs from a running instance.

@@ -7,6 +7,7 @@ import type {
 	InstanceHandle,
 	Endpoint,
 	ExecResult,
+	CreateOptions,
 	SnapshotRef,
 	SnapshotPaths,
 	SnapshotMetadata,
@@ -83,9 +84,9 @@ export class KubernetesRuntime implements Runtime {
 	async create(
 		workload: Workload,
 		instanceId: InstanceId,
-		onLog?: (line: string) => void,
+		options?: CreateOptions,
 	): Promise<InstanceHandle> {
-		const log = onLog ?? (() => {});
+		const log = options?.onLog ?? (() => {});
 
 		const { imageRef, localBuild } = await this.ensureImage(workload, log);
 		log(`Creating pod ${instanceId} (image: ${imageRef})...`);
@@ -225,7 +226,7 @@ export class KubernetesRuntime implements Runtime {
 		};
 	}
 
-	async restore(ref: SnapshotRef, instanceId: InstanceId): Promise<InstanceHandle> {
+	async restore(ref: SnapshotRef, instanceId: InstanceId, _options?: CreateOptions): Promise<InstanceHandle> {
 		// Read workload.json from the snapshot directory
 		const snapshotDir = join(ref.paths.memory, "..");
 		const workloadPath = join(snapshotDir, "workload.json");
@@ -431,15 +432,6 @@ export class KubernetesRuntime implements Runtime {
 		return podList.items.map(
 			(p) => p.metadata.name as InstanceId,
 		);
-	}
-
-	async getContainerIp(handle: InstanceHandle): Promise<string | null> {
-		try {
-			const pod = await this.client.getPod(this.namespace, handle.instanceId);
-			return pod.status?.podIP ?? null;
-		} catch {
-			return null;
-		}
 	}
 
 	async logs(handle: InstanceHandle, tail = 100): Promise<string | null> {

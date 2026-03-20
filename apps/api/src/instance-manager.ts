@@ -9,6 +9,7 @@ import type {
 	SnapshotRef,
 	Workload,
 	Endpoint,
+	CreateOptions,
 } from "@boilerhouse/core";
 import { generateInstanceId, canTransition, InvalidTransitionError } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
@@ -20,7 +21,9 @@ import {
 } from "./transitions";
 import type { Logger } from "@boilerhouse/o11y";
 import type { EventBus } from "./event-bus";
-import type { ProxyRegistrar } from "./proxy-registrar";
+import type { SecretStore } from "./secret-store";
+import { generateEnvoyConfig } from "@boilerhouse/envoy-config";
+import type { CredentialRule } from "@boilerhouse/envoy-config";
 
 /** Derives an InstanceHandle from a DB row's status. */
 export function instanceHandleFrom(instanceId: InstanceId, status: string): InstanceHandle {
@@ -42,7 +45,7 @@ export class InstanceManager {
 		private readonly nodeId: NodeId,
 		private readonly eventBus?: EventBus,
 		private readonly log?: Logger,
-		private readonly proxyRegistrar?: ProxyRegistrar,
+		private readonly secretStore?: SecretStore,
 	) {}
 
 	async create(
@@ -65,10 +68,9 @@ export class InstanceManager {
 			.run();
 
 		try {
-			const handle = await this.runtime.create(workload, instanceId);
+			const createOptions = this.buildCreateOptions(workload, tenantId);
+			const handle = await this.runtime.create(workload, instanceId, createOptions);
 			await this.runtime.start(handle);
-
-			await this.registerProxy(handle, workload, tenantId);
 
 			applyInstanceTransition(this.db, instanceId, "starting", "started");
 
@@ -99,8 +101,6 @@ export class InstanceManager {
 		if (!row) return;
 
 		const handle = instanceHandleFrom(instanceId, row.status);
-
-		await this.deregisterProxy(handle);
 
 		applyInstanceTransition(this.db, instanceId, row.status, "destroy");
 
@@ -160,8 +160,6 @@ export class InstanceManager {
 		}
 
 		const handle = instanceHandleFrom(instanceId, row.status);
-
-		await this.deregisterProxy(handle);
 
 		let ref: SnapshotRef;
 		try {
@@ -293,26 +291,26 @@ export class InstanceManager {
 			})
 			.run();
 
-		let handle: InstanceHandle;
-		try {
-			handle = await this.runtime.restore(ref, instanceId);
-		} catch (err) {
-			this.log?.error(
-				{ snapshotId: ref.id, instanceId, tenantId, err },
-				"Failed to restore instance from snapshot",
-			);
-			throw err;
-		}
-
-		// Register the restored container in the proxy
+		// Build proxy config for the restored instance
 		const workloadRow = this.db
 			.select({ config: workloads.config })
 			.from(workloads)
 			.where(eq(workloads.workloadId, snapshotRow.workloadId))
 			.get();
 
-		if (workloadRow) {
-			await this.registerProxy(handle, workloadRow.config as Workload, tenantId);
+		const restoreOptions = workloadRow
+			? this.buildCreateOptions(workloadRow.config as Workload, tenantId)
+			: undefined;
+
+		let handle: InstanceHandle;
+		try {
+			handle = await this.runtime.restore(ref, instanceId, restoreOptions);
+		} catch (err) {
+			this.log?.error(
+				{ snapshotId: ref.id, instanceId, tenantId, err },
+				"Failed to restore instance from snapshot",
+			);
+			throw err;
 		}
 
 		applyInstanceTransition(this.db, instanceId, "starting", "started");
@@ -341,46 +339,38 @@ export class InstanceManager {
 		return this.runtime.getEndpoint(handle);
 	}
 
-	// ── Proxy helpers ──────────────────────────────────────────────────────
+	// ── Proxy config helpers ────────────────────────────────────────────────
 
-	private async registerProxy(
-		handle: InstanceHandle,
+	/**
+	 * Build CreateOptions including Envoy sidecar proxy config if the
+	 * workload has restricted network access with credentials.
+	 */
+	private buildCreateOptions(
 		workload: Workload,
 		tenantId?: TenantId,
-	): Promise<void> {
-		if (!this.proxyRegistrar || workload.network.access === "none") return;
-		if (!this.runtime.getContainerIp) return;
-
-		const ip = await this.runtime.getContainerIp(handle);
-		if (!ip) {
-			this.log?.warn({ instanceId: handle.instanceId }, "Cannot register proxy — container has no IP");
-			return;
+	): CreateOptions | undefined {
+		if (workload.network.access !== "restricted" || !this.secretStore) {
+			return undefined;
 		}
 
-		this.log?.info(
-			{ instanceId: handle.instanceId, containerIp: ip, tenantId },
-			"Registering container in proxy routing table",
-		);
-		this.proxyRegistrar.registerInstance(
-			ip,
-			workload,
-			tenantId ?? ("" as TenantId),
-		);
-	}
+		const allowlist = workload.network.allowlist ?? [];
 
-	private async deregisterProxy(handle: InstanceHandle): Promise<void> {
-		if (!this.proxyRegistrar) return;
-		if (!this.runtime.getContainerIp) return;
-
-		let ip: string | null;
-		try {
-			ip = await this.runtime.getContainerIp(handle);
-		} catch {
-			// Container already gone — nothing to deregister
-			return;
+		let credentials: CredentialRule[] | undefined;
+		if (workload.network.credentials && workload.network.credentials.length > 0) {
+			credentials = workload.network.credentials.map((cred) => {
+				const resolvedHeaders: Record<string, string> = {};
+				for (const [key, template] of Object.entries(cred.headers)) {
+					resolvedHeaders[key] = this.secretStore!.resolveSecretRefs(
+						tenantId ?? ("" as TenantId),
+						template,
+					);
+				}
+				return { domain: cred.domain, headers: resolvedHeaders };
+			});
 		}
-		if (!ip) return;
 
-		this.proxyRegistrar.deregisterInstance(ip);
+		const proxyConfig = generateEnvoyConfig({ allowlist, credentials });
+
+		return { proxyConfig };
 	}
 }

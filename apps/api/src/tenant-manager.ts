@@ -9,6 +9,7 @@ import type {
 	SnapshotRef,
 	Endpoint,
 	TenantStatus,
+	Workload,
 } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import { instances, snapshots, tenants, workloads, snapshotRefFrom } from "@boilerhouse/db";

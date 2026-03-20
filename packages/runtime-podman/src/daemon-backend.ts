@@ -75,12 +75,14 @@ export class DaemonBackend implements ContainerBackend {
 		hmac: string | undefined,
 		name: string,
 		publishPorts?: string[],
+		pod?: string,
 	): Promise<string> {
 		const res = await this.request("POST", "/containers/restore", {
 			archivePath,
 			hmac,
 			name,
 			publishPorts,
+			pod,
 		});
 		return (res as { id: string }).id;
 	}
@@ -105,6 +107,36 @@ export class DaemonBackend implements ContainerBackend {
 			`/containers/${encodeURIComponent(id)}/logs?tail=${tail}`,
 		);
 		return (res as { logs: string }).logs;
+	}
+
+	// ── Pod operations ──────────────────────────────────────────────────────
+
+	async inspectPod(name: string): Promise<{ infraContainerId: string }> {
+		const res = await this.request("GET", `/pods/${encodeURIComponent(name)}`);
+		return res as { infraContainerId: string };
+	}
+
+	async createPod(name: string, spec?: { portmappings?: Array<{ container_port: number; host_port: number; protocol?: string }>; netns?: { nsmode: string } }): Promise<void> {
+		await this.request("POST", "/pods", { name, ...spec });
+	}
+
+	async startPod(name: string): Promise<void> {
+		await this.request("POST", `/pods/${encodeURIComponent(name)}/start`);
+	}
+
+	async removePod(name: string): Promise<void> {
+		await this.request("DELETE", `/pods/${encodeURIComponent(name)}`);
+	}
+
+	// ── File operations ─────────────────────────────────────────────────────
+
+	async writeFile(name: string, content: string): Promise<string> {
+		const res = await this.request("POST", "/files", { name, content });
+		return (res as { path: string }).path;
+	}
+
+	async removeFile(name: string): Promise<void> {
+		await this.request("DELETE", `/files/${encodeURIComponent(name)}`);
 	}
 
 	// ── HTTP transport ──────────────────────────────────────────────────────

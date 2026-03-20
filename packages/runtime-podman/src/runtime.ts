@@ -5,7 +5,7 @@ import type { InstanceId } from "@boilerhouse/core";
 import { generateSnapshotId, generateWorkloadId, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
 import type { SnapshotRef, SnapshotPaths, SnapshotMetadata } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
-import type { Runtime, RuntimeCapabilities, InstanceHandle, Endpoint, ExecResult } from "@boilerhouse/core";
+import type { Runtime, RuntimeCapabilities, InstanceHandle, Endpoint, ExecResult, CreateOptions } from "@boilerhouse/core";
 import type { PodmanConfig } from "./types";
 import type { ContainerBackend } from "./backend";
 import { PodmanRuntimeError } from "./errors";
@@ -13,24 +13,27 @@ import type { ContainerCreateSpec } from "./client";
 import { resolveTemplates, assertNoSecretRefs } from "./templates";
 import { DaemonBackend } from "./daemon-backend";
 
+/** Envoy sidecar image used for per-instance proxy containers. */
+const ENVOY_IMAGE = "docker.io/envoyproxy/envoy:v1.32-latest";
+const ENVOY_PROXY_PORT = 18080;
 
-interface ManagedContainer {
+interface ManagedInstance {
 	instanceId: InstanceId;
 	running: boolean;
 	/** Published host ports (resolved after start or restore). */
 	ports: number[];
+	/** Whether this instance has an Envoy proxy sidecar for network restriction. */
+	hasEnvoyProxySidecar: boolean;
 }
 
 export class PodmanRuntime implements Runtime {
 	readonly capabilities: RuntimeCapabilities = { goldenSnapshots: true };
-	private readonly containers = new Map<string, ManagedContainer>();
+	private readonly instances = new Map<string, ManagedInstance>();
 	private readonly snapshotDir: string;
-	private readonly proxyAddress: string | undefined;
 	private readonly backend: ContainerBackend;
 
 	constructor(config: PodmanConfig) {
 		this.snapshotDir = config.snapshotDir;
-		this.proxyAddress = config.proxyAddress;
 		this.backend = new DaemonBackend({ socketPath: config.socketPath ?? DEFAULT_RUNTIME_SOCKET });
 	}
 
@@ -43,8 +46,9 @@ export class PodmanRuntime implements Runtime {
 		}
 	}
 
-	async create(workload: Workload, instanceId: InstanceId, onLog?: (line: string) => void): Promise<InstanceHandle> {
-		const log = onLog ?? (() => {});
+	async create(workload: Workload, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle> {
+		const log = options?.onLog ?? (() => {});
+		const proxyConfig = options?.proxyConfig;
 
 		const imageSource = workload.image.dockerfile
 			? `Dockerfile ${workload.image.dockerfile}`
@@ -64,10 +68,71 @@ export class PodmanRuntime implements Runtime {
 			log(`Image cached: ${imageRef}`);
 		}
 
-		// Build container create spec
+		// Determine port mappings
+		let portmappings: Array<{ container_port: number; host_port: number; protocol: string }> | undefined;
+		if (workload.network.access !== "none") {
+			const exposePorts = workload.network.expose;
+			if (exposePorts && exposePorts.length > 0) {
+				portmappings = exposePorts.map((mapping) => ({
+					container_port: mapping.guest,
+					host_port: 0,
+					protocol: "tcp",
+				}));
+			} else {
+				portmappings = [{ container_port: 8080, host_port: 0, protocol: "tcp" }];
+			}
+		}
+
+		// Security assertion: no fixed host ports
+		if (portmappings) {
+			for (const pm of portmappings) {
+				if (pm.host_port !== 0) {
+					throw new PodmanRuntimeError(
+						`Fixed host port ${pm.host_port} is not allowed — use host_port: 0 for ephemeral allocation`,
+					);
+				}
+			}
+		}
+
+		const hasEnvoyProxySidecar = !!proxyConfig;
+
+		// Always create a podman pod — containers share the pod's network namespace
+		await this.backend.createPod(instanceId, {
+			portmappings,
+			netns: workload.network.access === "none" ? { nsmode: "none" } : undefined,
+		});
+
+		// Add Envoy sidecar if proxy config is provided
+		if (proxyConfig) {
+			await this.backend.ensureImage({ ref: ENVOY_IMAGE }, { name: "envoy-proxy", version: "sidecar" });
+
+			const configPath = await this.backend.writeFile(
+				`${instanceId}-envoy.yaml`,
+				proxyConfig,
+			);
+
+			await this.backend.createContainer({
+				name: `${instanceId}-proxy`,
+				image: ENVOY_IMAGE,
+				pod: instanceId,
+				command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"],
+				privileged: false,
+				mounts: [{
+					destination: "/etc/envoy/envoy.yaml",
+					type: "bind",
+					source: configPath,
+					options: ["ro"],
+				}],
+			});
+
+			log("Envoy sidecar proxy created");
+		}
+
+		// Build workload container spec
 		const spec: ContainerCreateSpec = {
 			name: instanceId,
 			image: imageRef,
+			pod: instanceId,
 			privileged: false,
 			labels: {
 				"boilerhouse.workload": workload.workload.name,
@@ -83,24 +148,6 @@ export class PodmanRuntime implements Runtime {
 				},
 			},
 		};
-
-		// Network mode — "none" means no network namespace at all (no port mappings possible)
-		if (workload.network.access === "none") {
-			spec.netns = { nsmode: "none" };
-		} else {
-			// Port mappings only make sense when a network namespace exists
-			const exposePorts = workload.network.expose;
-			if (exposePorts && exposePorts.length > 0) {
-				spec.portmappings = exposePorts.map((mapping) => ({
-					container_port: mapping.guest,
-					host_port: 0,
-					protocol: "tcp",
-				}));
-			} else {
-				// Default: expose port 8080
-				spec.portmappings = [{ container_port: 8080, host_port: 0, protocol: "tcp" }];
-			}
-		}
 
 		// Mount overlay_dirs as tmpfs so CRIU can checkpoint inode handles
 		if (workload.filesystem?.overlay_dirs) {
@@ -129,63 +176,53 @@ export class PodmanRuntime implements Runtime {
 			}
 		}
 
-		// Inject HTTP_PROXY for containers with network access
-		if (this.proxyAddress && workload.network.access !== "none") {
+		// Inject HTTP_PROXY pointing to the sidecar on localhost
+		if (hasEnvoyProxySidecar && workload.network.access !== "none") {
 			spec.env ??= {};
-			spec.env.HTTP_PROXY ??= this.proxyAddress;
-			spec.env.http_proxy ??= this.proxyAddress;
-			// Ensure host.containers.internal resolves inside the container
-			// (Libpod API doesn't add it automatically like `podman run` does)
-			spec.hostadd = ["host.containers.internal:host-gateway"];
-		}
-
-		// Security assertions: enforce unprivileged mode, ephemeral host ports, isolated netns
-		if (spec.portmappings) {
-			for (const pm of spec.portmappings) {
-				if (pm.host_port !== 0) {
-					throw new PodmanRuntimeError(
-						`Fixed host port ${pm.host_port} is not allowed — use host_port: 0 for ephemeral allocation`,
-					);
-				}
-			}
-		}
-		if (spec.netns?.nsmode === "host") {
-			throw new PodmanRuntimeError(
-				"Host network namespace is not allowed — containers must use an isolated netns",
-			);
+			spec.env.HTTP_PROXY ??= `http://localhost:${ENVOY_PROXY_PORT}`;
+			spec.env.http_proxy ??= `http://localhost:${ENVOY_PROXY_PORT}`;
 		}
 
 		await this.backend.createContainer(spec);
 
-		this.containers.set(instanceId, {
+		this.instances.set(instanceId, {
 			instanceId,
 			running: false,
 			ports: [],
+			hasEnvoyProxySidecar,
 		});
 
 		return { instanceId, running: false };
 	}
 
 	async start(handle: InstanceHandle): Promise<void> {
-		await this.backend.startContainer(handle.instanceId);
+		const instance = this.requireInstance(handle.instanceId);
 
-		const container = this.requireContainer(handle.instanceId);
-		container.running = true;
+		await this.backend.startPod(handle.instanceId);
+
+		instance.running = true;
 		handle.running = true;
 
 		// Resolve published host ports
-		container.ports = await this.resolveHostPorts(handle.instanceId);
+		instance.ports = await this.resolveHostPorts(handle.instanceId);
 	}
 
 	async destroy(handle: InstanceHandle): Promise<void> {
-		// Force remove — idempotent (ignores 404)
-		await this.backend.removeContainer(handle.instanceId);
-		this.containers.delete(handle.instanceId);
+		const instance = this.instances.get(handle.instanceId);
+
+		// Delete the pod — removes all containers (infra, proxy, workload)
+		await this.backend.removePod(handle.instanceId);
+
+		if (instance?.hasEnvoyProxySidecar) {
+			await this.backend.removeFile(`${handle.instanceId}-envoy.yaml`);
+		}
+
+		this.instances.delete(handle.instanceId);
 		handle.running = false;
 	}
 
 	async snapshot(handle: InstanceHandle): Promise<SnapshotRef> {
-		const container = this.requireContainer(handle.instanceId);
+		const instance = this.requireInstance(handle.instanceId);
 		const snapshotId = generateSnapshotId();
 
 		const archiveDir = `${this.snapshotDir}/${snapshotId}`;
@@ -197,6 +234,11 @@ export class PodmanRuntime implements Runtime {
 			);
 		}
 
+		// Capture exposed container ports from the pod's infra container.
+		// In a pod, port mappings are on the infra container, not the workload,
+		// so the checkpoint archive won't contain them.
+		const exposedPorts = await this.resolveExposedContainerPorts(handle.instanceId);
+
 		// Wait for all established TCP connections to close before CRIU checkpoint.
 		// CRIU cannot restore TCP connections when the container's IP changes on restore.
 		await this.waitForTcpDrain(handle.instanceId);
@@ -204,7 +246,7 @@ export class PodmanRuntime implements Runtime {
 		const result = await this.backend.checkpoint(handle.instanceId, archiveDir);
 
 		// Container is stopped after checkpoint
-		container.running = false;
+		instance.running = false;
 		handle.running = false;
 
 		const info = await this.backend.info();
@@ -217,7 +259,7 @@ export class PodmanRuntime implements Runtime {
 		const runtimeMeta: SnapshotMetadata = {
 			runtimeVersion: info.version,
 			architecture: info.architecture,
-			exposedPorts: result.exposedPorts.length > 0 ? result.exposedPorts : undefined,
+			exposedPorts: exposedPorts.length > 0 ? exposedPorts : undefined,
 		};
 
 		return {
@@ -231,25 +273,62 @@ export class PodmanRuntime implements Runtime {
 		};
 	}
 
-	async restore(ref: SnapshotRef, instanceId: InstanceId): Promise<InstanceHandle> {
-		// Build publishPorts specs from the snapshot's exposed container ports.
-		// Just the container port number — podman picks a random host port.
-		const containerPorts = ref.runtimeMeta?.exposedPorts;
-		const publishPorts = containerPorts?.map((p) => String(p));
+	async restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle> {
+		const proxyConfig = options?.proxyConfig;
+		const hasEnvoyProxySidecar = !!proxyConfig;
 
+		const containerPorts = ref.runtimeMeta?.exposedPorts;
+
+		// Always create a pod for the restored instance
+		const portmappings = containerPorts?.map((p) => ({
+			container_port: p,
+			host_port: 0,
+			protocol: "tcp",
+		}));
+
+		await this.backend.createPod(instanceId, { portmappings });
+
+		// Add Envoy sidecar if proxy config is provided
+		if (proxyConfig) {
+			await this.backend.ensureImage({ ref: ENVOY_IMAGE }, { name: "envoy-proxy", version: "sidecar" });
+
+			const configPath = await this.backend.writeFile(
+				`${instanceId}-envoy.yaml`,
+				proxyConfig,
+			);
+
+			await this.backend.createContainer({
+				name: `${instanceId}-proxy`,
+				image: ENVOY_IMAGE,
+				pod: instanceId,
+				command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"],
+				privileged: false,
+				mounts: [{
+					destination: "/etc/envoy/envoy.yaml",
+					type: "bind",
+					source: configPath,
+					options: ["ro"],
+				}],
+			});
+		}
+
+		// Restore the container into the pod. Port mappings are on the pod
+		// (not the container), so we don't pass publishPorts.
 		await this.backend.restore(
 			ref.paths.vmstate,
 			ref.archiveHmac,
 			instanceId,
-			publishPorts,
+			undefined,
+			instanceId,
 		);
 
 		const ports = await this.resolveHostPorts(instanceId);
 
-		this.containers.set(instanceId, {
+		this.instances.set(instanceId, {
 			instanceId,
 			running: true,
 			ports,
+			hasEnvoyProxySidecar,
 		});
 
 		return { instanceId, running: true };
@@ -260,13 +339,13 @@ export class PodmanRuntime implements Runtime {
 	}
 
 	async getEndpoint(handle: InstanceHandle): Promise<Endpoint> {
-		const container = this.containers.get(handle.instanceId);
-		let ports = container?.ports;
+		const instance = this.instances.get(handle.instanceId);
+		let ports = instance?.ports;
 
 		if (!ports || ports.length === 0) {
 			ports = await this.resolveHostPorts(handle.instanceId);
-			if (container) {
-				container.ports = ports;
+			if (instance) {
+				instance.ports = ports;
 			}
 		}
 
@@ -278,28 +357,12 @@ export class PodmanRuntime implements Runtime {
 	}
 
 	async list(): Promise<InstanceId[]> {
-		return Array.from(this.containers.keys()) as InstanceId[];
+		return Array.from(this.instances.keys()) as InstanceId[];
 	}
 
 	async logs(handle: InstanceHandle, tail = 100): Promise<string | null> {
 		try {
 			return await this.backend.logs(handle.instanceId, tail);
-		} catch {
-			return null;
-		}
-	}
-
-	async getContainerIp(handle: InstanceHandle): Promise<string | null> {
-		try {
-			const inspect = await this.backend.inspectContainer(handle.instanceId);
-			const networks = (inspect.NetworkSettings as Record<string, unknown>)
-				?.Networks as Record<string, { IPAddress?: string }> | undefined;
-			if (!networks) return null;
-
-			for (const net of Object.values(networks)) {
-				if (net.IPAddress) return net.IPAddress;
-			}
-			return null;
 		} catch {
 			return null;
 		}
@@ -360,21 +423,51 @@ export class PodmanRuntime implements Runtime {
 		);
 	}
 
-	private requireContainer(instanceId: InstanceId): ManagedContainer {
-		const container = this.containers.get(instanceId);
-		if (!container) {
-			throw new PodmanRuntimeError(`Container not tracked: ${instanceId}`);
+	/**
+	 * Get the exposed container ports (guest ports) from the pod's infra container.
+	 * These are needed when creating a new pod for restore.
+	 */
+	private async resolveExposedContainerPorts(instanceId: string): Promise<number[]> {
+		try {
+			const pod = await this.backend.inspectPod(instanceId);
+			if (!pod.infraContainerId) return [];
+
+			const inspect = await this.backend.inspectContainer(pod.infraContainerId);
+			const portsMap = inspect.NetworkSettings?.Ports;
+			if (!portsMap) return [];
+
+			// Keys are like "8080/tcp" — extract the container port number
+			const ports: number[] = [];
+			for (const key of Object.keys(portsMap)) {
+				const port = parseInt(key.split("/")[0]!, 10);
+				if (port > 0) ports.push(port);
+			}
+			return ports;
+		} catch {
+			return [];
 		}
-		return container;
+	}
+
+	private requireInstance(instanceId: InstanceId): ManagedInstance {
+		const instance = this.instances.get(instanceId);
+		if (!instance) {
+			throw new PodmanRuntimeError(`Instance not tracked: ${instanceId}`);
+		}
+		return instance;
 	}
 
 	/**
-	 * Resolve published host ports by inspecting the container.
-	 * Parses NetworkSettings.Ports from the inspect response.
+	 * Resolve published host ports by inspecting the pod's infra container.
+	 *
+	 * In a podman pod, port mappings belong to the infra container (which
+	 * owns the shared network namespace), not the workload container.
 	 */
 	private async resolveHostPorts(instanceId: string): Promise<number[]> {
 		try {
-			const inspect = await this.backend.inspectContainer(instanceId);
+			const pod = await this.backend.inspectPod(instanceId);
+			if (!pod.infraContainerId) return [];
+
+			const inspect = await this.backend.inspectContainer(pod.infraContainerId);
 			const portsMap = inspect.NetworkSettings?.Ports;
 			if (!portsMap) return [];
 

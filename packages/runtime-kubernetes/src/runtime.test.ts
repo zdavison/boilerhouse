@@ -267,16 +267,6 @@ describe("KubernetesRuntime", () => {
 		expect(ids).toContain(INSTANCE_ID);
 	});
 
-	test("getContainerIp() returns pod IP", async () => {
-		setup();
-		const workload = makeWorkload();
-		const handle = await runtime.create(workload, INSTANCE_ID);
-		await runtime.start(handle);
-
-		const ip = await runtime.getContainerIp!(handle);
-		expect(ip).toBe("10.244.0.10");
-	});
-
 	test("logs() returns pod logs", async () => {
 		setup();
 		const workload = makeWorkload();

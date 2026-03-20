@@ -43,12 +43,33 @@ describe("validateContainerSpec", () => {
 		expect(() => validateContainerSpec(spec)).toThrow(/host.*network/i);
 	});
 
-	test("rejects bind mounts", () => {
+	test("rejects bind mounts from arbitrary paths", () => {
+		const spec = validSpec({
+			mounts: [{ destination: "/data", type: "bind", source: "/etc/passwd", options: [] }],
+		});
+		expect(() => validateContainerSpec(spec)).toThrow(PolicyViolationError);
+		expect(() => validateContainerSpec(spec)).toThrow(/bind/i);
+	});
+
+	test("rejects bind mounts with no source", () => {
 		const spec = validSpec({
 			mounts: [{ destination: "/data", type: "bind", options: [] }],
 		});
 		expect(() => validateContainerSpec(spec)).toThrow(PolicyViolationError);
-		expect(() => validateContainerSpec(spec)).toThrow(/bind/i);
+	});
+
+	test("allows bind mounts from allowed source directories", () => {
+		const spec = validSpec({
+			mounts: [{ destination: "/etc/envoy/envoy.yaml", type: "bind", source: "/var/lib/configs/my-envoy.yaml", options: ["ro"] }],
+		});
+		expect(() => validateContainerSpec(spec, { allowedBindSources: ["/var/lib/configs"] })).not.toThrow();
+	});
+
+	test("rejects bind mounts outside allowed source directories", () => {
+		const spec = validSpec({
+			mounts: [{ destination: "/etc/envoy/envoy.yaml", type: "bind", source: "/tmp/evil.yaml", options: ["ro"] }],
+		});
+		expect(() => validateContainerSpec(spec, { allowedBindSources: ["/var/lib/configs"] })).toThrow(PolicyViolationError);
 	});
 
 	test("allows tmpfs mounts", () => {

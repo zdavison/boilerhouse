@@ -11,11 +11,4 @@ export interface PodmanConfig {
 	 * @default DEFAULT_RUNTIME_SOCKET (platform-dependent, see @boilerhouse/core paths.ts)
 	 */
 	socketPath?: string;
-
-	/**
-	 * Forward proxy address to inject as HTTP_PROXY/http_proxy into containers.
-	 * Only injected when the workload has network access (not "none").
-	 * @example "http://host.containers.internal:38080"
-	 */
-	proxyAddress?: string;
 }

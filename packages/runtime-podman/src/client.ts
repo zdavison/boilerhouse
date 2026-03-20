@@ -37,6 +37,7 @@ export interface ContainerCreateSpec {
 	mounts?: Array<{
 		destination: string;
 		type: string;
+		source?: string;
 		options?: string[];
 	}>;
 	netns?: { nsmode: string };
@@ -45,6 +46,21 @@ export interface ContainerCreateSpec {
 	 * @example ["host.containers.internal:host-gateway"]
 	 */
 	hostadd?: string[];
+	/**
+	 * Name of the podman pod to join. When set, the container shares
+	 * the pod's network namespace (port mappings belong to the pod).
+	 */
+	pod?: string;
+}
+
+/** Pod create specification. */
+export interface PodCreateSpec {
+	portmappings?: Array<{
+		container_port: number;
+		host_port: number;
+		protocol?: string;
+	}>;
+	netns?: { nsmode: string };
 }
 
 /** Subset of the container inspect response we use. */
@@ -272,7 +288,7 @@ export class PodmanClient {
 	 *   Podman assigns a random available host port for each.
 	 *   @example `["8080", "9090"]`
 	 */
-	async restoreContainer(archive: Buffer, name: string, publishPorts?: string[]): Promise<string> {
+	async restoreContainer(archive: Buffer, name: string, publishPorts?: string[], pod?: string): Promise<string> {
 		let path =
 			`/libpod/containers/${encodeURIComponent(name)}/restore` +
 			`?import=true&name=${encodeURIComponent(name)}` +
@@ -280,6 +296,10 @@ export class PodmanClient {
 
 		if (publishPorts && publishPorts.length > 0) {
 			path += `&publishPorts=${encodeURIComponent(publishPorts.join(" "))}`;
+		}
+
+		if (pod) {
+			path += `&pod=${encodeURIComponent(pod)}`;
 		}
 
 		const res = await this.request("POST", path, archive);
@@ -451,6 +471,9 @@ export class PodmanClient {
 		}
 		if (spec.hostadd && spec.hostadd.length > 0) {
 			body.hostadd = spec.hostadd;
+		}
+		if (spec.pod) {
+			body.pod = spec.pod;
 		}
 
 		return body;

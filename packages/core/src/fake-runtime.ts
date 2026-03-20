@@ -2,7 +2,7 @@ import type { InstanceId } from "./types";
 import { generateSnapshotId, generateWorkloadId, generateNodeId } from "./types";
 import type { SnapshotRef } from "./snapshot";
 import type { Workload } from "./workload";
-import type { Runtime, RuntimeCapabilities, InstanceHandle, Endpoint, ExecResult } from "./runtime";
+import type { Runtime, RuntimeCapabilities, InstanceHandle, Endpoint, ExecResult, CreateOptions } from "./runtime";
 
 type RuntimeOperation =
 	| "create"
@@ -64,7 +64,7 @@ export class FakeRuntime implements Runtime {
 	async create(
 		workload: Workload,
 		instanceId: InstanceId,
-		_onLog?: (line: string) => void,
+		_options?: CreateOptions,
 	): Promise<InstanceHandle> {
 		await this.maybeDelay("create");
 		const ports = (workload.network.expose ?? []).map((e) => e.guest);
@@ -123,6 +123,7 @@ export class FakeRuntime implements Runtime {
 	async restore(
 		ref: SnapshotRef,
 		instanceId: InstanceId,
+		_options?: CreateOptions,
 	): Promise<InstanceHandle> {
 		await this.maybeDelay("restore");
 		if (!this.snapshots.has(ref.id)) {
@@ -161,13 +162,6 @@ export class FakeRuntime implements Runtime {
 	async list(): Promise<InstanceId[]> {
 		await this.maybeDelay("list");
 		return Array.from(this.instances.keys()) as InstanceId[];
-	}
-
-	private nextIpOctet = 2;
-
-	async getContainerIp(handle: InstanceHandle): Promise<string | null> {
-		this.requireInstance(handle.instanceId);
-		return `10.88.0.${this.nextIpOctet++}`;
 	}
 
 	async available(): Promise<boolean> {

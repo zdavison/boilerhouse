@@ -1,5 +1,5 @@
-import { mkdirSync, existsSync, rmSync, chmodSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdirSync, existsSync, rmSync, chmodSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type { Subprocess } from "bun";
 import { DEFAULT_RUNTIME_SOCKET, DEFAULT_PODMAN_SOCKET, DEFAULT_SNAPSHOT_DIR } from "@boilerhouse/core";
 import { PodmanClient } from "@boilerhouse/runtime-podman";
@@ -166,6 +166,10 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 
 	mkdirSync(config.snapshotDir, { recursive: true, mode: 0o700 });
 
+	// Directory for sidecar proxy config files (bind-mounted into containers)
+	const configFilesDir = resolve(config.snapshotDir, "..", "proxy-configs");
+	mkdirSync(configFilesDir, { recursive: true, mode: 0o700 });
+
 	function jsonResponse(status: number, body?: unknown): Response {
 		if (body === undefined || body === null) {
 			return new Response(null, { status });
@@ -267,6 +271,44 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 				return await handleExec(execMatch[1]!, req);
 			}
 
+			// ── Pod routes ──────────────────────────────────────────────
+
+			// POST /pods (create)
+			if (method === "POST" && pathname === "/pods") {
+				return await handleCreatePod(req);
+			}
+
+			// GET /pods/:name (inspect)
+			const podInspectMatch = pathname.match(/^\/pods\/([^/]+)$/);
+			if (method === "GET" && podInspectMatch) {
+				return await handleInspectPod(podInspectMatch[1]!);
+			}
+
+			// POST /pods/:name/start
+			const podStartMatch = pathname.match(/^\/pods\/([^/]+)\/start$/);
+			if (method === "POST" && podStartMatch) {
+				return await handleStartPod(podStartMatch[1]!);
+			}
+
+			// DELETE /pods/:name
+			const podDeleteMatch = pathname.match(/^\/pods\/([^/]+)$/);
+			if (method === "DELETE" && podDeleteMatch) {
+				return await handleRemovePod(podDeleteMatch[1]!);
+			}
+
+			// ── File routes ─────────────────────────────────────────────
+
+			// POST /files (write)
+			if (method === "POST" && pathname === "/files") {
+				return await handleWriteFile(req);
+			}
+
+			// DELETE /files/:name
+			const fileDeleteMatch = pathname.match(/^\/files\/([^/]+)$/);
+			if (method === "DELETE" && fileDeleteMatch) {
+				return handleRemoveFile(decodeURIComponent(fileDeleteMatch[1]!));
+			}
+
 			return jsonResponse(404, { error: "not found" });
 		} catch (err) {
 			if (err instanceof PolicyViolationError) {
@@ -359,7 +401,9 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 		const body = (await readJsonBody(req)) as { spec: ContainerCreateSpec };
 
 		// Validate and sanitize the spec — throws PolicyViolationError on violation
-		const sanitized = validateContainerSpec(body.spec);
+		const sanitized = validateContainerSpec(body.spec, {
+			allowedBindSources: [configFilesDir],
+		});
 
 		const podmanId = await client.createContainer(sanitized);
 		registerContainer(podmanId, sanitized.name);
@@ -378,10 +422,8 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 	}
 
 	async function handleInspectContainer(identifier: string): Promise<Response> {
-		const podmanId = resolveContainer(identifier);
-		if (!podmanId) {
-			return jsonResponse(404, { error: `Container ${identifier} not in registry` });
-		}
+		// Resolve from registry, or pass through raw podman IDs (e.g. infra containers)
+		const podmanId = resolveContainer(identifier) ?? identifier;
 
 		const inspect = await client.inspectContainer(podmanId);
 		return jsonResponse(200, inspect);
@@ -448,6 +490,7 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 			hmac?: string;
 			name: string;
 			publishPorts?: string[];
+			pod?: string;
 		};
 
 		const { verifyArchiveHmac } = await import("@boilerhouse/runtime-podman");
@@ -469,7 +512,7 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 			}
 		}
 
-		const podmanId = await client.restoreContainer(archive, body.name, body.publishPorts);
+		const podmanId = await client.restoreContainer(archive, body.name, body.publishPorts, body.pod);
 		registerContainer(podmanId, body.name);
 
 		return jsonResponse(200, { id: podmanId });
@@ -501,6 +544,96 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 		const tail = Number(url.searchParams.get("tail") ?? 100);
 		const logs = await client.containerLogs(podmanId, tail);
 		return jsonResponse(200, { logs });
+	}
+
+	// ── Pod handlers ────────────────────────────────────────────────────────
+
+	async function handleInspectPod(name: string): Promise<Response> {
+		const res = await client.get(`/libpod/pods/${encodeURIComponent(name)}/json`);
+		if (res.status !== 200) {
+			return jsonResponse(res.status, { error: `Failed to inspect pod: HTTP ${res.status}` });
+		}
+		const pod = res.body as Record<string, unknown>;
+		const infraId = pod.InfraContainerID as string | undefined;
+		return jsonResponse(200, { infraContainerId: infraId ?? "" });
+	}
+
+	async function handleCreatePod(req: Request): Promise<Response> {
+		const body = (await readJsonBody(req)) as {
+			name: string;
+			portmappings?: Array<{ container_port: number; host_port: number; protocol?: string }>;
+			netns?: { nsmode: string };
+		};
+
+		const podSpec: Record<string, unknown> = {
+			name: body.name,
+			labels: { "managed-by": "boilerhouse-podmand" },
+		};
+
+		if (body.portmappings) {
+			podSpec.portmappings = body.portmappings;
+		}
+		if (body.netns) {
+			podSpec.netns = body.netns;
+		}
+
+		const res = await client.post("/libpod/pods/create", podSpec);
+		if (res.status !== 201 && res.status !== 200) {
+			const msg = (res.body as Record<string, unknown>)?.message ?? "unknown error";
+			return jsonResponse(res.status, { error: `Failed to create pod: ${msg}` });
+		}
+
+		return jsonResponse(201, { id: (res.body as { Id: string }).Id });
+	}
+
+	async function handleStartPod(name: string): Promise<Response> {
+		const res = await client.post(`/libpod/pods/${encodeURIComponent(name)}/start`);
+		// 200 = started, 304 = already running
+		if (res.status !== 200 && res.status !== 304) {
+			const msg = (res.body as Record<string, unknown>)?.message ?? "unknown error";
+			return jsonResponse(res.status, { error: `Failed to start pod: ${msg}` });
+		}
+		return jsonResponse(204);
+	}
+
+	async function handleRemovePod(name: string): Promise<Response> {
+		const res = await client.del(`/libpod/pods/${encodeURIComponent(name)}?force=true`);
+		// 200 = removed, 404 = already gone
+		if (res.status !== 200 && res.status !== 404) {
+			const msg = (res.body as Record<string, unknown>)?.message ?? "unknown error";
+			return jsonResponse(res.status, { error: `Failed to remove pod: ${msg}` });
+		}
+
+		// Unregister any containers that were in this pod
+		// (pod removal cascades to all containers)
+		for (const [containerName] of Array.from(nameToId.entries())) {
+			if (containerName.startsWith(`${name}-`) || containerName === name) {
+				unregisterByName(containerName);
+			}
+		}
+
+		return jsonResponse(204);
+	}
+
+	// ── File handlers ───────────────────────────────────────────────────────
+
+	async function handleWriteFile(req: Request): Promise<Response> {
+		const body = (await readJsonBody(req)) as { name: string; content: string };
+
+		const filePath = join(configFilesDir, body.name);
+		writeFileSync(filePath, body.content, { mode: 0o600 });
+
+		return jsonResponse(200, { path: filePath });
+	}
+
+	function handleRemoveFile(name: string): Response {
+		const filePath = join(configFilesDir, name);
+		try {
+			rmSync(filePath, { force: true });
+		} catch {
+			// Idempotent — ignore if file doesn't exist
+		}
+		return jsonResponse(204);
 	}
 
 	// ── Helpers ──────────────────────────────────────────────────────────────

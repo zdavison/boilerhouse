@@ -45,7 +45,7 @@ ensure_podman() {
   fi
 
   if [ -S "$RUNTIME_SOCKET" ]; then
-    if curl --unix-socket "$RUNTIME_SOCKET" --max-time 2 -sf http://localhost/_ping &>/dev/null; then
+    if curl --unix-socket "$RUNTIME_SOCKET" --max-time 2 -sf http://localhost/healthz &>/dev/null; then
       echo "✓ Podman daemon already running"
       return 0
     else

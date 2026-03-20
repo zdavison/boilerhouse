@@ -1,4 +1,4 @@
-import type { ContainerCreateSpec, ContainerInspect, ExecResult } from "./client";
+import type { ContainerCreateSpec, ContainerInspect, ExecResult, PodCreateSpec } from "./client";
 
 /** Result of a checkpoint operation performed by a backend. */
 export interface CheckpointResult {
@@ -71,6 +71,7 @@ export interface ContainerBackend {
 	 * Restore a container from a checkpoint archive.
 	 * Handles HMAC verification and archive reading.
 	 *
+	 * @param pod - Optional pod name to restore the container into.
 	 * @returns The new container ID.
 	 */
 	restore(
@@ -78,6 +79,7 @@ export interface ContainerBackend {
 		hmac: string | undefined,
 		name: string,
 		publishPorts?: string[],
+		pod?: string,
 	): Promise<string>;
 
 	/**
@@ -96,4 +98,29 @@ export interface ContainerBackend {
 	 * @param tail - Number of most recent lines to return.
 	 */
 	logs(id: string, tail?: number): Promise<string>;
+
+	// ── Pod operations ──────────────────────────────────────────────────────
+
+	/** Create a podman pod. Containers in the pod share a network namespace. */
+	createPod(name: string, spec?: PodCreateSpec): Promise<void>;
+
+	/** Start all containers in a pod. */
+	startPod(name: string): Promise<void>;
+
+	/** Inspect a pod. Returns the infra container ID for port resolution. */
+	inspectPod(name: string): Promise<{ infraContainerId: string }>;
+
+	/** Force remove a pod and all its containers. Idempotent. */
+	removePod(name: string): Promise<void>;
+
+	// ── File operations ─────────────────────────────────────────────────────
+
+	/**
+	 * Write a file to a daemon-managed directory. Returns the absolute
+	 * path where the file was written (for bind-mounting into containers).
+	 */
+	writeFile(name: string, content: string): Promise<string>;
+
+	/** Remove a file previously written via writeFile. Idempotent. */
+	removeFile(name: string): Promise<void>;
 }

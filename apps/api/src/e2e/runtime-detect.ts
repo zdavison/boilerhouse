@@ -34,7 +34,7 @@ function podmanSocketAvailable(): boolean {
 	try {
 		if (!existsSync(socketPath)) return false;
 		const result = Bun.spawnSync(
-			["curl", "--unix-socket", socketPath, "--max-time", "2", "-sf", "http://localhost/_ping"],
+			["curl", "--unix-socket", socketPath, "--max-time", "2", "-sf", "http://localhost/healthz"],
 			{ stdout: "pipe", stderr: "ignore" },
 		);
 		return result.exitCode === 0;

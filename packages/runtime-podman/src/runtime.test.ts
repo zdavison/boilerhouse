@@ -83,9 +83,9 @@ describe("PodmanRuntime", () => {
 	 */
 	function createSpecCapturingDaemon(): {
 		mock: ReturnType<typeof createMockDaemon>;
-		captured: { spec: ContainerCreateSpec | undefined };
+		captured: { spec: ContainerCreateSpec | undefined; podSpec: Record<string, unknown> | undefined };
 	} {
-		const captured: { spec: ContainerCreateSpec | undefined } = { spec: undefined };
+		const captured: { spec: ContainerCreateSpec | undefined; podSpec: Record<string, unknown> | undefined } = { spec: undefined, podSpec: undefined };
 
 		const mock = createMockDaemon((method, url, body) => {
 			// POST /images/ensure
@@ -93,11 +93,23 @@ describe("PodmanRuntime", () => {
 				const b = body as { ref?: string };
 				return { status: 200, body: { image: b.ref ?? "built:latest" } };
 			}
-			// POST /containers (create)
+			// POST /pods (create)
+			if (method === "POST" && url === "/pods") {
+				captured.podSpec = body as Record<string, unknown>;
+				return { status: 201, body: { id: "pod-mock" } };
+			}
+			// POST /containers (create) — capture the workload container spec
 			if (method === "POST" && url === "/containers") {
 				const b = body as { spec: ContainerCreateSpec };
-				captured.spec = b.spec;
+				// Only capture the workload container, not the proxy sidecar
+				if (!b.spec.name.endsWith("-proxy")) {
+					captured.spec = b.spec;
+				}
 				return { status: 201, body: { id: "ctr-mock" } };
+			}
+			// POST /files (write proxy config)
+			if (method === "POST" && url === "/files") {
+				return { status: 200, body: { path: "/tmp/mock-envoy.yaml" } };
 			}
 			return { status: 404, body: { error: "not found" } };
 		});
@@ -174,7 +186,6 @@ describe("PodmanRuntime", () => {
 		const runtime = new PodmanRuntime({
 			snapshotDir,
 			socketPath: mock.socketPath,
-			proxyAddress: "http://host.containers.internal:38080",
 		});
 
 		const workload: Workload = {
@@ -184,83 +195,8 @@ describe("PodmanRuntime", () => {
 
 		await runtime.create(workload, generateInstanceId());
 
-		expect(captured.spec?.env?.HTTP_PROXY).toBe(
-			"http://host.containers.internal:38080",
-		);
-		expect(captured.spec?.env?.http_proxy).toBe(
-			"http://host.containers.internal:38080",
-		);
-		expect(captured.spec?.hostadd).toEqual(["host.containers.internal:host-gateway"]);
-
-		rmSync(snapshotDir, { recursive: true, force: true });
-	});
-
-	test("create() does not inject HTTP_PROXY when proxyAddress is absent", async () => {
-		const { mock, captured } = createSpecCapturingDaemon();
-		mockServer = mock;
-
-		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-snap-"));
-		const runtime = new PodmanRuntime({
-			snapshotDir,
-			socketPath: mock.socketPath,
-		});
-
-		const workload: Workload = {
-			...BASE_WORKLOAD,
-			network: { access: "outbound" },
-		};
-
-		await runtime.create(workload, generateInstanceId());
-
+		// Without proxyConfig, no HTTP_PROXY is injected (no sidecar)
 		expect(captured.spec?.env).toBeUndefined();
-		expect(captured.spec?.hostadd).toBeUndefined();
-
-		rmSync(snapshotDir, { recursive: true, force: true });
-	});
-
-	test("create() does not inject HTTP_PROXY for network.access = 'none'", async () => {
-		const { mock, captured } = createSpecCapturingDaemon();
-		mockServer = mock;
-
-		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-snap-"));
-		const runtime = new PodmanRuntime({
-			snapshotDir,
-			socketPath: mock.socketPath,
-			proxyAddress: "http://host.containers.internal:38080",
-		});
-
-		await runtime.create(BASE_WORKLOAD, generateInstanceId());
-
-		expect(captured.spec?.env).toBeUndefined();
-
-		rmSync(snapshotDir, { recursive: true, force: true });
-	});
-
-	test("create() does not override user-specified HTTP_PROXY", async () => {
-		const { mock, captured } = createSpecCapturingDaemon();
-		mockServer = mock;
-
-		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-snap-"));
-		const runtime = new PodmanRuntime({
-			snapshotDir,
-			socketPath: mock.socketPath,
-			proxyAddress: "http://host.containers.internal:38080",
-		});
-
-		const workload: Workload = {
-			...BASE_WORKLOAD,
-			network: { access: "outbound" },
-			entrypoint: {
-				cmd: "node",
-				env: { HTTP_PROXY: "http://custom-proxy:9999" },
-			},
-		};
-
-		await runtime.create(workload, generateInstanceId());
-
-		expect(captured.spec?.env?.HTTP_PROXY).toBe(
-			"http://custom-proxy:9999",
-		);
 
 		rmSync(snapshotDir, { recursive: true, force: true });
 	});
@@ -302,8 +238,10 @@ describe("PodmanRuntime", () => {
 
 		await runtime.create(workload, generateInstanceId());
 
-		expect(captured.spec?.portmappings).toHaveLength(2);
-		for (const pm of captured.spec!.portmappings!) {
+		// Port mappings are on the pod, not the container
+		const podPorts = captured.podSpec?.portmappings as Array<{ host_port: number }>;
+		expect(podPorts).toHaveLength(2);
+		for (const pm of podPorts) {
 			expect(pm.host_port).toBe(0);
 		}
 

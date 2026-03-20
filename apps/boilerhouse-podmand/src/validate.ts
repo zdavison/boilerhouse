@@ -7,13 +7,18 @@ export class PolicyViolationError extends Error {
 	}
 }
 
+export interface ValidateOptions {
+	/** Directories from which bind mounts are permitted (read-only). */
+	allowedBindSources?: string[];
+}
+
 /**
  * Validates a container create spec against the daemon's security policy.
  * Throws `PolicyViolationError` if any rule is violated.
  *
  * Returns a sanitized copy of the spec with enforced labels and privileged=false.
  */
-export function validateContainerSpec(spec: ContainerCreateSpec): ContainerCreateSpec {
+export function validateContainerSpec(spec: ContainerCreateSpec, options?: ValidateOptions): ContainerCreateSpec {
 	if (spec.privileged === true) {
 		throw new PolicyViolationError("Privileged containers are not allowed");
 	}
@@ -33,11 +38,16 @@ export function validateContainerSpec(spec: ContainerCreateSpec): ContainerCreat
 	}
 
 	if (spec.mounts) {
+		const allowedPrefixes = options?.allowedBindSources ?? [];
 		for (const mount of spec.mounts) {
 			if (mount.type === "bind") {
-				throw new PolicyViolationError(
-					`Bind mount to ${mount.destination} is not allowed`,
-				);
+				const source = mount.source ?? "";
+				const allowed = allowedPrefixes.some((prefix) => source.startsWith(prefix + "/"));
+				if (!allowed) {
+					throw new PolicyViolationError(
+						`Bind mount from ${source || "(no source)"} to ${mount.destination} is not allowed`,
+					);
+				}
 			}
 		}
 	}
