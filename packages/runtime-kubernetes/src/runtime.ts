@@ -16,7 +16,7 @@ import type {
 } from "@boilerhouse/core";
 import type { KubernetesConfig } from "./types";
 import { KubeClient } from "./client";
-import { workloadToPod, MANAGED_LABEL } from "./translator";
+import { workloadToPod, MANAGED_LABEL, ENVOY_IMAGE } from "./translator";
 import { KubernetesRuntimeError } from "./errors";
 import { MinikubeImageProvider } from "./minikube";
 import type { EnsureImageResult } from "./minikube";
@@ -87,16 +87,39 @@ export class KubernetesRuntime implements Runtime {
 		options?: CreateOptions,
 	): Promise<InstanceHandle> {
 		const log = options?.onLog ?? (() => {});
+		const proxyConfig = options?.proxyConfig;
 
 		const { imageRef, localBuild } = await this.ensureImage(workload, log);
+
+		// Ensure the Envoy image is available in minikube
+		if (proxyConfig && this.imageProvider) {
+			await this.imageProvider.ensureImage(
+				{ ref: ENVOY_IMAGE },
+				{ name: "envoy-proxy", version: "sidecar" },
+				log,
+			);
+		}
+
 		log(`Creating pod ${instanceId} (image: ${imageRef})...`);
 
-		const { pod, service } = workloadToPod(workload, instanceId, this.namespace, imageRef);
+		const { pod, service, networkPolicy } = workloadToPod(
+			workload, instanceId, this.namespace, imageRef, proxyConfig,
+		);
 
 		// Locally-built images (via minikube) aren't in a registry —
 		// prevent K8s from trying to pull them.
 		if (localBuild) {
 			pod.spec.containers[0]!.imagePullPolicy = "Never";
+		}
+
+		// Create ConfigMap for proxy config before the pod (pod references it as a volume)
+		if (proxyConfig) {
+			await this.client.createConfigMap(this.namespace, {
+				apiVersion: "v1",
+				kind: "ConfigMap",
+				metadata: { name: `${instanceId}-proxy`, namespace: this.namespace },
+				data: { "envoy.yaml": proxyConfig },
+			});
 		}
 
 		await this.client.createPod(this.namespace, pod);
@@ -105,10 +128,17 @@ export class KubernetesRuntime implements Runtime {
 			try {
 				await this.client.createService(this.namespace, service);
 			} catch (err) {
-				// Clean up pod if service creation fails
+				// Clean up pod + configmap if service creation fails
 				await this.client.deletePod(this.namespace, instanceId).catch(() => {});
+				if (proxyConfig) {
+					await this.client.deleteConfigMap(this.namespace, `${instanceId}-proxy`).catch(() => {});
+				}
 				throw err;
 			}
+		}
+
+		if (networkPolicy) {
+			await this.client.createNetworkPolicy(this.namespace, networkPolicy).catch(() => {});
 		}
 
 		this.pods.set(instanceId, { instanceId, running: false, workload, portForwards: new Map() });
@@ -142,10 +172,15 @@ export class KubernetesRuntime implements Runtime {
 			}
 		}
 
-		// Delete pod and service (both idempotent, ignore 404)
+		// Delete pod and service (idempotent, ignore 404)
 		await Promise.all([
 			this.client.deletePod(this.namespace, handle.instanceId),
 			this.client.deleteService(this.namespace, `svc-${handle.instanceId}`),
+			// ConfigMap and NetworkPolicy are optional (only exist for proxy pods).
+			// Swallow all errors — these are best-effort cleanup and must never
+			// block pod destruction (e.g. if RBAC doesn't include configmaps yet).
+			this.client.deleteConfigMap(this.namespace, `${handle.instanceId}-proxy`).catch(() => {}),
+			this.client.deleteNetworkPolicy(this.namespace, `${handle.instanceId}-restrict`).catch(() => {}),
 		]);
 
 		// Wait for pod to actually be deleted
@@ -226,7 +261,9 @@ export class KubernetesRuntime implements Runtime {
 		};
 	}
 
-	async restore(ref: SnapshotRef, instanceId: InstanceId, _options?: CreateOptions): Promise<InstanceHandle> {
+	async restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle> {
+		const proxyConfig = options?.proxyConfig;
+
 		// Read workload.json from the snapshot directory
 		const snapshotDir = join(ref.paths.memory, "..");
 		const workloadPath = join(snapshotDir, "workload.json");
@@ -242,14 +279,40 @@ export class KubernetesRuntime implements Runtime {
 
 		// Ensure image is available and create pod
 		const { imageRef, localBuild } = await this.ensureImage(workload, () => {});
-		const { pod, service } = workloadToPod(workload, instanceId, this.namespace, imageRef);
+
+		if (proxyConfig && this.imageProvider) {
+			await this.imageProvider.ensureImage(
+				{ ref: ENVOY_IMAGE },
+				{ name: "envoy-proxy", version: "sidecar" },
+				() => {},
+			);
+		}
+
+		const { pod, service, networkPolicy } = workloadToPod(
+			workload, instanceId, this.namespace, imageRef, proxyConfig,
+		);
 		if (localBuild) {
 			pod.spec.containers[0]!.imagePullPolicy = "Never";
 		}
+
+		// Create ConfigMap before pod
+		if (proxyConfig) {
+			await this.client.createConfigMap(this.namespace, {
+				apiVersion: "v1",
+				kind: "ConfigMap",
+				metadata: { name: `${instanceId}-proxy`, namespace: this.namespace },
+				data: { "envoy.yaml": proxyConfig },
+			});
+		}
+
 		await this.client.createPod(this.namespace, pod);
 
 		if (service) {
 			await this.client.createService(this.namespace, service).catch(() => {});
+		}
+
+		if (networkPolicy) {
+			await this.client.createNetworkPolicy(this.namespace, networkPolicy).catch(() => {});
 		}
 
 		// Wait for pod to be running

@@ -86,24 +86,13 @@ fi
 echo ""
 
 # ── Run E2E tests ────────────────────────────────────────────────────────────
-
-EXIT_CODE=0
+# exec replaces this shell with bun so Ctrl+C is delivered directly to the
+# test runner instead of orphaning it in the background.
 
 if [ "$RUNTIMES" = "all" ]; then
   echo "Running E2E tests against all available runtimes..."
-  bun test apps/api/src/e2e/ --timeout 120000 || EXIT_CODE=$?
+  exec bun test apps/api/src/e2e/ --timeout 120000
 else
   echo "Running E2E tests against: $RUNTIMES"
-  BOILERHOUSE_E2E_RUNTIMES="$RUNTIMES" bun test apps/api/src/e2e/ --timeout 120000 || EXIT_CODE=$?
+  exec env BOILERHOUSE_E2E_RUNTIMES="$RUNTIMES" bun test apps/api/src/e2e/ --timeout 120000
 fi
-
-# ── Summary ──────────────────────────────────────────────────────────────────
-
-echo ""
-if [ "$EXIT_CODE" -eq 0 ]; then
-  echo "E2E tests passed."
-else
-  echo "E2E tests failed (exit $EXIT_CODE)."
-fi
-
-exit "$EXIT_CODE"

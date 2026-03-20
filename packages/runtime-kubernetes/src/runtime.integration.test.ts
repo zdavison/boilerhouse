@@ -23,9 +23,11 @@ function k8sAvailable(): boolean {
 	}
 }
 
-function getMinikubeIp(): string {
+function getApiUrl(): string {
+	// Use kubeconfig to get the API URL — minikube ip is not routable
+	// from the host with the docker driver on macOS.
 	return Bun.spawnSync(
-		["minikube", "ip", "-p", "boilerhouse-test"],
+		["kubectl", "--context", "boilerhouse-test", "config", "view", "--minify", "-o", "jsonpath={.clusters[0].cluster.server}"],
 		{ stdout: "pipe" },
 	).stdout.toString().trim();
 }
@@ -37,15 +39,16 @@ function getServiceAccountToken(): string {
 	).stdout.toString().trim();
 }
 
-function createRuntime(): KubernetesRuntime {
-	const ip = getMinikubeIp();
+function createRuntime(opts?: { minikubeProfile?: string }): KubernetesRuntime {
+	const apiUrl = getApiUrl();
 	const token = getServiceAccountToken();
 	return new KubernetesRuntime({
 		auth: "external",
-		apiUrl: `https://${ip}:8443`,
+		apiUrl,
 		token,
 		namespace: "boilerhouse",
 		context: "boilerhouse-test",
+		minikubeProfile: opts?.minikubeProfile,
 	});
 }
 
@@ -60,14 +63,50 @@ function testWorkload(overrides: Record<string, unknown> = {}): Workload {
 	} as Workload;
 }
 
+/**
+ * Minimal Envoy bootstrap config for integration testing.
+ * Listens on 18080 (proxy) and 18081 (admin), returns 403 for all requests.
+ */
+function minimalEnvoyConfig(): string {
+	return `
+admin:
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 18081 }
+static_resources:
+  listeners:
+    - name: proxy
+      address:
+        socket_address: { address: 127.0.0.1, port_value: 18080 }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: proxy
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                route_config:
+                  virtual_hosts:
+                    - name: deny_all
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          direct_response: { status: 403, body: { inline_string: "blocked" } }
+`.trim();
+}
+
 const available = k8sAvailable();
 
 describe.skipIf(!available)("KubernetesRuntime integration", () => {
 	const handles: Array<{ instanceId: InstanceId; running: boolean }> = [];
 	let runtime: KubernetesRuntime;
 
-	// Lazy init to avoid calling minikube ip when tests are skipped
-	function getRuntime(): KubernetesRuntime {
+	// Lazy init to avoid calling minikube ip when tests are skipped.
+	// When opts are provided, creates a fresh runtime (needed for minikubeProfile).
+	function getRuntime(opts?: { minikubeProfile?: string }): KubernetesRuntime {
+		if (opts) return createRuntime(opts);
 		if (!runtime) {
 			runtime = createRuntime();
 		}
@@ -190,5 +229,69 @@ describe.skipIf(!available)("KubernetesRuntime integration", () => {
 		await expect(rt.start(handle)).rejects.toThrow();
 
 		await rt.destroy(handle);
+	}, 120_000);
+
+	test("envoy sidecar proxy: pod has proxy container and HTTP_PROXY env", async () => {
+		const rt = getRuntime({ minikubeProfile: "boilerhouse-test" });
+		const id = instanceId();
+
+		const proxyConfig = minimalEnvoyConfig();
+
+		const handle = await rt.create(testWorkload({
+			workload: { name: "int-test-proxy", version: "1.0.0" },
+			network: { access: "restricted" },
+			entrypoint: { cmd: "/bin/sh", args: ["-c", "while true; do sleep 1; done"] },
+		}), id, { proxyConfig });
+		handles.push(handle);
+
+		await rt.start(handle);
+
+		// Verify HTTP_PROXY is set in the main container
+		const envResult = await rt.exec(handle, ["printenv", "HTTP_PROXY"]);
+		expect(envResult.stdout.trim()).toBe("http://localhost:18080");
+
+		// Verify envoy sidecar is running and reachable from the main container.
+		// Unset HTTP_PROXY so wget connects directly (not via the proxy),
+		// and use 127.0.0.1 explicitly (envoy binds IPv4 only).
+		const probeResult = await rt.exec(handle, [
+			"sh", "-c", "unset HTTP_PROXY http_proxy; wget -q -O /dev/null --timeout=5 http://127.0.0.1:18081/server_info",
+		]);
+		expect(probeResult.exitCode).toBe(0);
+
+		await rt.destroy(handle);
+	}, 120_000);
+
+	test("envoy sidecar proxy: cleanup removes ConfigMap and NetworkPolicy", async () => {
+		const rt = getRuntime({ minikubeProfile: "boilerhouse-test" });
+		const id = instanceId();
+
+		const proxyConfig = minimalEnvoyConfig();
+
+		const handle = await rt.create(testWorkload({
+			workload: { name: "int-test-proxy-cleanup", version: "1.0.0" },
+			network: { access: "restricted" },
+		}), id, { proxyConfig });
+		handles.push(handle);
+
+		await rt.start(handle);
+		await rt.destroy(handle);
+
+		// Verify ConfigMap is cleaned up
+		const cmResult = Bun.spawnSync([
+			"kubectl", "--context", "boilerhouse-test",
+			"-n", "boilerhouse",
+			"get", "configmap", `${id}-proxy`,
+			"-o", "name",
+		], { stdout: "pipe", stderr: "pipe" });
+		expect(cmResult.exitCode).not.toBe(0); // Should be 404 / not found
+
+		// Verify NetworkPolicy is cleaned up
+		const npResult = Bun.spawnSync([
+			"kubectl", "--context", "boilerhouse-test",
+			"-n", "boilerhouse",
+			"get", "networkpolicy", `${id}-restrict`,
+			"-o", "name",
+		], { stdout: "pipe", stderr: "pipe" });
+		expect(npResult.exitCode).not.toBe(0); // Should be 404 / not found
 	}, 120_000);
 });

@@ -82,8 +82,11 @@ metadata:
   namespace: boilerhouse
 rules:
   - apiGroups: [""]
-    resources: [pods, pods/exec, pods/log, services]
+    resources: [pods, pods/exec, pods/log, services, configmaps]
     verbs: [get, list, create, delete, watch]
+  - apiGroups: ["networking.k8s.io"]
+    resources: [networkpolicies]
+    verbs: [get, list, create, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -99,6 +102,11 @@ roleRef:
   name: boilerhouse-runtime
   apiGroup: rbac.authorization.k8s.io
 EOF
+
+# ── Pre-pull Envoy image for sidecar proxy tests ────────────────────────
+
+echo "Pulling Envoy image into minikube..."
+minikube -p "$PROFILE" image pull docker.io/envoyproxy/envoy:v1.32-latest
 
 echo ""
 echo "Minikube ready: profile=$PROFILE namespace=$NAMESPACE"

@@ -120,8 +120,8 @@ for (const entry of runtimes) {
 			// The real API key must NOT be in the container env
 			expect(execBody.stdout).not.toContain("ANTHROPIC_API_KEY=sk-ant");
 
-			// HTTP_PROXY should be present (for podman runtime)
-			if (entry.name === "podman") {
+			// HTTP_PROXY should be present for runtimes that inject the sidecar proxy
+			if (entry.name === "podman" || entry.name === "kubernetes") {
 				expect(execBody.stdout).toContain("HTTP_PROXY=");
 			}
 

@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import type { Workload, InstanceId } from "@boilerhouse/core";
-import { workloadToPod, MANAGED_LABEL, INSTANCE_ID_LABEL, WORKLOAD_NAME_LABEL } from "./translator";
+import { workloadToPod, MANAGED_LABEL, INSTANCE_ID_LABEL, WORKLOAD_NAME_LABEL, ENVOY_IMAGE, ENVOY_PROXY_PORT } from "./translator";
 
 function makeWorkload(overrides: Record<string, unknown> = {}): Workload {
 	return {
@@ -280,5 +280,90 @@ describe("workloadToPod", () => {
 		const workload = makeWorkload({ image: { dockerfile: "some/Dockerfile" } });
 		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, "boilerhouse/test:1.0");
 		expect(pod.spec.containers[0]!.image).toBe("boilerhouse/test:1.0");
+	});
+
+	// ── Envoy sidecar proxy ────────────────────────────────────────────
+
+	test("adds envoy sidecar container when proxyConfig provided", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted", expose: [{ guest: 8080, host_range: [0, 0] }] },
+		});
+		const proxyConfig = "static_resources: {}";
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, proxyConfig);
+
+		expect(pod.spec.containers).toHaveLength(2);
+		const sidecar = pod.spec.containers[1]!;
+		expect(sidecar.name).toBe("proxy");
+		expect(sidecar.image).toBe(ENVOY_IMAGE);
+		expect(sidecar.command).toEqual(["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"]);
+		expect(sidecar.ports).toEqual([{ containerPort: ENVOY_PROXY_PORT }]);
+		expect(sidecar.volumeMounts).toEqual([{ name: "proxy-config", mountPath: "/etc/envoy" }]);
+		expect(sidecar.resources?.limits).toEqual({ cpu: "100m", memory: "64Mi" });
+	});
+
+	test("injects HTTP_PROXY env vars on main container when proxyConfig provided", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted" },
+		});
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, "config: {}");
+		const mainEnv = pod.spec.containers[0]!.env!;
+
+		expect(mainEnv).toContainEqual({ name: "HTTP_PROXY", value: `http://localhost:${ENVOY_PROXY_PORT}` });
+		expect(mainEnv).toContainEqual({ name: "http_proxy", value: `http://localhost:${ENVOY_PROXY_PORT}` });
+	});
+
+	test("appends HTTP_PROXY to existing env vars", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted" },
+			entrypoint: { cmd: "node", env: { FOO: "bar" } },
+		});
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, "config: {}");
+		const mainEnv = pod.spec.containers[0]!.env!;
+
+		expect(mainEnv[0]).toEqual({ name: "FOO", value: "bar" });
+		expect(mainEnv).toContainEqual({ name: "HTTP_PROXY", value: `http://localhost:${ENVOY_PROXY_PORT}` });
+	});
+
+	test("adds proxy-config volume from ConfigMap", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted" },
+		});
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, "config: {}");
+
+		expect(pod.spec.volumes).toContainEqual({
+			name: "proxy-config",
+			configMap: { name: `${INSTANCE_ID}-proxy` },
+		});
+	});
+
+	test("creates NetworkPolicy when proxyConfig provided", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted" },
+		});
+		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, "config: {}");
+
+		expect(networkPolicy).toBeDefined();
+		expect(networkPolicy!.apiVersion).toBe("networking.k8s.io/v1");
+		expect(networkPolicy!.kind).toBe("NetworkPolicy");
+		expect(networkPolicy!.metadata.name).toBe(`${INSTANCE_ID}-restrict`);
+		expect(networkPolicy!.spec.podSelector.matchLabels).toEqual({
+			[INSTANCE_ID_LABEL]: INSTANCE_ID,
+		});
+		expect(networkPolicy!.spec.policyTypes).toEqual(["Egress"]);
+		// DNS egress
+		expect(networkPolicy!.spec.egress![0]!.ports).toContainEqual({ protocol: "UDP", port: 53 });
+		expect(networkPolicy!.spec.egress![0]!.ports).toContainEqual({ protocol: "TCP", port: 53 });
+		// HTTPS egress
+		expect(networkPolicy!.spec.egress![1]!.ports).toContainEqual({ protocol: "TCP", port: 443 });
+	});
+
+	test("no sidecar, no NetworkPolicy when proxyConfig not provided", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted" },
+		});
+		const { pod, networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		expect(pod.spec.containers).toHaveLength(1);
+		expect(networkPolicy).toBeUndefined();
 	});
 });

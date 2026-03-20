@@ -105,6 +105,7 @@ export interface K8sProbe {
 export interface K8sVolume {
 	name: string;
 	emptyDir?: { sizeLimit?: string };
+	configMap?: { name: string };
 }
 
 export interface K8sPodSpec {
@@ -171,4 +172,25 @@ export interface K8sNamespace {
 	kind: "Namespace";
 	metadata: K8sObjectMeta;
 	status?: { phase?: string };
+}
+
+export interface K8sConfigMap {
+	apiVersion: "v1";
+	kind: "ConfigMap";
+	metadata: K8sObjectMeta;
+	data?: Record<string, string>;
+}
+
+export interface K8sNetworkPolicy {
+	apiVersion: "networking.k8s.io/v1";
+	kind: "NetworkPolicy";
+	metadata: K8sObjectMeta;
+	spec: {
+		podSelector: { matchLabels: Record<string, string> };
+		policyTypes: string[];
+		egress?: Array<{
+			ports?: Array<{ protocol: string; port: number }>;
+			to?: Array<{ namespaceSelector: Record<string, never> }>;
+		}>;
+	};
 }

@@ -425,8 +425,12 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 		// Resolve from registry, or pass through raw podman IDs (e.g. infra containers)
 		const podmanId = resolveContainer(identifier) ?? identifier;
 
-		const inspect = await client.inspectContainer(podmanId);
-		return jsonResponse(200, inspect);
+		try {
+			const inspect = await client.inspectContainer(podmanId);
+			return jsonResponse(200, inspect);
+		} catch {
+			return jsonResponse(404, { error: `Container ${identifier} not found` });
+		}
 	}
 
 	async function handleRemoveContainer(identifier: string): Promise<Response> {

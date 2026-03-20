@@ -88,9 +88,13 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 		const { KubernetesRuntime } = await import("@boilerhouse/runtime-kubernetes");
 
 		snapshotDir = mkdtempSync(join(tmpdir(), "bh-e2e-k8s-snap-"));
-		const ip = Bun.spawnSync(["minikube", "ip", "-p", "boilerhouse-test"], {
-			stdout: "pipe",
-		}).stdout.toString().trim();
+		// Use kubeconfig to get the API URL — minikube ip is not routable
+		// from the host with the docker driver on macOS.
+		const apiUrl = Bun.spawnSync(
+			["kubectl", "--context", "boilerhouse-test", "config", "view",
+			 "--minify", "-o", "jsonpath={.clusters[0].cluster.server}"],
+			{ stdout: "pipe" },
+		).stdout.toString().trim();
 		const token = Bun.spawnSync(
 			["kubectl", "--context", "boilerhouse-test", "-n", "boilerhouse",
 			 "create", "token", "default"],
@@ -99,7 +103,7 @@ export async function startE2EServer(runtimeName: string): Promise<E2EServer> {
 
 		runtime = new KubernetesRuntime({
 			auth: "external",
-			apiUrl: `https://${ip}:8443`,
+			apiUrl,
 			token,
 			namespace: "boilerhouse",
 			context: "boilerhouse-test",

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { eq, and } from "drizzle-orm";
@@ -101,8 +101,11 @@ describe("loadWorkloadsFromDir", () => {
 
 		await loadWorkloadsFromDir(db, dir);
 
-		// Overwrite with changed config
+		// Overwrite with changed config — bump mtime so Bun's import cache is busted
+		// (without this, both writes can share the same mtime and Bun serves stale module)
 		writeTs(dir, "svc.workload.ts", UPDATED_TS);
+		const future = new Date(Date.now() + 2000);
+		utimesSync(join(dir, "svc.workload.ts"), future, future);
 
 		const result = await loadWorkloadsFromDir(db, dir);
 

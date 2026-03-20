@@ -150,10 +150,16 @@ describe("boilerhouse-podmand", () => {
 
 			// Container inspect
 			if (req.method === "GET" && url.includes("/json") && url.includes("/libpod/containers/")) {
+				// Extract container ID from URL and check if it's known
+				const ctrMatch = url.match(/\/libpod\/containers\/([^/?]+)\/json/);
+				const ctrId = ctrMatch?.[1];
+				if (ctrId && !createdContainers.includes(ctrId)) {
+					return { status: 404, body: { cause: "no such container", message: `no container with name or ID "${ctrId}" found`, response: 404 } };
+				}
 				return {
 					status: 200,
 					body: {
-						Id: "ctr-1",
+						Id: ctrId ?? "ctr-1",
 						State: { Running: true, Status: "running" },
 						NetworkSettings: { Ports: {} },
 					},
@@ -162,7 +168,17 @@ describe("boilerhouse-podmand", () => {
 
 			// Container remove
 			if (req.method === "DELETE" && url.includes("/libpod/containers/")) {
-				return { status: 200, body: [{ Id: "ctr-1", Err: null }] };
+				const ctrMatch = url.match(/\/libpod\/containers\/([^/?]+)/);
+				const ctrId = ctrMatch?.[1];
+				if (ctrId && !createdContainers.includes(ctrId)) {
+					return { status: 404, body: { cause: "no such container", message: `no container with name or ID "${ctrId}" found`, response: 404 } };
+				}
+				// Remove from tracked containers (mirrors real podman behavior)
+				if (ctrId) {
+					const idx = createdContainers.indexOf(ctrId);
+					if (idx !== -1) createdContainers.splice(idx, 1);
+				}
+				return { status: 200, body: [{ Id: ctrId ?? "ctr-1", Err: null }] };
 			}
 
 			// Exec create

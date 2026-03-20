@@ -4,6 +4,8 @@ import type {
 	K8sService,
 	K8sStatus,
 	K8sNamespace,
+	K8sConfigMap,
+	K8sNetworkPolicy,
 } from "./types";
 import { KubernetesRuntimeError } from "./errors";
 
@@ -151,6 +153,54 @@ export class KubeClient {
 			await this.request<K8sStatus>(
 				"DELETE",
 				`/api/v1/namespaces/${namespace}/services/${name}`,
+			);
+		} catch (err) {
+			if (err instanceof KubernetesRuntimeError && err.statusCode === 404) {
+				return;
+			}
+			throw err;
+		}
+	}
+
+	// ── ConfigMap operations ────────────────────────────────────────────────
+
+	async createConfigMap(namespace: string, configMap: K8sConfigMap): Promise<K8sConfigMap> {
+		return this.request<K8sConfigMap>(
+			"POST",
+			`/api/v1/namespaces/${namespace}/configmaps`,
+			configMap,
+		);
+	}
+
+	async deleteConfigMap(namespace: string, name: string): Promise<void> {
+		try {
+			await this.request<K8sStatus>(
+				"DELETE",
+				`/api/v1/namespaces/${namespace}/configmaps/${name}`,
+			);
+		} catch (err) {
+			if (err instanceof KubernetesRuntimeError && err.statusCode === 404) {
+				return;
+			}
+			throw err;
+		}
+	}
+
+	// ── NetworkPolicy operations ────────────────────────────────────────────
+
+	async createNetworkPolicy(namespace: string, policy: K8sNetworkPolicy): Promise<K8sNetworkPolicy> {
+		return this.request<K8sNetworkPolicy>(
+			"POST",
+			`/apis/networking.k8s.io/v1/namespaces/${namespace}/networkpolicies`,
+			policy,
+		);
+	}
+
+	async deleteNetworkPolicy(namespace: string, name: string): Promise<void> {
+		try {
+			await this.request<K8sStatus>(
+				"DELETE",
+				`/apis/networking.k8s.io/v1/namespaces/${namespace}/networkpolicies/${name}`,
 			);
 		} catch (err) {
 			if (err instanceof KubernetesRuntimeError && err.statusCode === 404) {
