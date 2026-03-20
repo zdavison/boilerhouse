@@ -1,0 +1,29 @@
+id: rapid-workload-creation
+
+info:
+  name: Server crashes under rapid workload creation
+  author: boilerhouse-security
+  severity: high
+  tags: dos
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "workload": {"name": "flood-{{rand_int(1,100000)}}", "version": "1.0.0"},
+        "image": {"ref": "alpine:latest"},
+        "resources": {"vcpus": 1, "memory_mb": 128},
+        "entrypoint": {"cmd": "/bin/sh"}
+      }
+    threads: 50
+    race: true
+    race_count: 50
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 500 || status_code == 0"
+    # FINDING if: server returns 500 or connection drops

@@ -2,6 +2,7 @@ import { Elysia } from "elysia";
 import { httpTracing } from "@boilerhouse/o11y";
 import type { RouteDeps } from "./routes/deps";
 import { errorHandler } from "./routes/errors";
+import { inputGuards } from "./routes/input-guards";
 import { systemRoutes } from "./routes/system";
 import { workloadRoutes } from "./routes/workloads";
 import { instanceRoutes } from "./routes/instances";
@@ -11,12 +12,12 @@ import { snapshotRoutes } from "./routes/snapshots";
 import { activityRoutes } from "./routes/activity";
 import { secretRoutes } from "./routes/secrets";
 import { triggerRoutes } from "./routes/triggers";
-import { triggerAdapterPlugin } from "./routes/trigger-adapters";
 import { wsPlugin } from "./routes/ws";
 
 export function createApp(deps: RouteDeps) {
 	const app = new Elysia()
-		.use(errorHandler);
+		.use(errorHandler)
+		.use(inputGuards);
 
 	// Add HTTP tracing/metrics if OTEL providers are available
 	if (deps.tracer && deps.meter) {
@@ -36,6 +37,5 @@ export function createApp(deps: RouteDeps) {
 				.use(secretRoutes(deps))
 				.use(triggerRoutes(deps)),
 		)
-		.use(triggerAdapterPlugin(deps))
 		.use(wsPlugin(deps));
 }

@@ -1,0 +1,29 @@
+id: telegram-missing-token
+
+info:
+  name: Telegram endpoint accepts request without secret token
+  author: boilerhouse-security
+  severity: critical
+  tags: auth-bypass,telegram
+
+http:
+  - method: POST
+    path:
+      - "{{trigger_base_url}}/telegram/{{telegram_trigger_name}}"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "update_id": 12345,
+        "message": {
+          "message_id": 1,
+          "from": {"id": 999, "is_bot": false, "first_name": "Attacker"},
+          "chat": {"id": 999, "type": "private"},
+          "text": "malicious command"
+        }
+      }
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+    # FINDING if: dispatched without secret token

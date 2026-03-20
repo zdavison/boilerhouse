@@ -2,6 +2,8 @@ import { Elysia, t } from "elysia";
 import type { TenantId } from "@boilerhouse/core";
 import type { RouteDeps } from "./deps";
 
+const SAFE_SECRET_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
 export function secretRoutes(deps: RouteDeps) {
 	const { secretStore } = deps;
 
@@ -10,6 +12,11 @@ export function secretRoutes(deps: RouteDeps) {
 			if (!secretStore) {
 				set.status = 501;
 				return { error: "Secret store not configured" };
+			}
+
+			if (!SAFE_SECRET_NAME.test(params.name)) {
+				set.status = 400;
+				return { error: "Invalid secret name" };
 			}
 
 			const tenantId = params.id as TenantId;

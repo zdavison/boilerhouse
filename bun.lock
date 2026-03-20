@@ -49,6 +49,14 @@
         "@types/react-syntax-highlighter": "^15.5.13",
       },
     },
+    "apps/trigger-gateway": {
+      "name": "@boilerhouse/trigger-gateway",
+      "version": "0.0.1",
+      "dependencies": {
+        "@boilerhouse/triggers": "workspace:*",
+        "elysia": "^1.4.25",
+      },
+    },
     "packages/core": {
       "name": "@boilerhouse/core",
       "version": "0.0.1",
@@ -147,6 +155,8 @@
     "@boilerhouse/runtime-kubernetes": ["@boilerhouse/runtime-kubernetes@workspace:packages/runtime-kubernetes"],
 
     "@boilerhouse/runtime-podman": ["@boilerhouse/runtime-podman@workspace:packages/runtime-podman"],
+
+    "@boilerhouse/trigger-gateway": ["@boilerhouse/trigger-gateway@workspace:apps/trigger-gateway"],
 
     "@boilerhouse/triggers": ["@boilerhouse/triggers@workspace:packages/triggers"],
 

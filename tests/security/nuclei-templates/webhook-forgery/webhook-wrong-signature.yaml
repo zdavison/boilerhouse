@@ -1,0 +1,21 @@
+id: webhook-wrong-signature
+
+info:
+  name: Webhook accepts forged HMAC signature
+  author: boilerhouse-security
+  severity: critical
+  tags: auth-bypass,webhook
+
+http:
+  - method: POST
+    path:
+      - "{{trigger_base_url}}/hooks/{{webhook_trigger_name}}"
+    headers:
+      Content-Type: application/json
+      X-Signature-256: "sha256=0000000000000000000000000000000000000000000000000000000000000000"
+    body: '{"tenant_id": "attacker", "data": "malicious"}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+    # FINDING if: forged signature accepted

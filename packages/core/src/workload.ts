@@ -80,7 +80,7 @@ const ExecProbeSchema = Type.Object({
 
 export const WorkloadSchema = Type.Object({
 	workload: Type.Object({
-		name: Type.String({ minLength: 1 }),
+		name: Type.String({ minLength: 1, pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$" }),
 		version: Type.String({ minLength: 1 }),
 	}),
 	image: Type.Object({

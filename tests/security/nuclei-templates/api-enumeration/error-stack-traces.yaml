@@ -1,0 +1,26 @@
+id: error-stack-traces
+
+info:
+  name: Error responses leak stack traces or internal paths
+  author: boilerhouse-security
+  severity: medium
+  tags: info-disclosure
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: "not json at all {"
+    matchers:
+      - type: word
+        words:
+          - "node_modules"
+          - "at Object"
+          - "at Module"
+          - ".ts:"
+          - "/Users/"
+          - "/home/"
+        condition: or
+    # FINDING if: internal paths or stack traces in error response

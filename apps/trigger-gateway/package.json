@@ -1,0 +1,14 @@
+{
+	"name": "@boilerhouse/trigger-gateway",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --hot src/server.ts",
+		"start": "bun src/server.ts"
+	},
+	"dependencies": {
+		"@boilerhouse/triggers": "workspace:*",
+		"elysia": "^1.4.25"
+	}
+}

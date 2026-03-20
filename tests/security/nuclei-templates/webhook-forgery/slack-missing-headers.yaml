@@ -1,0 +1,30 @@
+id: slack-missing-headers
+
+info:
+  name: Slack endpoint accepts request without signature headers
+  author: boilerhouse-security
+  severity: critical
+  tags: auth-bypass,slack
+
+http:
+  - method: POST
+    path:
+      - "{{trigger_base_url}}/slack/events"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "type": "event_callback",
+        "team_id": "T12345",
+        "event": {
+          "type": "app_mention",
+          "user": "U12345",
+          "channel": "C12345",
+          "text": "test"
+        }
+      }
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+    # FINDING if: dispatched without any signature

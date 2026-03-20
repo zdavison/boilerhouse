@@ -1,0 +1,75 @@
+id: trigger-port-api-leak
+
+info:
+  name: Internal API accessible on public trigger port
+  author: boilerhouse-security
+  severity: critical
+  tags: port-isolation,network
+
+flow: |
+  http("check-workloads") || http("check-instances") || http("check-tenants") || http("check-nodes") || http("check-stats") || http("check-activity") || http("check-secrets")
+
+http:
+  - id: check-workloads
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/workloads"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+
+  - id: check-instances
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/instances"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+
+  - id: check-tenants
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/tenants"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+
+  - id: check-nodes
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/nodes"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+
+  - id: check-stats
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/stats"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+
+  - id: check-activity
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/activity"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+
+  - id: check-secrets
+    method: GET
+    path:
+      - "{{trigger_base_url}}/api/v1/tenants/{{tenant_a_id}}/secrets"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+    # FINDING if: any internal API endpoint responds on the public trigger port
