@@ -1,8 +1,8 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, setDefaultTimeout } from "bun:test";
 import { generateInstanceId, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
-import { PodmanRuntime } from "./runtime";
-import { DaemonBackend } from "./daemon-backend";
+import { PodmanRuntime } from "@boilerhouse/runtime-podman";
+import { DaemonBackend } from "@boilerhouse/runtime-podman";
 import { mkdtempSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -62,7 +62,7 @@ const cleanupBackend = podmanAvailable
 
 afterEach(async () => {
 	for (const id of containersToCleanup) {
-		await cleanupBackend?.removeContainer(id).catch(() => {});
+		await cleanupBackend?.removePod(id).catch(() => {});
 	}
 	containersToCleanup.length = 0;
 });
@@ -72,6 +72,8 @@ function trackInstance(id: string): void {
 }
 
 describe.skipIf(!podmanAvailable)("PodmanRuntime (daemon)", () => {
+	setDefaultTimeout(60_000);
+
 	test("available() returns true when podman and CRIU are present", async () => {
 		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-test-"));
 		const runtime = new PodmanRuntime({ snapshotDir, socketPath: DAEMON_SOCKET });

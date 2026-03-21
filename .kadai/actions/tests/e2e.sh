@@ -91,8 +91,8 @@ echo ""
 
 if [ "$RUNTIMES" = "all" ]; then
   echo "Running E2E tests against all available runtimes..."
-  exec bun test apps/api/src/e2e/ --timeout 120000
+  exec bun test tests/e2e/ --timeout 120000
 else
   echo "Running E2E tests against: $RUNTIMES"
-  exec env BOILERHOUSE_E2E_RUNTIMES="$RUNTIMES" bun test apps/api/src/e2e/ --timeout 120000
+  exec env BOILERHOUSE_E2E_RUNTIMES="$RUNTIMES" bun test tests/e2e/ --timeout 120000
 fi

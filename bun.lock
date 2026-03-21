@@ -138,6 +138,21 @@
         "croner": "^10.0.1",
       },
     },
+    "tests": {
+      "name": "@boilerhouse/tests",
+      "dependencies": {
+        "@boilerhouse/core": "workspace:*",
+        "@boilerhouse/db": "workspace:*",
+        "@boilerhouse/envoy-config": "workspace:*",
+        "@boilerhouse/o11y": "workspace:*",
+        "@boilerhouse/runtime-kubernetes": "workspace:*",
+        "@boilerhouse/runtime-podman": "workspace:*",
+        "@boilerhouse/triggers": "workspace:*",
+        "@elysiajs/cors": "^1.4.1",
+        "drizzle-orm": "0.44.7",
+        "elysia": "^1.4.25",
+      },
+    },
     "workloads": {
       "name": "@boilerhouse/workloads",
       "version": "0.0.1",
@@ -168,6 +183,8 @@
     "@boilerhouse/runtime-kubernetes": ["@boilerhouse/runtime-kubernetes@workspace:packages/runtime-kubernetes"],
 
     "@boilerhouse/runtime-podman": ["@boilerhouse/runtime-podman@workspace:packages/runtime-podman"],
+
+    "@boilerhouse/tests": ["@boilerhouse/tests@workspace:tests"],
 
     "@boilerhouse/trigger-gateway": ["@boilerhouse/trigger-gateway@workspace:apps/trigger-gateway"],
 

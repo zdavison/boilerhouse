@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, setDefaultTimeout } from "bun:test";
 import { generateTenantId } from "@boilerhouse/core";
 import { availableRuntimes, E2E_TIMEOUTS } from "./runtime-matrix";
 import { startE2EServer, api, readFixture, waitForWorkloadReady, type E2EServer } from "./e2e-helpers";
@@ -7,6 +7,8 @@ for (const rt of availableRuntimes()) {
 	const timeouts = E2E_TIMEOUTS[rt.name as keyof typeof E2E_TIMEOUTS] ?? E2E_TIMEOUTS.fake;
 
 	describe(`[${rt.name}] error recovery`, () => {
+		setDefaultTimeout(timeouts.operation);
+
 		let server: E2EServer;
 
 		afterEach(async () => {

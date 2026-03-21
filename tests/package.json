@@ -1,0 +1,16 @@
+{
+	"name": "@boilerhouse/tests",
+	"private": true,
+	"dependencies": {
+		"@boilerhouse/core": "workspace:*",
+		"@boilerhouse/db": "workspace:*",
+		"@boilerhouse/envoy-config": "workspace:*",
+		"@boilerhouse/o11y": "workspace:*",
+		"@boilerhouse/runtime-kubernetes": "workspace:*",
+		"@boilerhouse/runtime-podman": "workspace:*",
+		"@boilerhouse/triggers": "workspace:*",
+		"@elysiajs/cors": "^1.4.1",
+		"drizzle-orm": "0.44.7",
+		"elysia": "^1.4.25"
+	}
+}

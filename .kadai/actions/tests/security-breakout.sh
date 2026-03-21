@@ -86,4 +86,27 @@ echo ""
 # ── Run container breakout tests ────────────────────────────────────────────
 
 echo "Running container breakout tests against: $RUNTIMES"
-exec env BOILERHOUSE_E2E_RUNTIMES="$RUNTIMES" bun test tests/security/container-breakout/ --timeout 300000
+
+TEST_OUTPUT=$(env BOILERHOUSE_E2E_RUNTIMES="$RUNTIMES" bun run tests/security/container-breakout/breakout.ts 2>&1) || true
+TEST_EXIT=$?
+
+# ── Print raw output ────────────────────────────────────────────────────────
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════"
+echo "  Raw Test Output"
+echo "═══════════════════════════════════════════════════════════════════════"
+echo ""
+echo "$TEST_OUTPUT"
+
+# ── AI Summary ──────────────────────────────────────────────────────────────
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════"
+echo "  AI Summary"
+echo "═══════════════════════════════════════════════════════════════════════"
+echo ""
+
+echo "$TEST_OUTPUT" | deerbox "You are a security engineer reviewing container breakout test results from CDK (Container Debug Toolkit). Summarize the results concisely: which runtimes were tested, how many findings were detected, whether any critical escape vectors were found, and an overall pass/fail verdict. Be brief."
+
+exit $TEST_EXIT

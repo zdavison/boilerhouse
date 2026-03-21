@@ -37,6 +37,20 @@ export function validateContainerSpec(spec: ContainerCreateSpec, options?: Valid
 		}
 	}
 
+	// Require capabilities to be dropped
+	if (!spec.cap_drop || !spec.cap_drop.includes("ALL")) {
+		throw new PolicyViolationError(
+			'cap_drop must include "ALL" — capabilities must be explicitly dropped',
+		);
+	}
+
+	// Require no-new-privileges
+	if (spec.no_new_privileges !== true) {
+		throw new PolicyViolationError(
+			"no_new_privileges must be enabled",
+		);
+	}
+
 	if (spec.mounts) {
 		const allowedPrefixes = options?.allowedBindSources ?? [];
 		for (const mount of spec.mounts) {
@@ -55,6 +69,7 @@ export function validateContainerSpec(spec: ContainerCreateSpec, options?: Valid
 	return {
 		...spec,
 		privileged: false,
+		no_new_privileges: true,
 		labels: {
 			...spec.labels,
 			"managed-by": "boilerhouse-podmand",

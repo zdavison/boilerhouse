@@ -5,6 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createDaemon } from "./main";
 
+/** Base security fields required by validation policy. */
+const HARDENED = {
+	cap_drop: ["ALL"],
+	cap_add: ["CAP_CHOWN", "CAP_NET_BIND_SERVICE"],
+	no_new_privileges: true,
+} as const;
+
 /**
  * Creates a mock Podman API server on a temp Unix socket.
  * Tracks requests for assertion.
@@ -246,6 +253,7 @@ describe("boilerhouse-podmand", () => {
 			name: "test-ctr-1",
 			image: "alpine:3.21",
 			portmappings: [{ container_port: 8080, host_port: 0, protocol: "tcp" }],
+			...HARDENED,
 		};
 		const res = await request(daemonSocketPath, "POST", "/containers", { spec });
 		expect(res.status).toBe(201);
@@ -258,6 +266,7 @@ describe("boilerhouse-podmand", () => {
 			name: "evil-ctr",
 			image: "alpine:3.21",
 			privileged: true,
+			...HARDENED,
 		};
 		const res = await request(daemonSocketPath, "POST", "/containers", { spec });
 		expect(res.status).toBe(403);
@@ -268,6 +277,7 @@ describe("boilerhouse-podmand", () => {
 			name: "evil-port",
 			image: "alpine:3.21",
 			portmappings: [{ container_port: 80, host_port: 80, protocol: "tcp" }],
+			...HARDENED,
 		};
 		const res = await request(daemonSocketPath, "POST", "/containers", { spec });
 		expect(res.status).toBe(403);
@@ -278,6 +288,7 @@ describe("boilerhouse-podmand", () => {
 			name: "evil-netns",
 			image: "alpine:3.21",
 			netns: { nsmode: "host" },
+			...HARDENED,
 		};
 		const res = await request(daemonSocketPath, "POST", "/containers", { spec });
 		expect(res.status).toBe(403);
@@ -287,6 +298,7 @@ describe("boilerhouse-podmand", () => {
 		const spec = {
 			name: "evil-bind",
 			image: "alpine:3.21",
+			...HARDENED,
 			mounts: [{ destination: "/host", type: "bind", options: [] }],
 		};
 		const res = await request(daemonSocketPath, "POST", "/containers", { spec });
@@ -296,7 +308,7 @@ describe("boilerhouse-podmand", () => {
 	test("POST /containers/:id/start starts a registered container", async () => {
 		// First create a container
 		const createRes = await request(daemonSocketPath, "POST", "/containers", {
-			spec: { name: "start-test", image: "alpine:3.21" },
+			spec: { name: "start-test", image: "alpine:3.21", ...HARDENED },
 		});
 		const { id } = createRes.body as { id: string };
 
@@ -312,7 +324,7 @@ describe("boilerhouse-podmand", () => {
 	test("GET /containers/:id inspects a registered container", async () => {
 		// Create a container first
 		const createRes = await request(daemonSocketPath, "POST", "/containers", {
-			spec: { name: "inspect-test", image: "alpine:3.21" },
+			spec: { name: "inspect-test", image: "alpine:3.21", ...HARDENED },
 		});
 		const { id } = createRes.body as { id: string };
 
@@ -327,7 +339,7 @@ describe("boilerhouse-podmand", () => {
 
 	test("DELETE /containers/:id removes a registered container", async () => {
 		const createRes = await request(daemonSocketPath, "POST", "/containers", {
-			spec: { name: "delete-test", image: "alpine:3.21" },
+			spec: { name: "delete-test", image: "alpine:3.21", ...HARDENED },
 		});
 		const { id } = createRes.body as { id: string };
 
@@ -346,7 +358,7 @@ describe("boilerhouse-podmand", () => {
 
 	test("POST /containers/:id/exec runs a command in a registered container", async () => {
 		const createRes = await request(daemonSocketPath, "POST", "/containers", {
-			spec: { name: "exec-test", image: "alpine:3.21" },
+			spec: { name: "exec-test", image: "alpine:3.21", ...HARDENED },
 		});
 		const { id } = createRes.body as { id: string };
 
@@ -379,7 +391,7 @@ describe("boilerhouse-podmand", () => {
 	test("containers are addressable by name (not just podman ID)", async () => {
 		const name = "name-lookup-test";
 		const createRes = await request(daemonSocketPath, "POST", "/containers", {
-			spec: { name, image: "alpine:3.21" },
+			spec: { name, image: "alpine:3.21", ...HARDENED },
 		});
 		expect(createRes.status).toBe(201);
 

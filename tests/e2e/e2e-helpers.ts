@@ -8,16 +8,16 @@ import { join } from "node:path";
 import { createTestDatabase, ActivityLog, nodes } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
-import { InstanceManager } from "../instance-manager";
-import { SnapshotManager } from "../snapshot-manager";
-import { TenantManager } from "../tenant-manager";
-import { TenantDataStore } from "../tenant-data";
-import { EventBus } from "../event-bus";
-import { GoldenCreator } from "../golden-creator";
-import { BootstrapLogStore } from "../bootstrap-log-store";
-import { ResourceLimiter } from "../resource-limits";
-import { SecretStore } from "../secret-store";
-import { createApp } from "../app";
+import { InstanceManager } from "../../apps/api/src/instance-manager";
+import { SnapshotManager } from "../../apps/api/src/snapshot-manager";
+import { TenantManager } from "../../apps/api/src/tenant-manager";
+import { TenantDataStore } from "../../apps/api/src/tenant-data";
+import { EventBus } from "../../apps/api/src/event-bus";
+import { GoldenCreator } from "../../apps/api/src/golden-creator";
+import { BootstrapLogStore } from "../../apps/api/src/bootstrap-log-store";
+import { ResourceLimiter } from "../../apps/api/src/resource-limits";
+import { SecretStore } from "../../apps/api/src/secret-store";
+import { createApp } from "../../apps/api/src/app";
 import { E2E_TIMEOUTS } from "./runtime-matrix";
 
 type RuntimeOperation =

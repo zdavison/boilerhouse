@@ -25,6 +25,23 @@ export interface ContainerCreateSpec {
 	 * @default false
 	 */
 	privileged?: boolean;
+	/**
+	 * Linux capabilities to drop. Use `["ALL"]` to drop everything.
+	 */
+	cap_drop?: string[];
+	/**
+	 * Linux capabilities to add back after dropping.
+	 */
+	cap_add?: string[];
+	/**
+	 * Path to an OCI seccomp profile JSON file on the host.
+	 */
+	seccomp_profile_path?: string;
+	/**
+	 * Prevent the container from gaining new privileges via setuid/setgid.
+	 * @default false
+	 */
+	no_new_privileges?: boolean;
 	resource_limits?: {
 		cpu?: { quota?: number; period?: number };
 		memory?: { limit?: number };
@@ -462,6 +479,18 @@ export class PodmanClient {
 		}
 		if (spec.netns) {
 			body.netns = spec.netns;
+		}
+		if (spec.cap_drop && spec.cap_drop.length > 0) {
+			body.cap_drop = spec.cap_drop;
+		}
+		if (spec.cap_add && spec.cap_add.length > 0) {
+			body.cap_add = spec.cap_add;
+		}
+		if (spec.seccomp_profile_path) {
+			body.seccomp_profile_path = spec.seccomp_profile_path;
+		}
+		if (spec.no_new_privileges) {
+			body.no_new_privileges = spec.no_new_privileges;
 		}
 		if (spec.resource_limits) {
 			body.resource_limits = spec.resource_limits;

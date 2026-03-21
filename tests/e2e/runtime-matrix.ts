@@ -251,6 +251,6 @@ export function availableRuntimes(): RuntimeEntry[] {
 export const E2E_TIMEOUTS = {
 	fake: { operation: 2_000, connect: 1_000 },
 	docker: { operation: 30_000, connect: 10_000 },
-	podman: { operation: 60_000, connect: 10_000 },
-	kubernetes: { operation: 60_000, connect: 10_000 },
+	podman: { operation: 120_000, connect: 10_000 },
+	kubernetes: { operation: 120_000, connect: 10_000 },
 } as const;

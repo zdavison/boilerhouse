@@ -12,6 +12,7 @@ import { PodmanRuntimeError } from "./errors";
 import type { ContainerCreateSpec } from "./client";
 import { resolveTemplates, assertNoSecretRefs } from "./templates";
 import { DaemonBackend } from "./daemon-backend";
+import { HARDENED_CAP_ADD } from "./hardening";
 
 /** Envoy sidecar image used for per-instance proxy containers. */
 const ENVOY_IMAGE = "docker.io/envoyproxy/envoy:v1.32-latest";
@@ -31,9 +32,11 @@ export class PodmanRuntime implements Runtime {
 	private readonly instances = new Map<string, ManagedInstance>();
 	private readonly snapshotDir: string;
 	private readonly backend: ContainerBackend;
+	private readonly seccompProfilePath?: string;
 
 	constructor(config: PodmanConfig) {
 		this.snapshotDir = config.snapshotDir;
+		this.seccompProfilePath = config.seccompProfilePath;
 		this.backend = new DaemonBackend({ socketPath: config.socketPath ?? DEFAULT_RUNTIME_SOCKET });
 	}
 
@@ -134,6 +137,10 @@ export class PodmanRuntime implements Runtime {
 			image: imageRef,
 			pod: instanceId,
 			privileged: false,
+			cap_drop: ["ALL"],
+			cap_add: HARDENED_CAP_ADD,
+			...(this.seccompProfilePath ? { seccomp_profile_path: this.seccompProfilePath } : {}),
+			no_new_privileges: true,
 			labels: {
 				"boilerhouse.workload": workload.workload.name,
 				"boilerhouse.version": workload.workload.version,
