@@ -1,0 +1,33 @@
+apps/api/src/tenant-data.test.ts
+  743bda7e5c5b9be8 81-82,87,93,104,117,124,130
+apps/api/src/tenant-manager.ts
+  743bda7e5c5b9be8 118,140-142,159,172-175,177-178,189-191,196,203,245-255
+tests/e2e/overlay-restore.e2e.test.ts
+  743bda7e5c5b9be8 1-144
+apps/api/src/instance-manager.ts
+  743bda7e5c5b9be8 1,340-399
+apps/api/src/tenant-manager.test.ts
+  743bda7e5c5b9be8 157
+apps/api/src/tenant-data.ts
+  743bda7e5c5b9be8 1,15,22,32-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "495b14aab4eb90c39cdefbf8f77a2260ad2f83dc",
+  "prompts": {
+    "743bda7e5c5b9be8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b49915b4-0ef8-4825-9cb8-5677e47b37f5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 265,
+      "total_deletions": 18,
+      "accepted_lines": 264,
+      "overriden_lines": 0
+    }
+  }
+}
