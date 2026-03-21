@@ -275,6 +275,25 @@ export function hostUninstallCommand(): void {
 	});
 	run("systemctl daemon-reload");
 
+	// ── Revert nftables firewall ──────────────────────────────────────────────
+	// If the current /etc/nftables.conf contains our marker comment, remove it
+	// and flush the ruleset so the host returns to an open firewall.
+	log("Reverting nftables firewall");
+	try {
+		const nftConf = readFileSync("/etc/nftables.conf", "utf8");
+		if (nftConf.includes("Boilerhouse VM firewall")) {
+			spawnSync("rm", ["-f", "/etc/nftables.conf"], { stdio: "inherit" });
+			// Flush all rules — returns to kernel default (accept all)
+			spawnSync("nft", ["flush", "ruleset"], { stdio: "inherit" });
+			spawnSync("systemctl", ["disable", "--now", "nftables"], { stdio: "inherit" });
+			console.log("  Boilerhouse firewall rules removed");
+		} else {
+			console.log("  /etc/nftables.conf was modified — leaving in place");
+		}
+	} catch {
+		// No nftables.conf or nft not installed — nothing to revert
+	}
+
 	console.log("");
 	console.log("Boilerhouse services removed.");
 	console.log(

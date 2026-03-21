@@ -1,6 +1,6 @@
 # Binary Releases
 
-## Status: PLANNED
+## Status: DONE (CLI implemented, CI release pipeline still needed)
 
 ## Context
 

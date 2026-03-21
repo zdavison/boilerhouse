@@ -71,10 +71,8 @@ sudo scripts/start-boilerhouse-podmand.sh
 **Production (systemd):**
 
 ```bash
-# Install the service (replace <group> with the API server's group)
-sudo cp deploy/boilerhouse-podmand.service /etc/systemd/system/boilerhouse-podmand@.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now boilerhouse-podmand@<group>.service
+# Install host deps + podmand systemd service
+sudo boilerhouse host install
 ```
 
 **Verify the daemon is running:**

@@ -60,11 +60,15 @@ idempotent — safe to re-run.
 
 ### From source (development)
 
-If you don't have the binary, use the install script directly:
+If you don't have the binary, clone the repo and run the API directly:
 
 ```bash
 git clone <boilerhouse-repo> /opt/boilerhouse
-bash /opt/boilerhouse/deploy/install.sh
+cd /opt/boilerhouse && bun install --frozen-lockfile
+
+# Install host deps manually (podman, criu, nftables) then:
+bun apps/boilerhouse-podmand/src/main.ts   # in one terminal
+bun apps/api/src/server.ts                 # in another
 ```
 
 ### What the installer does
@@ -105,11 +109,6 @@ boilerhouse api install
 # Run directly (foreground)
 set -a && source /etc/boilerhouse/api.env && set +a
 cd /opt/boilerhouse && bun apps/api/src/server.ts
-
-# Or install as a systemd service
-cp /opt/boilerhouse/deploy/boilerhouse-api.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now boilerhouse-api
 ```
 
 Your application can reach the API at `http://localhost:3000`.
@@ -248,13 +247,11 @@ A Grafana dashboard is available at `deploy/grafana/boilerhouse.json`.
 
 ## Step 5: Firewall
 
-If this VM is internet-facing, use the nftables config in `deploy/nftables.conf`
-as a starting point. It allows only SSH (22) and HTTPS (443) inbound.
+If this VM is internet-facing, the `boilerhouse host install` command
+configures nftables automatically (allows only SSH 22 and HTTPS 443
+inbound). To skip: `boilerhouse host install --skip-firewall`.
 
-```bash
-cp deploy/nftables.conf /etc/nftables.conf
-systemctl enable --now nftables
-```
+To uninstall (including firewall rules): `boilerhouse host uninstall`.
 
 ## Workload definitions
 
