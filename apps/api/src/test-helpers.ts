@@ -23,7 +23,7 @@ export interface TestContext extends RouteDeps {
  * Creates a fully wired test app with in-memory DB and FakeRuntime.
  * Registers a default node so FK constraints are satisfied.
  */
-export function createTestApp(): TestContext {
+export function createTestApp(overrides?: Partial<RouteDeps>): TestContext {
 	const db = createTestDatabase();
 	const runtime = new FakeRuntime();
 	const nodeId = generateNodeId();
@@ -77,6 +77,7 @@ export function createTestApp(): TestContext {
 		resourceLimiter,
 		secretStore,
 		log,
+		...overrides,
 	};
 
 	const app = createApp(deps);
