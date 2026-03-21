@@ -1,0 +1,99 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "f7590e9429e7a2f5f46f9c16d799ef695d54b603",
+  "prompts": {
+    "2bc03677e9a4828e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba5b1657-cea1-4ed8-b57f-8037651cb47a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 457,
+      "total_deletions": 158,
+      "accepted_lines": 425,
+      "overriden_lines": 0
+    },
+    "45d584b33594b67b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "284d93cc-de8f-4e69-b65a-390071b7bd23",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 404,
+      "total_deletions": 169,
+      "accepted_lines": 324,
+      "overriden_lines": 2
+    },
+    "9ac51c5ff152bc62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cc3c12b-cc08-42a1-bd99-7eecf5f1edfe",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 548,
+      "total_deletions": 137,
+      "accepted_lines": 450,
+      "overriden_lines": 0
+    },
+    "ba85c08d7ed4ed51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f901175-e56c-43b0-9ed4-7a402154bdbf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 69,
+      "accepted_lines": 90,
+      "overriden_lines": 0
+    },
+    "c7bb92983166f130": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4ec4c90b-2730-4c65-b171-fd4e20a7e7a1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 725,
+      "total_deletions": 160,
+      "accepted_lines": 698,
+      "overriden_lines": 0
+    },
+    "d0932d65f8d46640": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0dd3a817-7770-47ea-bf54-27ec631b2596",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 112,
+      "total_deletions": 459,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    },
+    "e95ee971bd38fcd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ea5a63a-c37c-429d-a9f8-92dabfd72100",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 255,
+      "total_deletions": 72,
+      "accepted_lines": 148,
+      "overriden_lines": 0
+    }
+  }
+}
