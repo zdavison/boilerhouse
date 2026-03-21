@@ -23,6 +23,7 @@ export interface RouteDeps {
 	bootstrapLogStore: BootstrapLogStore;
 	resourceLimiter?: ResourceLimiter;
 	secretStore: SecretStore;
+	apiKey?: string;
 	log?: Logger;
 	tracer?: Tracer;
 	meter?: Meter;

@@ -105,118 +105,39 @@ dashboard or API is exposed beyond the private network.
 
 ## Tier 1 — Must-have before production
 
-### 1. API Authentication (opt-in)
+### 1. API Authentication (opt-in) ✅ DONE
 
 **Risk:** T4, T5 — when the API or dashboard is exposed beyond the private network,
 anyone who can reach it can claim, release, destroy, and enumerate all tenants and
 instances.
 
-**Current state:** Zero authentication. All routes are open. This is correct for
-private-network deployments where the upstream API server is the sole trusted caller.
+**Current state:** Implemented. Single static API key via `BOILERHOUSE_API_KEY` env var.
+When set, all `/api/v1` routes (except `/health`) and `/ws` require the key.
+When unset (default), all callers are trusted (private-network deployment).
 
-**When needed:** When the dashboard is exposed to external networks, or when multiple
-untrusted callers share the same Boilerhouse deployment.
-
-**Fix:** Add opt-in API key authentication as Elysia middleware (`beforeHandle` hook
-on the `/api/v1` group). Disabled by default. Enabled when a bootstrap key is
-configured or any API key exists in the database. Each API consumer gets a key scoped
-to a set of tenants.
-
+**Usage:**
 ```
-Authorization: Bearer bh_live_<key>
+Authorization: Bearer <BOILERHOUSE_API_KEY>   # HTTP
+/ws?token=<BOILERHOUSE_API_KEY>               # WebSocket
 ```
 
-#### Schema — `api_keys` table
+**Files changed:**
+- `apps/api/src/routes/auth-middleware.ts` — Elysia `onBeforeHandle` plugin; exempts `/health`
+- `apps/api/src/routes/deps.ts` — added `apiKey?: string`
+- `apps/api/src/app.ts` — `.use(authMiddleware(deps.apiKey))` at top of `/api/v1` group
+- `apps/api/src/routes/ws.ts` — validates `?token=` on WS upgrade when `apiKey` is set
+- `apps/api/src/server.ts` — reads `BOILERHOUSE_API_KEY`, logs auth state, passes to `createApp`
 
-New table in `packages/db/src/schema.ts`:
-
-| Column          | Type                      | Notes                                    |
-|-----------------|---------------------------|------------------------------------------|
-| `key_id`        | TEXT PK                   | `apk_...` prefix                         |
-| `key_hash`      | TEXT                      | SHA-256 of the full key                  |
-| `tenant_scope`  | jsonObject<string[] \| "*"> | Tenant ID prefixes or `"*"` for admin  |
-| `description`   | TEXT                      | Human label                              |
-| `created_at`    | INTEGER (epoch ms)        |                                          |
-| `revoked_at`    | INTEGER (epoch ms)        | NULL until revoked                       |
-
-Generate migration `0006_*.sql`.
-
-#### Auth helpers — `apps/api/src/auth.ts`
-
-| Function                              | Purpose                                               |
-|---------------------------------------|-------------------------------------------------------|
-| `generateApiKey()`                    | Returns `{ key: "bh_live_<32hex>", keyId, keyHash }` |
-| `hashApiKey(key)`                     | SHA-256 hex                                           |
-| `parseBearer(header)`                 | Extracts `bh_live_*` from `Authorization: Bearer ...` |
-| `lookupApiKey(db, keyHash)`           | DB lookup, check not revoked → `AuthContext \| null`  |
-| `isInScope(auth, tenantId)`           | `"*"` matches all; prefix-match for scoped keys      |
-| `isAdmin(auth)`                       | `tenantScope === "*"`                                 |
-| `filterByScope(auth, items, getTenantId)` | Filters list results                             |
-
-```typescript
-interface AuthContext {
-  keyId: string;
-  tenantScope: string[] | "*";
-}
-```
-
-#### Auth middleware — `apps/api/src/routes/auth-middleware.ts`
-
-- `derive` to parse/validate token → `{ auth: AuthContext | null }`
-- `onBeforeHandle` to reject 401 if null
-- When `authEnabled=false` (default): returns synthetic admin context — existing tests unaffected
-- Health endpoint `/api/v1/health` exempt
-
-#### Scope checking — `apps/api/src/routes/scope-check.ts`
-
-- `checkTenantScope(auth, tenantId, set)` → `{ error } | null`
-- `checkAdminScope(auth, set)` → `{ error } | null`
-
-#### Route enforcement
-
-| Route file             | Changes                                                     |
-|------------------------|-------------------------------------------------------------|
-| `routes/tenants.ts`    | Scope check on `:id`, filter on `GET /tenants`              |
-| `routes/instances.ts`  | Scope check on `:id` (via instance tenantId), filter list   |
-| `routes/snapshots.ts`  | Filter by tenantId                                          |
-| `routes/secrets.ts`    | Scope check on tenant `:id`                                 |
-| `routes/activity.ts`   | Filter by tenantId                                          |
-| `routes/workloads.ts`  | Admin check on POST/DELETE                                  |
-| `routes/nodes.ts`      | Admin check                                                 |
-| `routes/system.ts`     | Admin check on `/stats`                                     |
-
-Instances with null `tenantId` (pre-claim) require admin scope.
-
-#### Key management routes — `apps/api/src/routes/auth-routes.ts`
-
-- `POST /api/v1/auth/keys` — admin only, returns plaintext key once
-- `GET /api/v1/auth/keys` — admin only, lists keys (no hashes)
-- `DELETE /api/v1/auth/keys/:keyId` — admin only, soft-revokes
-
-#### Wiring
-
-- `apps/api/src/routes/deps.ts` — add `authEnabled?: boolean`
-- `apps/api/src/app.ts` — `.use(authMiddleware(deps.db, deps.authEnabled))` before route plugins inside `/api/v1` group. Add `.use(authRoutes(deps))`.
-
-#### Bootstrap + test updates
-
-`apps/api/src/server.ts`:
-- If `BOILERHOUSE_API_KEY` env var set → seed bootstrap admin key at startup (idempotent)
-- Set `authEnabled: true` when `BOILERHOUSE_API_KEY` is set or any key exists in DB
-- When unset (default): auth disabled, all callers trusted (private-network deployment)
-
-`apps/api/src/test-helpers.ts`:
-- `createTestApp(opts?)` accepts `{ authEnabled?: boolean }`. Default `false`.
-- `apiRequest()` accepts optional `token` option.
-
-`apps/api/src/e2e/e2e-helpers.ts`:
-- Seed admin key, return `adminToken`
-- `api()` includes `Authorization` header
-- WS connections use `?token=<adminToken>`
+**Not implemented (out of scope for now):** DB-backed per-tenant scoped keys, key
+management routes, key rotation. Can be added later if multi-caller scoping is needed.
 
 ---
 
-### 2. WebSocket Authentication + Tenant-Scoped Events (opt-in)
+### 2. WebSocket Authentication + Tenant-Scoped Events (opt-in) ✅ DONE (auth part)
+
+**Note:** WS token validation is implemented (see Item 1). Tenant-scoped event filtering
+(only sending events matching the caller's tenant scope) is not needed while there is only
+a single shared API key — all authenticated callers are trusted equally.
 
 **Risk:** T4, T5 — when auth is enabled, the `/ws` endpoint must also be gated,
 otherwise it leaks all domain events (tenant IDs, instance IDs, state changes) to

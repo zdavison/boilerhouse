@@ -64,6 +64,14 @@ if (!existingNode) {
 const activityLog = new ActivityLog(db);
 const eventBus = new EventBus();
 
+// Optional API key — when set, all /api/v1 routes (except /health) and /ws require it
+const apiKey = process.env.BOILERHOUSE_API_KEY || undefined;
+if (apiKey) {
+	log.info("API authentication enabled (BOILERHOUSE_API_KEY is set)");
+} else {
+	log.warn("API authentication disabled — set BOILERHOUSE_API_KEY to require auth");
+}
+
 // Encrypted secret store for credential injection (required in production)
 const secretKey = process.env.BOILERHOUSE_SECRET_KEY;
 if (!secretKey && process.env.NODE_ENV !== "test") {
@@ -238,6 +246,7 @@ const app = createApp({
 	runtime,
 	nodeId,
 	activityLog,
+	apiKey,
 	instanceManager: tracedInstanceManager,
 	tenantManager: tracedTenantManager,
 	snapshotManager: tracedSnapshotManager,

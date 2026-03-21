@@ -16,6 +16,7 @@ import { activityRoutes } from "./routes/activity";
 import { secretRoutes } from "./routes/secrets";
 import { triggerRoutes } from "./routes/triggers";
 import { wsPlugin } from "./routes/ws";
+import { authMiddleware } from "./routes/auth-middleware";
 
 export function createApp(deps: RouteDeps) {
 	const corsOrigin = process.env.CORS_ORIGIN;
@@ -45,6 +46,7 @@ export function createApp(deps: RouteDeps) {
 	return app
 		.group("/api/v1", (group) =>
 			group
+				.use(authMiddleware(deps.apiKey))
 				.use(systemRoutes(deps))
 				.use(workloadRoutes(deps))
 				.use(instanceRoutes(deps))
