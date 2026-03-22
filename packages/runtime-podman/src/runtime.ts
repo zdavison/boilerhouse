@@ -141,6 +141,7 @@ export class PodmanRuntime implements Runtime {
 			cap_add: HARDENED_CAP_ADD,
 			...(this.seccompProfilePath ? { seccomp_profile_path: this.seccompProfilePath } : {}),
 			no_new_privileges: true,
+			pidns: { nsmode: "private" },
 			labels: {
 				"boilerhouse.workload": workload.workload.name,
 				"boilerhouse.version": workload.workload.version,

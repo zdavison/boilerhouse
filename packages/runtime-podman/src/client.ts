@@ -59,6 +59,12 @@ export interface ContainerCreateSpec {
 	}>;
 	netns?: { nsmode: string };
 	/**
+	 * PID namespace mode for the container.
+	 * Use `{ nsmode: "private" }` to give each container its own PID namespace,
+	 * preventing processes from seeing (or ptracing) processes in other containers.
+	 */
+	pidns?: { nsmode: string };
+	/**
 	 * Extra `/etc/hosts` entries for the container.
 	 * @example ["host.containers.internal:host-gateway"]
 	 */
@@ -479,6 +485,9 @@ export class PodmanClient {
 		}
 		if (spec.netns) {
 			body.netns = spec.netns;
+		}
+		if (spec.pidns) {
+			body.pidns = spec.pidns;
 		}
 		if (spec.cap_drop && spec.cap_drop.length > 0) {
 			body.cap_drop = spec.cap_drop;
