@@ -11,16 +11,16 @@ import { MetricsPage } from "./pages/MetricsPage";
 import { TriggerList } from "./pages/TriggerList";
 import { SnapshotList } from "./pages/SnapshotList";
 
-const NAV_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
+const ENTITY_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
 	{ path: "/workloads", label: "workloads", icon: Package },
 	{ path: "/triggers", label: "triggers", icon: Zap },
+	{ path: "/entities/snapshots", label: "snapshots", icon: Camera },
+];
+
+const INFRA_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
 	{ path: "/nodes", label: "nodes", icon: HardDrive },
 	{ path: "/metrics", label: "metrics", icon: BarChart3 },
 	{ path: "/logs", label: "logs", icon: ScrollText },
-];
-
-const ENTITY_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
-	{ path: "/entities/snapshots", label: "snapshots", icon: Camera },
 ];
 
 function App() {
@@ -73,7 +73,10 @@ function App() {
 					</h1>
 				</div>
 				<ul className="flex-1 py-1">
-					{NAV_ITEMS.map((item) => {
+					<li className="px-4 pt-3 pb-1">
+						<span className="text-xs font-tight uppercase tracking-wider text-muted/60">entities</span>
+					</li>
+					{ENTITY_ITEMS.map((item) => {
 						const active =
 							item.path === "/workloads"
 								? path === "/" || path === "/workloads" || path.startsWith("/workloads/")
@@ -95,10 +98,10 @@ function App() {
 							</li>
 						);
 					})}
-				<li className="px-4 pt-4 pb-1">
-					<span className="text-xs font-tight uppercase tracking-wider text-muted/60">entities</span>
-				</li>
-					{ENTITY_ITEMS.map((item) => {
+					<li className="px-4 pt-4 pb-1">
+						<span className="text-xs font-tight uppercase tracking-wider text-muted/60">infra</span>
+					</li>
+					{INFRA_ITEMS.map((item) => {
 						const active = path === item.path || path.startsWith(item.path + "/");
 						const Icon = item.icon;
 						return (
