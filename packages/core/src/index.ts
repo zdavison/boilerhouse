@@ -46,7 +46,6 @@ export {
 	type NetworkAccess,
 	type IdleAction,
 	type PortExpose,
-	type BindMount,
 	type HttpGetProbe,
 	type ExecProbe,
 	type CredentialRule,

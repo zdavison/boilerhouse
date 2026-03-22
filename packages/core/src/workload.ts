@@ -29,12 +29,6 @@ const PortExposeSchema = Type.Object({
 	host_range: Type.Tuple([Type.Integer(), Type.Integer()]),
 });
 
-const BindMountSchema = Type.Object({
-	host: Type.String({ minLength: 1 }),
-	guest: Type.String({ minLength: 1 }),
-	readonly: Type.Optional(Type.Boolean()),
-});
-
 const NetworkAccessSchema = Type.Union([
 	Type.Literal("none"),
 	Type.Literal("outbound"),
@@ -121,7 +115,6 @@ export const WorkloadSchema = Type.Object({
 	filesystem: Type.Optional(
 		Type.Object({
 			overlay_dirs: Type.Optional(Type.Array(Type.String())),
-			bind_mounts: Type.Optional(Type.Array(BindMountSchema)),
 		}),
 	),
 	/** @default { action: "hibernate" } */
@@ -174,7 +167,6 @@ export type Workload = Static<typeof WorkloadSchema>;
 export type NetworkAccess = Static<typeof NetworkAccessSchema>;
 export type IdleAction = Static<typeof IdleActionSchema>;
 export type PortExpose = Static<typeof PortExposeSchema>;
-export type BindMount = Static<typeof BindMountSchema>;
 export type HttpGetProbe = Static<typeof HttpGetProbeSchema>;
 export type ExecProbe = Static<typeof ExecProbeSchema>;
 export type CredentialRule = Static<typeof CredentialRuleSchema>;
@@ -300,7 +292,6 @@ export interface WorkloadConfig {
 	};
 	filesystem?: {
 		overlay_dirs?: string[];
-		bind_mounts?: Array<{ host: string; guest: string; readonly?: boolean }>;
 	};
 	idle?: {
 		watch_dirs?: string[];
