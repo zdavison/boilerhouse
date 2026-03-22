@@ -22,9 +22,7 @@ export interface DaemonConfig {
 	listenSocketPath: string;
 	/** Directory for storing checkpoint archives. */
 	snapshotDir: string;
-	/** Hex-encoded HMAC key for archive signing. */
-	hmacKey?: string;
-	/** Hex-encoded 32-byte key for encrypting snapshot archives at rest. */
+	/** age secret key ("AGE-SECRET-KEY-1...") for encrypting snapshot archives at rest. */
 	encryptionKey?: string;
 	/** Base directory for resolving workload Dockerfiles. */
 	workloadsDir?: string;
@@ -455,10 +453,7 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 
 		const body = (await readJsonBody(req)) as { archiveDir: string };
 
-		// Import checkpoint logic from runtime-podman
-		const { rewriteCheckpointPorts, computeArchiveHmac } = await import(
-			"@boilerhouse/runtime-podman"
-		);
+		const { rewriteCheckpointPorts } = await import("@boilerhouse/runtime-podman");
 		const { encryptArchive } = await import("@boilerhouse/core");
 		const { chmodSync } = await import("node:fs");
 		const { join } = await import("node:path");
@@ -474,14 +469,9 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 		const { archive: rewrittenArchive, containerPorts } =
 			await rewriteCheckpointPorts(archiveBuffer);
 
-		// HMAC is computed over the plaintext archive (before encryption)
-		const hmac = config.hmacKey
-			? computeArchiveHmac(rewrittenArchive, config.hmacKey)
-			: undefined;
-
 		// Encrypt the archive at rest if an encryption key is configured
 		const dataToWrite = config.encryptionKey
-			? encryptArchive(rewrittenArchive, config.encryptionKey)
+			? await encryptArchive(rewrittenArchive, config.encryptionKey)
 			: rewrittenArchive;
 
 		await Bun.write(archivePath, dataToWrite);
@@ -492,7 +482,6 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 
 		return jsonResponse(200, {
 			archivePath,
-			hmac,
 			exposedPorts: containerPorts,
 			encrypted: !!config.encryptionKey,
 		});
@@ -501,14 +490,12 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 	async function handleRestore(req: Request): Promise<Response> {
 		const body = (await readJsonBody(req)) as {
 			archivePath: string;
-			hmac?: string;
 			name: string;
 			publishPorts?: string[];
 			pod?: string;
 			encrypted?: boolean;
 		};
 
-		const { verifyArchiveHmac } = await import("@boilerhouse/runtime-podman");
 		const { decryptArchive } = await import("@boilerhouse/core");
 
 		const archiveData = await Bun.file(body.archivePath).arrayBuffer();
@@ -522,23 +509,9 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 				});
 			}
 			try {
-				archive = decryptArchive(archive, config.encryptionKey);
+				archive = await decryptArchive(archive, config.encryptionKey);
 			} catch {
 				return jsonResponse(403, { error: "Archive decryption failed" });
-			}
-		}
-
-		// Verify HMAC over the plaintext archive
-		if (config.hmacKey) {
-			if (!body.hmac) {
-				return jsonResponse(403, {
-					error: "Archive HMAC is missing but daemon has HMAC key configured",
-				});
-			}
-			try {
-				verifyArchiveHmac(archive, config.hmacKey, body.hmac);
-			} catch {
-				return jsonResponse(403, { error: "Archive HMAC verification failed" });
 			}
 		}
 
@@ -698,11 +671,6 @@ if (import.meta.main) {
 	const podmanSocketPath = process.env.PODMAN_SOCKET ?? DEFAULT_PODMAN_SOCKET ?? "/var/run/boilerhouse/podman.sock";
 	const listenSocketPath = process.env.LISTEN_SOCKET ?? DEFAULT_RUNTIME_SOCKET;
 	const snapshotDir = process.env.SNAPSHOT_DIR ?? DEFAULT_SNAPSHOT_DIR;
-	const hmacKey = process.env.HMAC_KEY;
-	if (!hmacKey) {
-		console.error("HMAC_KEY is required. Set it to a hex-encoded key for snapshot archive signing.");
-		process.exit(1);
-	}
 	const encryptionKey = process.env.BOILERHOUSE_ENCRYPTION_KEY;
 	const workloadsDir = process.env.WORKLOADS_DIR;
 
@@ -712,7 +680,6 @@ if (import.meta.main) {
 			podmanSocketPath,
 			listenSocketPath,
 			snapshotDir,
-			hmacKey,
 			encryptionKey,
 			workloadsDir,
 			managePodman: true,

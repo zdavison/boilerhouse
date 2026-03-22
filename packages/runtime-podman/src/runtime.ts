@@ -276,7 +276,6 @@ export class PodmanRuntime implements Runtime {
 			workloadId: generateWorkloadId(),
 			nodeId: generateNodeId(),
 			runtimeMeta,
-			archiveHmac: result.hmac,
 			encrypted: result.encrypted,
 		};
 	}
@@ -324,7 +323,6 @@ export class PodmanRuntime implements Runtime {
 		// (not the container), so we don't pass publishPorts.
 		await this.backend.restore(
 			ref.paths.vmstate,
-			ref.archiveHmac,
 			instanceId,
 			undefined,
 			instanceId,

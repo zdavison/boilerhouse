@@ -1,10 +1,8 @@
 export { PodmanRuntime } from "./runtime";
 export { PodmanClient } from "./client";
 export { PodmanRuntimeError } from "./errors";
-export { ArchiveIntegrityError } from "./hmac";
 export { DaemonBackend } from "./daemon-backend";
 export { rewriteCheckpointPorts } from "./runtime";
-export { computeArchiveHmac, verifyArchiveHmac } from "./hmac";
 export type { ContainerBackend, CheckpointResult, BackendInfo, EnsureImageResult } from "./backend";
 export type { DaemonBackendConfig } from "./daemon-backend";
 export type { PodmanConfig } from "./types";

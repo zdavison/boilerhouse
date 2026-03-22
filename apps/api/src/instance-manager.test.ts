@@ -314,18 +314,17 @@ describe("InstanceManager", () => {
 			expect(allSnapshots).toHaveLength(1);
 		});
 
-		test("stores archiveHmac in the snapshot DB row when present", async () => {
-			// Use a runtime that returns an archiveHmac on snapshot
-			const hmacRuntime = new FakeRuntime();
-			const originalSnapshot = hmacRuntime.snapshot.bind(hmacRuntime);
-			hmacRuntime.snapshot = async (handle) => {
+		test("stores encrypted flag in the snapshot DB row when set", async () => {
+			const encryptedRuntime = new FakeRuntime();
+			const originalSnapshot = encryptedRuntime.snapshot.bind(encryptedRuntime);
+			encryptedRuntime.snapshot = async (handle) => {
 				const ref = await originalSnapshot(handle);
-				return { ...ref, archiveHmac: "deadbeefcafe1234" };
+				return { ...ref, encrypted: true };
 			};
 
-			const hmacManager = new InstanceManager(hmacRuntime, db, log, nodeId);
-			const handle = await hmacManager.create(workloadId, TEST_WORKLOAD);
-			const ref = await hmacManager.hibernate(handle.instanceId);
+			const encryptedManager = new InstanceManager(encryptedRuntime, db, log, nodeId);
+			const handle = await encryptedManager.create(workloadId, TEST_WORKLOAD);
+			const ref = await encryptedManager.hibernate(handle.instanceId);
 
 			const row = db
 				.select()
@@ -333,20 +332,7 @@ describe("InstanceManager", () => {
 				.where(eq(snapshots.snapshotId, ref.id))
 				.get();
 
-			expect(row!.archiveHmac).toBe("deadbeefcafe1234");
-		});
-
-		test("stores null archiveHmac when not present in snapshot ref", async () => {
-			const handle = await manager.create(workloadId, TEST_WORKLOAD);
-			const ref = await manager.hibernate(handle.instanceId);
-
-			const row = db
-				.select()
-				.from(snapshots)
-				.where(eq(snapshots.snapshotId, ref.id))
-				.get();
-
-			expect(row!.archiveHmac).toBeNull();
+			expect(row!.encrypted).toBe(true);
 		});
 
 		test("falls back to destroy on snapshot failure", async () => {

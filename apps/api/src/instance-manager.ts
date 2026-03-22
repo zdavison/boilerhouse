@@ -189,7 +189,6 @@ export class InstanceManager {
 				nodeId: this.nodeId,
 				vmstatePath: correctedRef.paths.vmstate,
 				memoryPath: correctedRef.paths.memory,
-				archiveHmac: correctedRef.archiveHmac ?? null,
 				encrypted: correctedRef.encrypted ?? false,
 				sizeBytes: 0,
 				runtimeMeta: correctedRef.runtimeMeta as Record<string, unknown>,

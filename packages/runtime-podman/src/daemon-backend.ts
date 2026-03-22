@@ -72,7 +72,6 @@ export class DaemonBackend implements ContainerBackend {
 
 	async restore(
 		archivePath: string,
-		hmac: string | undefined,
 		name: string,
 		publishPorts?: string[],
 		pod?: string,
@@ -80,7 +79,6 @@ export class DaemonBackend implements ContainerBackend {
 	): Promise<string> {
 		const res = await this.request("POST", "/containers/restore", {
 			archivePath,
-			hmac,
 			name,
 			publishPorts,
 			pod,

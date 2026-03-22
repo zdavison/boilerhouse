@@ -31,13 +31,6 @@ export async function podmandStartCommand(): Promise<void> {
 		"/var/run/boilerhouse/podman.sock";
 	const listenSocketPath = process.env["LISTEN_SOCKET"] ?? DEFAULT_RUNTIME_SOCKET;
 	const snapshotDir = process.env["SNAPSHOT_DIR"] ?? DEFAULT_SNAPSHOT_DIR;
-	const hmacKey = process.env["HMAC_KEY"];
-	if (!hmacKey) {
-		console.error(
-			"HMAC_KEY is required. Set it in /etc/boilerhouse/podmand.env or as an env var.",
-		);
-		process.exit(1);
-	}
 	const encryptionKey = process.env["BOILERHOUSE_ENCRYPTION_KEY"];
 	const workloadsDir = process.env["WORKLOADS_DIR"];
 
@@ -47,7 +40,6 @@ export async function podmandStartCommand(): Promise<void> {
 			podmanSocketPath,
 			listenSocketPath,
 			snapshotDir,
-			hmacKey,
 			encryptionKey,
 			workloadsDir,
 			managePodman: true,

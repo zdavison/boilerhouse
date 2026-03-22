@@ -4,11 +4,9 @@ import type { ContainerCreateSpec, ContainerInspect, ExecResult, PodCreateSpec }
 export interface CheckpointResult {
 	/** Absolute path to the stored checkpoint archive. */
 	archivePath: string;
-	/** Hex-encoded HMAC-SHA256 of the archive, if signing is enabled. */
-	hmac?: string;
 	/** Container ports extracted from the checkpoint's config.dump. */
 	exposedPorts: number[];
-	/** Whether the archive on disk is encrypted at rest. */
+	/** Whether the archive on disk is age-encrypted at rest. */
 	encrypted?: boolean;
 }
 
@@ -71,15 +69,13 @@ export interface ContainerBackend {
 
 	/**
 	 * Restore a container from a checkpoint archive.
-	 * Handles HMAC verification and archive reading.
 	 *
 	 * @param pod - Optional pod name to restore the container into.
-	 * @param encrypted - Whether the archive on disk is encrypted.
+	 * @param encrypted - Whether the archive on disk is age-encrypted.
 	 * @returns The new container ID.
 	 */
 	restore(
 		archivePath: string,
-		hmac: string | undefined,
 		name: string,
 		publishPorts?: string[],
 		pod?: string,

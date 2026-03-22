@@ -240,7 +240,7 @@ export class KubernetesRuntime implements Runtime {
 
 				// Encrypt the overlay archive at rest
 				if (this.encryptionKey) {
-					tarData = encryptArchive(tarData, this.encryptionKey);
+					tarData = await encryptArchive(tarData, this.encryptionKey);
 				}
 
 				writeFileSync(join(archiveDir, "overlay.tar.gz"), tarData);
@@ -340,7 +340,7 @@ export class KubernetesRuntime implements Runtime {
 							"Snapshot is encrypted but no encryption key is configured",
 						);
 					}
-					overlayData = decryptArchive(overlayData, this.encryptionKey);
+					overlayData = await decryptArchive(overlayData, this.encryptionKey);
 				}
 
 				const b64 = overlayData.toString("base64");

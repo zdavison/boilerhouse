@@ -198,7 +198,6 @@ describe("DaemonBackend", () => {
 				status: 200,
 				body: {
 					archivePath: "/tmp/snapshots/snap-1/checkpoint.tar.gz",
-					hmac: "abc123",
 					exposedPorts: [8080],
 				},
 			};
@@ -206,7 +205,6 @@ describe("DaemonBackend", () => {
 
 		const result = await backend.checkpoint("ctr-123", "/tmp/snapshots/snap-1");
 		expect(result.archivePath).toBe("/tmp/snapshots/snap-1/checkpoint.tar.gz");
-		expect(result.hmac).toBe("abc123");
 		expect(result.exposedPorts).toEqual([8080]);
 	});
 
@@ -220,13 +218,11 @@ describe("DaemonBackend", () => {
 
 		const id = await backend.restore(
 			"/tmp/archive.tar.gz",
-			"hmac-123",
 			"new-ctr",
 			["8080"],
 		);
 		expect(id).toBe("restored-456");
 		expect(receivedBody?.archivePath).toBe("/tmp/archive.tar.gz");
-		expect(receivedBody?.hmac).toBe("hmac-123");
 		expect(receivedBody?.name).toBe("new-ctr");
 		expect(receivedBody?.publishPorts).toEqual(["8080"]);
 	});

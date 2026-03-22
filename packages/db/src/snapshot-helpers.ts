@@ -28,7 +28,6 @@ export function snapshotRefFrom(row: SnapshotRow): SnapshotRef | null {
 		workloadId: row.workloadId,
 		nodeId: row.nodeId,
 		runtimeMeta: meta as unknown as SnapshotMetadata,
-		archiveHmac: row.archiveHmac ?? undefined,
 		encrypted: row.encrypted ?? false,
 	};
 }

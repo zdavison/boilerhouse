@@ -1,5 +1,6 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll } from "bun:test";
 import { randomBytes } from "node:crypto";
+import { generateX25519Identity } from "age-encryption";
 import {
 	encryptArchive,
 	decryptArchive,
@@ -7,94 +8,79 @@ import {
 	ArchiveDecryptionError,
 } from "./archive-crypto";
 
-const TEST_KEY = randomBytes(32).toString("hex");
-const OTHER_KEY = randomBytes(32).toString("hex");
 const TEST_DATA = Buffer.from("checkpoint-archive-content-with-process-memory");
 
+let TEST_KEY: string;
+let OTHER_KEY: string;
+
+beforeAll(async () => {
+	TEST_KEY = await generateX25519Identity();
+	OTHER_KEY = await generateX25519Identity();
+});
+
 describe("encryptArchive / decryptArchive", () => {
-	test("round-trips data correctly", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
-		const decrypted = decryptArchive(encrypted, TEST_KEY);
+	test("round-trips data correctly", async () => {
+		const encrypted = await encryptArchive(TEST_DATA, TEST_KEY);
+		const decrypted = await decryptArchive(encrypted, TEST_KEY);
 		expect(decrypted).toEqual(TEST_DATA);
 	});
 
-	test("encrypted output differs from plaintext", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
+	test("encrypted output differs from plaintext", async () => {
+		const encrypted = await encryptArchive(TEST_DATA, TEST_KEY);
 		expect(encrypted).not.toEqual(TEST_DATA);
 		expect(encrypted.length).toBeGreaterThan(TEST_DATA.length);
 	});
 
-	test("each encryption produces different ciphertext (random IV)", () => {
-		const a = encryptArchive(TEST_DATA, TEST_KEY);
-		const b = encryptArchive(TEST_DATA, TEST_KEY);
+	test("each encryption produces different ciphertext", async () => {
+		const a = await encryptArchive(TEST_DATA, TEST_KEY);
+		const b = await encryptArchive(TEST_DATA, TEST_KEY);
 		expect(a).not.toEqual(b);
 		// But both decrypt to the same thing
-		expect(decryptArchive(a, TEST_KEY)).toEqual(TEST_DATA);
-		expect(decryptArchive(b, TEST_KEY)).toEqual(TEST_DATA);
+		expect(await decryptArchive(a, TEST_KEY)).toEqual(TEST_DATA);
+		expect(await decryptArchive(b, TEST_KEY)).toEqual(TEST_DATA);
 	});
 
-	test("wrong key fails decryption", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
-		expect(() => decryptArchive(encrypted, OTHER_KEY)).toThrow(
+	test("wrong key fails decryption", async () => {
+		const encrypted = await encryptArchive(TEST_DATA, TEST_KEY);
+		await expect(decryptArchive(encrypted, OTHER_KEY)).rejects.toBeInstanceOf(
 			ArchiveDecryptionError,
 		);
 	});
 
-	test("tampered ciphertext fails decryption", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
-		// Flip a byte in the ciphertext region (after 32-byte header)
-		encrypted[40] ^= 0xff;
-		expect(() => decryptArchive(encrypted, TEST_KEY)).toThrow(
+	test("tampered ciphertext fails decryption", async () => {
+		const encrypted = await encryptArchive(TEST_DATA, TEST_KEY);
+		// Flip a byte well into the ciphertext body (past the age header)
+		const idx = encrypted.length - 10;
+		encrypted[idx] = (encrypted[idx] ?? 0) ^ 0xff;
+		await expect(decryptArchive(encrypted, TEST_KEY)).rejects.toBeInstanceOf(
 			ArchiveDecryptionError,
 		);
 	});
 
-	test("tampered auth tag fails decryption", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
-		// Flip last byte (in auth tag)
-		encrypted[encrypted.length - 1] ^= 0xff;
-		expect(() => decryptArchive(encrypted, TEST_KEY)).toThrow(
+	test("rejects non-encrypted data", async () => {
+		await expect(decryptArchive(TEST_DATA, TEST_KEY)).rejects.toBeInstanceOf(
 			ArchiveDecryptionError,
 		);
 	});
 
-	test("truncated data fails decryption", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
-		const truncated = encrypted.subarray(0, 40);
-		expect(() => decryptArchive(truncated, TEST_KEY)).toThrow(
-			ArchiveDecryptionError,
-		);
-	});
-
-	test("rejects non-encrypted data", () => {
-		expect(() => decryptArchive(TEST_DATA, TEST_KEY)).toThrow(
-			ArchiveDecryptionError,
-		);
-	});
-
-	test("handles empty plaintext", () => {
+	test("handles empty plaintext", async () => {
 		const empty = Buffer.alloc(0);
-		const encrypted = encryptArchive(empty, TEST_KEY);
-		const decrypted = decryptArchive(encrypted, TEST_KEY);
+		const encrypted = await encryptArchive(empty, TEST_KEY);
+		const decrypted = await decryptArchive(encrypted, TEST_KEY);
 		expect(decrypted).toEqual(empty);
 	});
 
-	test("handles large data", () => {
+	test("handles large data", async () => {
 		const large = randomBytes(1024 * 1024); // 1 MB
-		const encrypted = encryptArchive(large, TEST_KEY);
-		const decrypted = decryptArchive(encrypted, TEST_KEY);
+		const encrypted = await encryptArchive(large, TEST_KEY);
+		const decrypted = await decryptArchive(encrypted, TEST_KEY);
 		expect(decrypted).toEqual(large);
-	});
-
-	test("rejects invalid key length", () => {
-		expect(() => encryptArchive(TEST_DATA, "abcd")).toThrow(/32 bytes/);
-		expect(() => decryptArchive(Buffer.alloc(100), "abcd")).toThrow(/32 bytes/);
 	});
 });
 
 describe("isEncryptedArchive", () => {
-	test("returns true for encrypted data", () => {
-		const encrypted = encryptArchive(TEST_DATA, TEST_KEY);
+	test("returns true for age-encrypted data", async () => {
+		const encrypted = await encryptArchive(TEST_DATA, TEST_KEY);
 		expect(isEncryptedArchive(encrypted)).toBe(true);
 	});
 
