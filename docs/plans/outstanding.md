@@ -258,27 +258,13 @@ polling, or remove the field.
 
 ---
 
-### 11. HTTP_PROXY on Restored Containers
+### 11. HTTP_PROXY on Restored Containers ✓ DONE
 
-**Priority:** Low
-**Category:** Core functionality gap
-
-**Current state:** `proxyAddress` is injected into env vars during `create()`,
-but restored containers inherit whatever was baked into the snapshot. Stale
-value if proxy address changes.
-
-**Work:** Re-inject proxy env vars after CRIU restore, or use a stable internal
-DNS name.
-
-**Cons:**
-- Env vars are baked into CRIU checkpoint. Modifying post-restore requires
-  patching checkpoint files (fragile) or `podman exec` (doesn't affect
-  already-running processes).
-- Workaround: use stable DNS name, making this a non-issue.
-
-**Files:** `runtime.ts`
-
-> CONCLUSION: let's use the stable DNS name approach
+Both runtimes already inject `HTTP_PROXY=http://localhost:18080`, which is the
+stable DNS name approach. `localhost` resolves correctly in the shared pod
+network namespace on both Podman and Kubernetes, so restored containers always
+reach the Envoy sidecar at the same address regardless of when the snapshot was
+taken. No further work required.
 
 ---
 
