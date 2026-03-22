@@ -79,7 +79,7 @@ describe("createMachine", () => {
 				{
 					transitions,
 					guards: [
-						(status, event, ctx) => {
+						(_status, event, ctx) => {
 							if (event === "start") return ctx?.allowed ?? false;
 							return true;
 						},

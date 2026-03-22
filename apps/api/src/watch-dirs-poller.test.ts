@@ -79,7 +79,7 @@ afterEach(() => {
 describe("WatchDirsPoller", () => {
 	test("polling calls reportActivity and keeps heartbeat alive", async () => {
 		const firedEvents: Array<{ instanceId: InstanceId; action: IdleAction }> = [];
-		idleMonitor.onIdle(async (id, action) => firedEvents.push({ instanceId: id, action }));
+		idleMonitor.onIdle(async (id, action) => { firedEvents.push({ instanceId: id, action }); });
 
 		// Seed workload and create a real instance so statWatchDirs can find it
 		const workloadId = generateWorkloadId() as WorkloadId;
@@ -106,7 +106,7 @@ describe("WatchDirsPoller", () => {
 
 	test("mtime change resets idle timer", async () => {
 		const firedEvents: Array<{ instanceId: InstanceId; action: IdleAction }> = [];
-		idleMonitor.onIdle(async (id, action) => firedEvents.push({ instanceId: id, action }));
+		idleMonitor.onIdle(async (id, action) => { firedEvents.push({ instanceId: id, action }); });
 
 		const workloadId = generateWorkloadId() as WorkloadId;
 		seedWorkload(db, workloadId, TEST_WORKLOAD);
@@ -134,7 +134,7 @@ describe("WatchDirsPoller", () => {
 
 	test("stopPolling cancels interval — heartbeat fires after deadline", async () => {
 		const firedEvents: Array<{ instanceId: InstanceId; action: IdleAction }> = [];
-		idleMonitor.onIdle(async (id, action) => firedEvents.push({ instanceId: id, action }));
+		idleMonitor.onIdle(async (id, action) => { firedEvents.push({ instanceId: id, action }); });
 
 		const workloadId = generateWorkloadId() as WorkloadId;
 		seedWorkload(db, workloadId, TEST_WORKLOAD);
@@ -164,7 +164,7 @@ describe("WatchDirsPoller", () => {
 
 	test("exec failure does not throw — heartbeat expires naturally", async () => {
 		const firedEvents: Array<{ instanceId: InstanceId; action: IdleAction }> = [];
-		idleMonitor.onIdle(async (id, action) => firedEvents.push({ instanceId: id, action }));
+		idleMonitor.onIdle(async (id, action) => { firedEvents.push({ instanceId: id, action }); });
 
 		const workloadId = generateWorkloadId() as WorkloadId;
 		seedWorkload(db, workloadId, TEST_WORKLOAD);

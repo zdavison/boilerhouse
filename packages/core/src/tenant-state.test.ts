@@ -39,6 +39,10 @@ describe("tenant state machine", () => {
 		test("active → claiming (via 'claim', re-claim)", () => {
 			expect(tenantTransition("active", "claim")).toBe("claiming");
 		});
+
+		test("releasing → active (via 'recover')", () => {
+			expect(tenantTransition("releasing", "recover")).toBe("active");
+		});
 	});
 
 	describe("invalid transitions", () => {
@@ -82,6 +86,7 @@ describe("tenant state machine", () => {
 			"release",
 			"hibernated",
 			"destroyed",
+			"recover",
 		]);
 	});
 });

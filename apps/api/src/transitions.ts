@@ -6,14 +6,14 @@
  * the redundant DB read that the Actor pattern required.
  */
 
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type {
 	InstanceId,
 	InstanceStatus,
 	InstanceEvent,
-	TenantId,
-	TenantStatus,
-	TenantEvent,
+	ClaimId,
+	ClaimStatus,
+	ClaimEvent,
 	SnapshotId,
 	SnapshotStatus,
 	SnapshotEvent,
@@ -23,12 +23,12 @@ import type {
 } from "@boilerhouse/core";
 import {
 	transition,
-	tenantTransition,
+	claimTransition,
 	snapshotTransition,
 	workloadTransition,
 } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
-import { instances, tenants, snapshots, workloads } from "@boilerhouse/db";
+import { instances, claims, snapshots, workloads } from "@boilerhouse/db";
 
 // ── Instance ─────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,9 @@ export function applyInstanceTransition(
 	return next;
 }
 
-/** Bypasses the state machine and writes status directly (recovery only). */
+/**
+ * Force-set an instance status without transition validation.
+ */
 export function forceInstanceStatus(
 	db: DrizzleDb,
 	instanceId: InstanceId,
@@ -62,38 +64,24 @@ export function forceInstanceStatus(
 		.run();
 }
 
-// ── Tenant ───────────────────────────────────────────────────────────────────
+// ── Claim ────────────────────────────────────────────────────────────────────
 
 /**
  * Validates the transition, writes new status to DB, returns the new status.
  * Throws {@link InvalidTransitionError} if the transition is not allowed.
  */
-export function applyTenantTransition(
+export function applyClaimTransition(
 	db: DrizzleDb,
-	tenantId: TenantId,
-	workloadId: WorkloadId,
-	currentStatus: TenantStatus,
-	event: TenantEvent,
-): TenantStatus {
-	const next = tenantTransition(currentStatus, event);
-	db.update(tenants)
+	claimId: ClaimId,
+	currentStatus: ClaimStatus,
+	event: ClaimEvent,
+): ClaimStatus {
+	const next = claimTransition(currentStatus, event);
+	db.update(claims)
 		.set({ status: next })
-		.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
+		.where(eq(claims.claimId, claimId))
 		.run();
 	return next;
-}
-
-/** Bypasses the state machine and writes status directly (recovery only). */
-export function forceTenantStatus(
-	db: DrizzleDb,
-	tenantId: TenantId,
-	workloadId: WorkloadId,
-	status: TenantStatus,
-): void {
-	db.update(tenants)
-		.set({ status })
-		.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-		.run();
 }
 
 // ── Snapshot ─────────────────────────────────────────────────────────────────
@@ -136,14 +124,3 @@ export function applyWorkloadTransition(
 	return next;
 }
 
-/** Bypasses the state machine and writes status directly (recovery only). */
-export function forceWorkloadStatus(
-	db: DrizzleDb,
-	workloadId: WorkloadId,
-	status: WorkloadStatus,
-): void {
-	db.update(workloads)
-		.set({ status })
-		.where(eq(workloads.workloadId, workloadId))
-		.run();
-}

@@ -110,7 +110,7 @@ export class SecretStore {
 	 * Throws if a referenced secret does not exist.
 	 */
 	resolveSecretRefs(tenantId: TenantId, template: string): string {
-		return template.replace(SECRET_REF_RE, (match, scope: string, name: string) => {
+		return template.replace(SECRET_REF_RE, (_match, scope: string, name: string) => {
 			if (scope === "global-secret") {
 				const value = process.env[name];
 				if (value === undefined) {

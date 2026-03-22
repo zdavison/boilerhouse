@@ -22,8 +22,9 @@ describe("workload state machine", () => {
 	});
 
 	describe("invalid transitions", () => {
-		test("ready → anything throws (terminal)", () => {
+		test("ready → creating throws for non-recover events", () => {
 			for (const event of WORKLOAD_EVENTS) {
+				if (event === "recover") continue;
 				expect(() => workloadTransition("ready", event)).toThrow(
 					InvalidTransitionError,
 				);
@@ -41,6 +42,10 @@ describe("workload state machine", () => {
 				InvalidTransitionError,
 			);
 		});
+	});
+
+	test("ready → creating (via 'recover')", () => {
+		expect(workloadTransition("ready", "recover")).toBe("creating");
 	});
 
 	test("error includes entity name 'workload'", () => {
@@ -65,6 +70,7 @@ describe("workload state machine", () => {
 			"created",
 			"failed",
 			"retry",
+			"recover",
 		]);
 	});
 });

@@ -5,8 +5,8 @@ import {
 	type InstanceStatus,
 	type WorkloadId,
 	type NodeId,
-	type TenantId,
-	type TenantStatus,
+	type ClaimId,
+	type ClaimStatus,
 	type SnapshotId,
 	type SnapshotStatus,
 	type Workload,
@@ -15,6 +15,7 @@ import {
 	generateWorkloadId,
 	generateNodeId,
 	generateSnapshotId,
+	generateClaimId,
 } from "@boilerhouse/core";
 import {
 	createTestDatabase,
@@ -23,16 +24,16 @@ import {
 	nodes,
 	workloads,
 	tenants,
+	claims,
 	snapshots,
 } from "@boilerhouse/db";
+import type { TenantId } from "@boilerhouse/core";
+import { generateTenantId } from "@boilerhouse/core";
 import {
 	applyInstanceTransition,
-	forceInstanceStatus,
-	applyTenantTransition,
-	forceTenantStatus,
+	applyClaimTransition,
 	applySnapshotTransition,
 	applyWorkloadTransition,
-	forceWorkloadStatus,
 } from "./transitions";
 
 let db: DrizzleDb;
@@ -55,12 +56,25 @@ function seedInstance(
 	return id;
 }
 
-function seedTenant(status: TenantStatus = "idle"): TenantId {
-	const id = `tenant-${Math.random().toString(36).slice(2, 8)}` as TenantId;
+function seedTenant(): TenantId {
+	const id = generateTenantId();
 	db.insert(tenants)
 		.values({
 			tenantId: id,
 			workloadId,
+			createdAt: new Date(),
+		})
+		.run();
+	return id;
+}
+
+function seedClaim(status: ClaimStatus = "creating"): ClaimId {
+	const tid = seedTenant();
+	const id = generateClaimId();
+	db.insert(claims)
+		.values({
+			claimId: id,
+			tenantId: tid,
 			status,
 			createdAt: new Date(),
 		})
@@ -91,8 +105,8 @@ function getInstanceStatus(id: InstanceId): string {
 	return db.select({ status: instances.status }).from(instances).where(eq(instances.instanceId, id)).get()!.status;
 }
 
-function getTenantStatus(id: TenantId): string {
-	return db.select({ status: tenants.status }).from(tenants).where(eq(tenants.tenantId, id)).get()!.status;
+function getClaimStatus(id: ClaimId): string {
+	return db.select({ status: claims.status }).from(claims).where(eq(claims.claimId, id)).get()!.status;
 }
 
 function getSnapshotStatus(id: SnapshotId): string {
@@ -210,49 +224,58 @@ describe("applyInstanceTransition", () => {
 	});
 });
 
-describe("forceInstanceStatus", () => {
-	test("writes status directly, bypassing state machine", () => {
+describe("applyInstanceTransition (recover)", () => {
+	test("transitions starting → destroyed on 'recover'", () => {
 		const id = seedInstance({ status: "starting" });
-		forceInstanceStatus(db, id, "destroyed");
+		const next = applyInstanceTransition(db, id, "starting", "recover");
+		expect(next).toBe("destroyed");
+		expect(getInstanceStatus(id)).toBe("destroyed");
+	});
+
+	test("transitions active → destroyed on 'recover'", () => {
+		const id = seedInstance({ status: "active" });
+		const next = applyInstanceTransition(db, id, "active", "recover");
+		expect(next).toBe("destroyed");
 		expect(getInstanceStatus(id)).toBe("destroyed");
 	});
 });
 
-describe("applyTenantTransition", () => {
-	test("transitions idle → claiming on 'claim'", () => {
-		const id = seedTenant("idle");
-		const next = applyTenantTransition(db, id, workloadId, "idle", "claim");
-		expect(next).toBe("claiming");
-		expect(getTenantStatus(id)).toBe("claiming");
-	});
-
-	test("transitions claiming → active on 'claimed'", () => {
-		const id = seedTenant("claiming");
-		const next = applyTenantTransition(db, id, workloadId, "claiming", "claimed");
+describe("applyClaimTransition", () => {
+	test("transitions creating → active on 'created'", () => {
+		const id = seedClaim("creating");
+		const next = applyClaimTransition(db, id, "creating", "created");
 		expect(next).toBe("active");
-		expect(getTenantStatus(id)).toBe("active");
+		expect(getClaimStatus(id)).toBe("active");
 	});
 
 	test("transitions active → releasing on 'release'", () => {
-		const id = seedTenant("active");
-		const next = applyTenantTransition(db, id, workloadId, "active", "release");
+		const id = seedClaim("active");
+		const next = applyClaimTransition(db, id, "active", "release");
 		expect(next).toBe("releasing");
-		expect(getTenantStatus(id)).toBe("releasing");
+		expect(getClaimStatus(id)).toBe("releasing");
+	});
+
+	test("transitions releasing → active on 'recover'", () => {
+		const id = seedClaim("releasing");
+		const next = applyClaimTransition(db, id, "releasing", "recover");
+		expect(next).toBe("active");
+		expect(getClaimStatus(id)).toBe("active");
 	});
 
 	test("throws InvalidTransitionError for invalid transition", () => {
-		const id = seedTenant("idle");
+		const id = seedClaim("creating");
 		expect(() =>
-			applyTenantTransition(db, id, workloadId, "idle", "claimed"),
+			applyClaimTransition(db, id, "creating", "release"),
 		).toThrow(InvalidTransitionError);
 	});
 });
 
-describe("forceTenantStatus", () => {
-	test("writes status directly, bypassing state machine", () => {
-		const id = seedTenant("claiming");
-		forceTenantStatus(db, id, workloadId, "idle");
-		expect(getTenantStatus(id)).toBe("idle");
+describe("applyClaimTransition (recover)", () => {
+	test("transitions releasing → active on 'recover'", () => {
+		const id = seedClaim("releasing");
+		const next = applyClaimTransition(db, id, "releasing", "recover");
+		expect(next).toBe("active");
+		expect(getClaimStatus(id)).toBe("active");
 	});
 });
 
@@ -307,9 +330,11 @@ describe("applyWorkloadTransition", () => {
 	});
 });
 
-describe("forceWorkloadStatus", () => {
-	test("writes status directly, bypassing state machine", () => {
-		forceWorkloadStatus(db, workloadId, "error");
-		expect(getWorkloadStatus(workloadId)).toBe("error");
+describe("applyWorkloadTransition (recover)", () => {
+	test("transitions ready → creating on 'recover'", () => {
+		applyWorkloadTransition(db, workloadId, "creating", "created");
+		const next = applyWorkloadTransition(db, workloadId, "ready", "recover");
+		expect(next).toBe("creating");
+		expect(getWorkloadStatus(workloadId)).toBe("creating");
 	});
 });

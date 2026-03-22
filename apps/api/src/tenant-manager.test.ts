@@ -18,6 +18,7 @@ import {
 	ActivityLog,
 	instances,
 	tenants,
+	claims,
 	nodes,
 	workloads,
 } from "@boilerhouse/db";
@@ -126,7 +127,7 @@ describe("TenantManager", () => {
 			// Create golden, claim, then release (hibernate creates a tenant snapshot)
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId, workloadId);
+			await tenantManager.release(tenantId);
 
 			// Verify tenant has a lastSnapshotId
 			const tenantRow = db
@@ -224,7 +225,7 @@ describe("TenantManager", () => {
 			expect(first.source).toBe("cold");
 
 			// Release → hibernates (snapshot overlay data, destroy pod)
-			await noGoldenTM.release(tenantId, workloadId);
+			await noGoldenTM.release(tenantId);
 
 			const row = db
 				.select()
@@ -263,7 +264,7 @@ describe("TenantManager", () => {
 			expect(after!.workloadId).toBe(workloadId);
 		});
 
-		test("updates tenant row if exists (sets instanceId)", async () => {
+		test("creates a claim row with instanceId on successful claim", async () => {
 			const tenantId = generateTenantId();
 
 			db.insert(tenants)
@@ -273,13 +274,15 @@ describe("TenantManager", () => {
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const result = await tenantManager.claim(tenantId, workloadId);
 
-			const row = db
+			const claimRow = db
 				.select()
-				.from(tenants)
-				.where(eq(tenants.tenantId, tenantId))
+				.from(claims)
+				.where(eq(claims.tenantId, tenantId))
 				.get();
 
-			expect(row!.instanceId).toBe(result.instanceId);
+			expect(claimRow).toBeDefined();
+			expect(claimRow!.instanceId).toBe(result.instanceId);
+			expect(claimRow!.status).toBe("active");
 		});
 
 		test("sets tenantId on instance row", async () => {
@@ -406,7 +409,7 @@ describe("TenantManager", () => {
 
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const claimed = await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId, workloadId);
+			await tenantManager.release(tenantId);
 
 			const row = db
 				.select()
@@ -447,7 +450,7 @@ describe("TenantManager", () => {
 
 			const tenantId = generateTenantId();
 			const claimed = await destroyTenantManager.claim(tenantId, destroyWorkloadId);
-			await destroyTenantManager.release(tenantId, destroyWorkloadId);
+			await destroyTenantManager.release(tenantId);
 
 			const row = db
 				.select()
@@ -458,20 +461,28 @@ describe("TenantManager", () => {
 			expect(row!.status).toBe("destroyed");
 		});
 
-		test("clears instanceId on tenant row", async () => {
+		test("deletes claim row on release", async () => {
 			const tenantId = generateTenantId();
 
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId, workloadId);
+			await tenantManager.release(tenantId);
 
-			const row = db
+			const claimRow = db
+				.select()
+				.from(claims)
+				.where(eq(claims.tenantId, tenantId))
+				.get();
+
+			// Claim is deleted after release; tenant identity row persists
+			expect(claimRow).toBeUndefined();
+
+			const tenantRow = db
 				.select()
 				.from(tenants)
 				.where(eq(tenants.tenantId, tenantId))
 				.get();
-
-			expect(row!.instanceId).toBeNull();
+			expect(tenantRow).toBeDefined();
 		});
 
 		test("preserves lastSnapshotId on tenant row after hibernate", async () => {
@@ -479,7 +490,7 @@ describe("TenantManager", () => {
 
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId, workloadId);
+			await tenantManager.release(tenantId);
 
 			const row = db
 				.select()
@@ -498,7 +509,7 @@ describe("TenantManager", () => {
 				.run();
 
 			// Should not throw
-			await expect(tenantManager.release(tenantId, workloadId)).resolves.toBeUndefined();
+			await expect(tenantManager.release(tenantId)).resolves.toBeUndefined();
 		});
 
 		test("logs 'tenant.released' activity", async () => {
@@ -506,7 +517,7 @@ describe("TenantManager", () => {
 
 			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId, workloadId);
+			await tenantManager.release(tenantId);
 
 			const events = log.queryByTenant(tenantId);
 			const releaseEvent = events.find(

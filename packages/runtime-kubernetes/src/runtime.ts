@@ -21,7 +21,7 @@ import { workloadToPod, MANAGED_LABEL, ENVOY_IMAGE } from "./translator";
 import { KubernetesRuntimeError } from "./errors";
 import { MinikubeImageProvider } from "./minikube";
 import type { EnsureImageResult } from "./minikube";
-import { isInCluster, resolveInClusterConfig } from "./in-cluster";
+import { resolveInClusterConfig } from "./in-cluster";
 
 /**
  * Tracks a managed pod and its associated workload (needed for restore).

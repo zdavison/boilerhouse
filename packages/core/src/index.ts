@@ -7,18 +7,21 @@ export {
 	type NodeId,
 	type SnapshotId,
 	type TriggerId,
+	type ClaimId,
 	InstanceIdSchema,
 	TenantIdSchema,
 	WorkloadIdSchema,
 	NodeIdSchema,
 	SnapshotIdSchema,
 	TriggerIdSchema,
+	ClaimIdSchema,
 	generateInstanceId,
 	generateTenantId,
 	generateWorkloadId,
 	generateNodeId,
 	generateSnapshotId,
 	generateTriggerId,
+	generateClaimId,
 } from "./types";
 
 export {
@@ -105,15 +108,15 @@ export {
 export { FakeRuntime, type FakeRuntimeOptions } from "./fake-runtime";
 
 export {
-	type TenantStatus,
-	type TenantEvent,
-	TenantStatusSchema,
-	TenantEventSchema,
-	TENANT_STATUSES,
-	TENANT_EVENTS,
-	tenantTransition,
-	canTenantTransition,
-} from "./tenant-state";
+	type ClaimStatus,
+	type ClaimEvent,
+	ClaimStatusSchema,
+	ClaimEventSchema,
+	CLAIM_STATUSES,
+	CLAIM_EVENTS,
+	claimTransition,
+	canClaimTransition,
+} from "./claim-state";
 
 export {
 	type SnapshotStatus,

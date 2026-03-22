@@ -1,16 +1,16 @@
-import { eq, and } from "drizzle-orm";
-import type { Runtime, NodeId, InstanceStatus, TenantStatus } from "@boilerhouse/core";
-import { instances, tenants } from "@boilerhouse/db";
+import { eq } from "drizzle-orm";
+import type { Runtime, NodeId, InstanceStatus } from "@boilerhouse/core";
+import { instances, claims } from "@boilerhouse/db";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
-import { forceInstanceStatus, forceTenantStatus } from "./transitions";
+import { applyInstanceTransition, applyClaimTransition } from "./transitions";
 
 export interface RecoveryReport {
 	/** Instances confirmed alive in the runtime. */
 	recovered: number;
 	/** DB rows marked destroyed (instance gone from runtime). */
 	destroyed: number;
-	/** Tenants reset from intermediate states (claiming/releasing). */
-	tenantsReset: number;
+	/** Claims reset from intermediate states (creating/releasing). */
+	claimsReset: number;
 }
 
 /** Statuses that indicate an instance should be running in the runtime. */
@@ -35,7 +35,7 @@ export async function recoverState(
 	const report: RecoveryReport = {
 		recovered: 0,
 		destroyed: 0,
-		tenantsReset: 0,
+		claimsReset: 0,
 	};
 
 	// 1. Query instances that should have a live runtime instance
@@ -54,16 +54,8 @@ export async function recoverState(
 		if (liveInstances.has(row.instanceId)) {
 			report.recovered++;
 		} else {
-			// Instance is gone — mark destroyed
-			forceInstanceStatus(db, row.instanceId, "destroyed");
-
-			// Clear tenant's instanceId if assigned
-			if (row.tenantId) {
-				db.update(tenants)
-					.set({ instanceId: null })
-					.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
-					.run();
-			}
+			// Instance is gone — mark destroyed (skips intermediate destroying state)
+			applyInstanceTransition(db, row.instanceId, row.status as InstanceStatus, "recover");
 
 			// Log activity
 			activityLog.log({
@@ -88,7 +80,7 @@ export async function recoverState(
 		.filter((row) => row.status === "destroying" || row.status === "hibernating");
 
 	for (const row of destroyingInstances) {
-		forceInstanceStatus(db, row.instanceId, "destroyed");
+		applyInstanceTransition(db, row.instanceId, "destroying", "destroyed");
 
 		activityLog.log({
 			instanceId: row.instanceId,
@@ -101,54 +93,35 @@ export async function recoverState(
 		report.destroyed++;
 	}
 
-	// 3c. Recover tenants stuck in intermediate states
-	const stuckTenants = db
+	// 3c. Recover claims stuck in intermediate states
+	const stuckClaims = db
 		.select()
-		.from(tenants)
+		.from(claims)
 		.all()
-		.filter((row) =>
-			row.status === "claiming" || row.status === "releasing",
-		);
+		.filter((row) => row.status === "creating" || row.status === "releasing");
 
-	for (const row of stuckTenants) {
-		if (row.status === "claiming") {
-			// Claim never completed — reset to idle and clear instanceId
-			forceTenantStatus(db, row.tenantId, row.workloadId, "idle");
-			db.update(tenants)
-				.set({ instanceId: null })
-				.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
-				.run();
-		} else if (row.status === "releasing") {
-			// Check if the instance is still active
-			const instanceActive = row.instanceId
-				? db.select({ status: instances.status })
-						.from(instances)
-						.where(eq(instances.instanceId, row.instanceId))
-						.get()
-				: null;
+	for (const row of stuckClaims) {
+		// Check if instance is still alive
+		const instanceAlive = row.instanceId
+			? liveInstances.has(row.instanceId)
+			: false;
 
-			if (instanceActive && LIVE_STATUSES.includes(instanceActive.status!)) {
-				// Instance still alive — release didn't complete, revert to active
-				forceTenantStatus(db, row.tenantId, row.workloadId, "active" as TenantStatus);
-			} else {
-				// Instance destroyed/missing — reset to idle and clear instanceId
-				forceTenantStatus(db, row.tenantId, row.workloadId, "idle");
-				db.update(tenants)
-					.set({ instanceId: null })
-					.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
-					.run();
-			}
+		if (row.status === "creating" || !instanceAlive) {
+			// Instance never came up or is gone — delete claim
+			db.delete(claims).where(eq(claims.claimId, row.claimId)).run();
+		} else {
+			// releasing with live instance — revert to active via recover event
+			applyClaimTransition(db, row.claimId, "releasing", "recover");
 		}
 
 		activityLog.log({
 			tenantId: row.tenantId,
-			workloadId: row.workloadId,
 			nodeId,
-			event: "recovery.tenant_reset",
+			event: "recovery.claim_reset",
 			metadata: { previousStatus: row.status },
 		});
 
-		report.tenantsReset++;
+		report.claimsReset++;
 	}
 
 	return report;

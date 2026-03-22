@@ -13,6 +13,7 @@ export const WorkloadEventSchema = Type.Union([
 	Type.Literal("created"),
 	Type.Literal("failed"),
 	Type.Literal("retry"),
+	Type.Literal("recover"),
 ]);
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -30,13 +31,14 @@ export const WORKLOAD_EVENTS = [
 	"created",
 	"failed",
 	"retry",
+	"recover",
 ] as const satisfies readonly WorkloadEvent[];
 
 // ── Machine ─────────────────────────────────────────────────────────────────
 
 const transitions: TransitionMap<WorkloadStatus, WorkloadEvent> = {
 	creating: { created: "ready", failed: "error" },
-	ready: {},
+	ready: { recover: "creating" },
 	error: { retry: "creating" },
 };
 

@@ -6,7 +6,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { createTestDatabase, ActivityLog, nodes, tenants } from "@boilerhouse/db";
+import { createTestDatabase, ActivityLog, nodes, claims } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
 import { InstanceManager } from "../../apps/api/src/instance-manager";
@@ -162,15 +162,15 @@ export async function startE2EServer(
 	);
 
 	if (idleMonitor) {
-		idleMonitor.onIdle(async (instanceId, action) => {
-			const tenantRow = db
-				.select({ tenantId: tenants.tenantId, workloadId: tenants.workloadId })
-				.from(tenants)
-				.where(eq(tenants.instanceId, instanceId))
+		idleMonitor.onIdle(async (instanceId, _action) => {
+			const claimRow = db
+				.select({ tenantId: claims.tenantId })
+				.from(claims)
+				.where(eq(claims.instanceId, instanceId))
 				.get();
 
-			if (!tenantRow) return;
-			await tenantManager.release(tenantRow.tenantId, tenantRow.workloadId);
+			if (!claimRow) return;
+			await tenantManager.release(claimRow.tenantId);
 		});
 	}
 

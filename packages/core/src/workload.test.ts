@@ -7,18 +7,7 @@ import {
 	secret,
 	isSecretRef,
 	type WorkloadConfig,
-	type Workload,
 } from "./workload";
-
-// ── Minimal canonical workload (DB shape) ───────────────────────────────────
-
-const MINIMAL: Workload = {
-	workload: { name: "my-service", version: "1.0.0" },
-	image: { ref: "ghcr.io/org/my-service:latest" },
-	resources: { vcpus: 2, memory_mb: 512, disk_gb: 2 },
-	network: { access: "none" },
-	idle: { action: "hibernate" },
-};
 
 // ── validateWorkload() ──────────────────────────────────────────────────────
 

@@ -16,7 +16,7 @@ async function waitForIdle(server: E2EServer, tenantId: string): Promise<void> {
 		const res = await api(server, "GET", `/api/v1/tenants/${tenantId}`);
 		if (res.ok) {
 			const body = await res.json() as { instanceId: string | null }[];
-			if (body[0].instanceId === null) return;
+			if (body[0]!.instanceId === null) return;
 		}
 		await new Promise((r) => setTimeout(r, 200));
 	}
@@ -82,7 +82,7 @@ for (const rt of availableRuntimes()) {
 				const tenantRes = await api(server, "GET", `/api/v1/tenants/${tenantId}`);
 				expect(tenantRes.status).toBe(200);
 				const tenantBody = await tenantRes.json() as { instanceId: string | null }[];
-				expect(tenantBody[0].instanceId).toBeNull();
+				expect(tenantBody[0]!.instanceId).toBeNull();
 
 				// Instance should be hibernated (idle action is "hibernate").
 				const instanceRes = await api(server, "GET", `/api/v1/instances/${instanceId}`);

@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia";
 import { eq, and } from "drizzle-orm";
 import type { TenantId } from "@boilerhouse/core";
 import { InvalidTransitionError } from "@boilerhouse/core";
-import { tenants, workloads, instances, snapshots } from "@boilerhouse/db";
+import { tenants, workloads, instances, snapshots, claims } from "@boilerhouse/db";
 import { NoGoldenSnapshotError } from "../tenant-manager";
 import type { RouteDeps } from "./deps";
 
@@ -118,9 +118,14 @@ export function tenantRoutes(deps: RouteDeps) {
 				return { error: `Tenant '${params.id}' not found for workload '${workloadName}'` };
 			}
 
-			const instanceId = tenantRow.instanceId;
+			// Get instanceId from claim
+			const instanceId = db
+				.select({ instanceId: claims.instanceId })
+				.from(claims)
+				.where(eq(claims.tenantId, tenantId))
+				.get()?.instanceId;
 
-			await tenantManager.release(tenantId, workloadRow.workloadId);
+			await tenantManager.release(tenantId);
 
 			if (instanceId) {
 				eventBus.emit({
@@ -151,14 +156,18 @@ export function tenantRoutes(deps: RouteDeps) {
 				return { error: `Tenant '${params.id}' not found` };
 			}
 
+			// Build a map of tenantId → instanceId from claims
+			const tenantClaims = db.select({ instanceId: claims.instanceId }).from(claims).where(eq(claims.tenantId, tenantId)).all();
+			const claimedInstanceId = tenantClaims[0]?.instanceId ?? null;
+
 			return tenantRows.map((tenantRow) => {
 				// Get current instance if assigned
 				let instance = null;
-				if (tenantRow.instanceId) {
+				if (claimedInstanceId) {
 					const instanceRow = db
 						.select()
 						.from(instances)
-						.where(eq(instances.instanceId, tenantRow.instanceId))
+						.where(eq(instances.instanceId, claimedInstanceId))
 						.get();
 					if (instanceRow) {
 						instance = {
@@ -184,7 +193,7 @@ export function tenantRoutes(deps: RouteDeps) {
 				return {
 					tenantId: tenantRow.tenantId,
 					workloadId: tenantRow.workloadId,
-					instanceId: tenantRow.instanceId,
+					instanceId: claimedInstanceId,
 					lastSnapshotId: tenantRow.lastSnapshotId,
 					lastActivity: tenantRow.lastActivity?.toISOString() ?? null,
 					createdAt: tenantRow.createdAt.toISOString(),
@@ -197,10 +206,15 @@ export function tenantRoutes(deps: RouteDeps) {
 		})
 		.get("/tenants", () => {
 			const rows = db.select().from(tenants).all();
+
+			// Build a map of tenantId → instanceId from claims
+			const allClaims = db.select({ tenantId: claims.tenantId, instanceId: claims.instanceId }).from(claims).all();
+			const claimMap = new Map(allClaims.map((c) => [c.tenantId, c.instanceId]));
+
 			return rows.map((r) => ({
 				tenantId: r.tenantId,
 				workloadId: r.workloadId,
-				instanceId: r.instanceId,
+				instanceId: claimMap.get(r.tenantId) ?? null,
 				lastActivity: r.lastActivity?.toISOString() ?? null,
 				createdAt: r.createdAt.toISOString(),
 			}));

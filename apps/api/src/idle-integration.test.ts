@@ -118,7 +118,7 @@ beforeEach(() => {
 			.where(eq(instances.instanceId, instanceId))
 			.get();
 		if (instanceRow?.tenantId) {
-			await tenantManager.release(instanceRow.tenantId, instanceRow.workloadId);
+			await tenantManager.release(instanceRow.tenantId);
 		}
 	});
 });
@@ -175,7 +175,7 @@ describe("IdleMonitor + TenantManager integration", () => {
 
 		const tenantId = generateTenantId();
 		const result = await tenantManager.claim(tenantId, workloadId);
-		await tenantManager.release(tenantId, workloadId);
+		await tenantManager.release(tenantId);
 
 		// Instance is already hibernated by explicit release
 		const beforeRow = db

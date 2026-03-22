@@ -18,6 +18,7 @@ export const TenantEventSchema = Type.Union([
 	Type.Literal("release"),
 	Type.Literal("hibernated"),
 	Type.Literal("destroyed"),
+	Type.Literal("recover"),
 ]);
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ export const TENANT_EVENTS = [
 	"release",
 	"hibernated",
 	"destroyed",
+	"recover",
 ] as const satisfies readonly TenantEvent[];
 
 // ── Machine ─────────────────────────────────────────────────────────────────
@@ -48,7 +50,7 @@ const transitions: TransitionMap<TenantStatus, TenantEvent> = {
 	idle: { claim: "claiming" },
 	claiming: { claimed: "active", claim_failed: "idle" },
 	active: { claim: "claiming", release: "releasing" },
-	releasing: { hibernated: "released", destroyed: "idle" },
+	releasing: { hibernated: "released", destroyed: "idle", recover: "active" },
 	released: { claim: "claiming" },
 };
 

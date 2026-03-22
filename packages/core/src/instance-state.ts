@@ -29,6 +29,7 @@ export const InstanceEventSchema = Type.Union([
 	Type.Literal("hibernating_failed"),
 	Type.Literal("destroy"),
 	Type.Literal("destroyed"),
+	Type.Literal("recover"),
 ]);
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -55,14 +56,15 @@ export const INSTANCE_EVENTS = [
 	"hibernating_failed",
 	"destroy",
 	"destroyed",
+	"recover",
 ] as const satisfies readonly InstanceEvent[];
 
 // ── Machine ─────────────────────────────────────────────────────────────────
 
 const transitions: TransitionMap<InstanceStatus, InstanceEvent> = {
-	starting: { started: "active", restoring: "restoring", destroy: "destroying" },
+	starting: { started: "active", restoring: "restoring", destroy: "destroying", recover: "destroyed" },
 	restoring: { restored: "active", destroy: "destroying" },
-	active: { hibernate: "hibernating", destroy: "destroying" },
+	active: { hibernate: "hibernating", destroy: "destroying", recover: "destroyed" },
 	hibernating: { hibernated: "hibernated", hibernating_failed: "destroying" },
 	hibernated: { restoring: "restoring", destroy: "destroying" },
 	destroying: { destroyed: "destroyed" },

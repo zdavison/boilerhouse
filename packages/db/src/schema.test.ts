@@ -420,25 +420,9 @@ describe("tenants table", () => {
 
 		const row = db.select().from(tenants).get();
 		expect(row!.tenantId).toBe("tenant-1" as TenantId);
-		expect(row!.instanceId).toBeNull();
 		expect(row!.lastSnapshotId).toBeNull();
 		expect(row!.dataOverlayRef).toBeNull();
 		expect(row!.lastActivity).toBeNull();
-	});
-
-	test("instanceId is NOT a FK — can reference nonexistent instance", () => {
-		insertWorkload();
-
-		db.insert(tenants)
-			.values({
-				tenantId: "tenant-2" as TenantId,
-				workloadId: "wl-1" as WorkloadId,
-				instanceId: "inst-gone" as InstanceId,
-				createdAt: now,
-			})
-			.run();
-
-		expect(db.select().from(tenants).all()).toHaveLength(1);
 	});
 
 	test("lastSnapshotId is NOT a FK — can reference nonexistent snapshot", () => {
@@ -469,7 +453,7 @@ describe("tenants table", () => {
 		).toThrow();
 	});
 
-	test("update with instance and activity", () => {
+	test("update with activity and overlayRef", () => {
 		insertWorkload();
 		db.insert(tenants)
 			.values({
@@ -482,7 +466,6 @@ describe("tenants table", () => {
 		const activity = new Date("2025-06-15T14:00:00.000Z");
 		db.update(tenants)
 			.set({
-				instanceId: "inst-123" as InstanceId,
 				lastActivity: activity,
 				dataOverlayRef: "/overlays/tenant-upd",
 			})
@@ -490,7 +473,6 @@ describe("tenants table", () => {
 			.run();
 
 		const row = db.select().from(tenants).get();
-		expect(row!.instanceId).toBe("inst-123" as InstanceId);
 		expect(row!.lastActivity!.getTime()).toBe(activity.getTime());
 		expect(row!.dataOverlayRef).toBe("/overlays/tenant-upd");
 	});

@@ -10,7 +10,7 @@ import {
 	generateNodeId,
 	generateTriggerId,
 } from "../../packages/core/src/index";
-import type { Runtime, TriggerId } from "../../packages/core/src/index";
+import type { Runtime } from "../../packages/core/src/index";
 import { createTestDatabase, ActivityLog, nodes, triggers } from "../../packages/db/src/index";
 import type { DrizzleDb } from "../../packages/db/src/index";
 import { createLogger } from "../../packages/o11y/src/index";
@@ -79,8 +79,7 @@ async function startSecurityServer() {
 	const secretKey = randomBytes(32).toString("hex");
 	const secretStore = new SecretStore(db, secretKey);
 
-	const fakeFailOn = new Set<string>();
-	const runtime: Runtime = new FakeRuntime({ failOn: fakeFailOn });
+	const runtime: Runtime = new FakeRuntime();
 
 	const log = createLogger("security");
 	const instanceManager = new InstanceManager(

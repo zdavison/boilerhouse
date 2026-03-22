@@ -8,13 +8,17 @@ import type {
 	SnapshotId,
 	SnapshotRef,
 	Endpoint,
-	TenantStatus,
+	ClaimStatus,
 	Workload,
 } from "@boilerhouse/core";
+import {
+	generateClaimId,
+	InvalidTransitionError,
+} from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
-import { instances, snapshots, tenants, workloads, snapshotRefFrom } from "@boilerhouse/db";
+import { instances, snapshots, tenants, workloads, claims, snapshotRefFrom } from "@boilerhouse/db";
 import type { Logger } from "@boilerhouse/o11y";
-import { applyTenantTransition } from "./transitions";
+import { applyClaimTransition } from "./transitions";
 import { instanceHandleFrom } from "./instance-manager";
 import type { InstanceManager } from "./instance-manager";
 import type { SnapshotManager } from "./snapshot-manager";
@@ -68,14 +72,16 @@ export class TenantManager {
 	/**
 	 * Claims an instance for the given tenant.
 	 *
+	 * The claim row acts as a concurrency guard via UNIQUE constraint on tenantId.
+	 *
 	 * When the runtime supports golden snapshots, follows the restore hierarchy:
-	 * 1. Existing active instance
+	 * 1. Existing active claim
 	 * 2. Tenant snapshot (hot restore)
 	 * 3. Golden + data overlay (cold restore with data)
 	 * 4. Golden snapshot (fresh)
 	 *
 	 * When golden snapshots are not supported:
-	 * 1. Existing active instance
+	 * 1. Existing active claim
 	 * 2. Tenant snapshot (restore)
 	 * 3. Cold boot from workload definition
 	 */
@@ -94,71 +100,177 @@ export class TenantManager {
 	private async claimInner(tenantId: TenantId, workloadId: WorkloadId): Promise<ClaimResult> {
 		const start = performance.now();
 
-		// 1. Check for existing active, starting, or restoring instance for this tenant+workload
-		const existingInstance = this.db
-			.select()
-			.from(instances)
-			.where(
-				and(
-					eq(instances.tenantId, tenantId),
-					eq(instances.workloadId, workloadId),
-				),
-			)
-			.all()
-			.find((r) => r.status === "active" || r.status === "starting" || r.status === "restoring");
+		// 1. Check for existing claim
+		const existingClaim = this.db.select().from(claims)
+			.where(eq(claims.tenantId, tenantId)).get();
 
-		if (existingInstance) {
-			const handle = instanceHandleFrom(existingInstance.instanceId, existingInstance.status);
-			const endpoint = await this.safeGetEndpoint(handle);
+		if (existingClaim?.status === "active" && existingClaim.instanceId) {
+			// Verify the instance is actually running (it may have been hibernated/destroyed directly)
+			const instanceRow = this.db.select({ status: instances.status })
+				.from(instances)
+				.where(eq(instances.instanceId, existingClaim.instanceId))
+				.get();
 
-			return {
-				tenantId,
-				instanceId: existingInstance.instanceId,
-				endpoint,
-				source: "existing",
-				latencyMs: performance.now() - start,
-			};
+			if (instanceRow?.status === "active" || instanceRow?.status === "starting") {
+				// Instance is active or still starting — return it
+				const handle = instanceHandleFrom(existingClaim.instanceId, instanceRow.status);
+				const endpoint = await this.safeGetEndpoint(handle);
+				return {
+					tenantId,
+					instanceId: existingClaim.instanceId,
+					endpoint,
+					source: "existing",
+					latencyMs: performance.now() - start,
+				};
+			}
+
+			// Instance is gone/hibernated — delete stale claim and proceed
+			this.db.delete(claims).where(eq(claims.claimId, existingClaim.claimId)).run();
+		} else if (existingClaim?.status === "creating" || existingClaim?.status === "releasing") {
+			throw new InvalidTransitionError("claim", existingClaim.status, "created");
 		}
 
-		// 2. Check for tenant snapshot
+		// 2. Upsert tenant identity row first (FK target for claims)
+		this.upsertTenantIdentity(tenantId, workloadId);
+
+		// 3. Reserve claim slot (UNIQUE on tenantId prevents races)
+		const claimId = generateClaimId();
+		this.db.insert(claims).values({ claimId, tenantId, status: "creating", createdAt: new Date() }).run();
+
+		try {
+			// 4. Get or create the instance (same restore hierarchy as before)
+			const handle = await this.createInstance(tenantId, workloadId);
+
+			// 5. Transition claim to active
+			this.db.update(claims)
+				.set({ instanceId: handle.instanceId, status: "active" })
+				.where(eq(claims.claimId, claimId)).run();
+
+			// 6. Update tenant activity
+			this.db.update(tenants).set({ lastActivity: new Date() })
+				.where(eq(tenants.tenantId, tenantId)).run();
+
+			const endpoint = await this.safeGetEndpoint(handle);
+			const latencyMs = performance.now() - start;
+			this.logClaim(tenantId, handle.instanceId, workloadId, handle.source);
+			this.startIdleWatch(handle.instanceId, workloadId);
+
+			return { tenantId, instanceId: handle.instanceId, endpoint, source: handle.source, latencyMs };
+		} catch (err) {
+			this.db.delete(claims).where(eq(claims.claimId, claimId)).run();
+			throw err;
+		}
+	}
+
+	/**
+	 * Releases a tenant's instance according to the workload's idle policy.
+	 *
+	 * When `idle.action` is `"hibernate"`, the runtime snapshots the instance
+	 * (CRIU checkpoint on Podman, overlay tar on Kubernetes) and the tenant
+	 * can be restored from it on re-claim. When `"destroy"`, the instance is
+	 * removed entirely.
+	 *
+	 * No-op if the tenant has no active claim.
+	 */
+	async release(tenantId: TenantId): Promise<void> {
+		const claim = this.db.select().from(claims)
+			.where(eq(claims.tenantId, tenantId)).get();
+
+		if (!claim?.instanceId) return;
+
+		const instanceId = claim.instanceId;
+
+		applyClaimTransition(this.db, claim.claimId, claim.status as ClaimStatus, "release");
+
+		if (this.idleMonitor) {
+			this.idleMonitor.unwatch(instanceId);
+		}
+
+		if (this.watchDirsPoller) {
+			this.watchDirsPoller.stopPolling(instanceId);
+		}
+
+		// Get tenant row for workloadId
+		const tenantRow = this.db.select().from(tenants)
+			.where(eq(tenants.tenantId, tenantId)).get();
+
+		if (!tenantRow) return;
+
+		// Look up the workload config to determine idle action
+		const workloadRow = this.db
+			.select()
+			.from(workloads)
+			.where(eq(workloads.workloadId, tenantRow.workloadId))
+			.get();
+
+		const idleAction = workloadRow?.config?.idle?.action ?? "hibernate";
+
+		// Save overlay data from the running container before hibernate/destroy
+		const workloadConfig = workloadRow?.config as Workload | undefined;
+		const overlayDirs = workloadConfig?.filesystem?.overlay_dirs;
+		if (overlayDirs?.length) {
+			const overlayData = await this.instanceManager.extractOverlay(instanceId, overlayDirs);
+			if (overlayData) {
+				this.tenantDataStore.saveOverlayBuffer(tenantId, tenantRow.workloadId, overlayData);
+				this.log?.info({ tenantId, workloadId: tenantRow.workloadId }, "Saved overlay data for tenant");
+			}
+		}
+
+		if (idleAction === "hibernate") {
+			// hibernate() also updates tenant.lastSnapshotId and deletes the old snapshot
+			await this.instanceManager.hibernate(instanceId);
+		} else {
+			await this.instanceManager.destroy(instanceId);
+		}
+
+		// Delete the claim — tenant identity (with lastSnapshotId) persists
+		this.db.delete(claims).where(eq(claims.claimId, claim.claimId)).run();
+
+		this.activityLog.log({
+			event: "tenant.released",
+			tenantId,
+			instanceId,
+			workloadId: tenantRow.workloadId,
+			nodeId: this.nodeId,
+		});
+	}
+
+	/** Creates an instance via the restore hierarchy and returns handle with source. */
+	private async createInstance(
+		tenantId: TenantId,
+		workloadId: WorkloadId,
+	): Promise<InstanceHandle & { source: ClaimSource }> {
+		// Check for tenant snapshot
 		const tenantRow = this.db
 			.select()
 			.from(tenants)
 			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
 			.get();
 
-		// Register the tenant as "claiming" immediately so it's visible in the dashboard / API
-		this.markClaiming(tenantId, workloadId, tenantRow);
-
-		try {
-			if (tenantRow?.lastSnapshotId) {
-				const snapshotRef = this.getSnapshotRef(tenantRow.lastSnapshotId);
-				if (snapshotRef) {
-					this.log?.info({ tenantId, workloadId, source: "snapshot", snapshotId: snapshotRef.id }, "Claiming via tenant snapshot");
-					return await this.restoreAndClaim(snapshotRef, tenantId, workloadId, "snapshot", start);
-				}
+		if (tenantRow?.lastSnapshotId) {
+			const snapshotRef = this.getSnapshotRef(tenantRow.lastSnapshotId);
+			if (snapshotRef) {
+				this.log?.info({ tenantId, workloadId, source: "snapshot", snapshotId: snapshotRef.id }, "Claiming via tenant snapshot");
+				const handle = await this.restoreInstance(snapshotRef, tenantId);
+				this.updateInstanceClaimed(handle.instanceId);
+				return { ...handle, source: "snapshot" };
 			}
-
-			if (this.snapshotManager.capabilities.goldenSnapshots) {
-				return await this.claimViaGolden(tenantId, workloadId, tenantRow, start);
-			}
-
-			return await this.claimViaColdBoot(tenantId, workloadId, tenantRow, start);
-		} catch (err) {
-			// Restore/create failed — revert tenant to idle
-			this.revertClaiming(tenantId, workloadId);
-			throw err;
 		}
+
+		if (this.snapshotManager.capabilities.goldenSnapshots) {
+			return this.createViaGolden(tenantId, workloadId, tenantRow);
+		}
+
+		return this.createViaColdBoot(tenantId, workloadId, tenantRow);
 	}
 
-	/** Golden snapshot claim path (steps 3–4): overlay restore or fresh golden. */
-	private async claimViaGolden(
+	/** Golden snapshot create path (steps 3–4): overlay restore or fresh golden. */
+	private async createViaGolden(
 		tenantId: TenantId,
 		workloadId: WorkloadId,
 		tenantRow: { tenantId: TenantId } | undefined,
-		start: number,
-	): Promise<ClaimResult> {
-		// 3. Check for data overlay (cold+data path)
+	): Promise<InstanceHandle & { source: ClaimSource }> {
+		// Check for data overlay (cold+data path)
 		const overlayPath = tenantRow
 			? this.tenantDataStore.restoreOverlay(tenantId, workloadId)
 			: null;
@@ -170,28 +282,30 @@ export class TenantManager {
 			}
 
 			this.log?.info({ tenantId, workloadId, source: "cold+data", snapshotId: goldenRef.id }, "Claiming via golden + data overlay");
-			const result = await this.restoreAndClaim(goldenRef, tenantId, workloadId, "cold+data", start);
-			await this.instanceManager.injectOverlay(result.instanceId, overlayPath);
-			return result;
+			const handle = await this.restoreInstance(goldenRef, tenantId);
+			this.updateInstanceClaimed(handle.instanceId);
+			await this.instanceManager.injectOverlay(handle.instanceId, overlayPath);
+			return { ...handle, source: "cold+data" };
 		}
 
-		// 4. Fresh from golden
+		// Fresh from golden
 		const goldenRef = this.snapshotManager.getGolden(workloadId, this.nodeId);
 		if (!goldenRef) {
 			throw new NoGoldenSnapshotError(workloadId, this.nodeId);
 		}
 
 		this.log?.info({ tenantId, workloadId, source: "golden", snapshotId: goldenRef.id }, "Claiming via golden snapshot");
-		return this.restoreAndClaim(goldenRef, tenantId, workloadId, "golden", start);
+		const handle = await this.restoreInstance(goldenRef, tenantId);
+		this.updateInstanceClaimed(handle.instanceId);
+		return { ...handle, source: "golden" };
 	}
 
-	/** Cold boot claim path: create a fresh instance from the workload definition. */
-	private async claimViaColdBoot(
+	/** Cold boot create path: create a fresh instance from the workload definition. */
+	private async createViaColdBoot(
 		tenantId: TenantId,
 		workloadId: WorkloadId,
 		tenantRow: { tenantId: TenantId } | undefined,
-		start: number,
-	): Promise<ClaimResult> {
+	): Promise<InstanceHandle & { source: ClaimSource }> {
 		const workloadRow = this.db
 			.select()
 			.from(workloads)
@@ -216,164 +330,43 @@ export class TenantManager {
 			tenantId,
 		);
 
-		this.completeClaim(tenantId, workloadId, handle.instanceId);
 		this.updateInstanceClaimed(handle.instanceId);
 
 		if (overlayPath) {
 			await this.instanceManager.injectOverlay(handle.instanceId, overlayPath);
 		}
 
-		const endpoint = await this.safeGetEndpoint(handle);
-		const latencyMs = performance.now() - start;
-
-		this.logClaim(tenantId, handle.instanceId, workloadId, source);
-		this.startIdleWatch(handle.instanceId, workloadId);
-
-		return {
-			tenantId,
-			instanceId: handle.instanceId,
-			endpoint,
-			source,
-			latencyMs,
-		};
+		return { ...handle, source };
 	}
 
-	/**
-	 * Releases a tenant's instance according to the workload's idle policy.
-	 *
-	 * When `idle.action` is `"hibernate"`, the runtime snapshots the instance
-	 * (CRIU checkpoint on Podman, overlay tar on Kubernetes) and the tenant
-	 * can be restored from it on re-claim. When `"destroy"`, the instance is
-	 * removed entirely.
-	 *
-	 * No-op if the tenant has no active instance.
-	 */
-	async release(tenantId: TenantId, workloadId: WorkloadId): Promise<void> {
-		const tenantRow = this.db
-			.select()
-			.from(tenants)
-			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-			.get();
-
-		if (!tenantRow?.instanceId) return;
-
-		const instanceId = tenantRow.instanceId;
-
-		const tenantStatus = tenantRow.status as TenantStatus;
-		applyTenantTransition(this.db, tenantId, workloadId, tenantStatus, "release");
-
-		if (this.idleMonitor) {
-			this.idleMonitor.unwatch(instanceId);
-		}
-
-		if (this.watchDirsPoller) {
-			this.watchDirsPoller.stopPolling(instanceId);
-		}
-
-		// Look up the workload config to determine idle action
-		const workloadRow = this.db
-			.select()
-			.from(workloads)
-			.where(eq(workloads.workloadId, tenantRow.workloadId))
-			.get();
-
-		const idleAction = workloadRow?.config?.idle?.action ?? "hibernate";
-
-		// Save overlay data from the running container before hibernate/destroy
-		const workloadConfig = workloadRow?.config as Workload | undefined;
-		const overlayDirs = workloadConfig?.filesystem?.overlay_dirs;
-		if (overlayDirs?.length) {
-			const overlayData = await this.instanceManager.extractOverlay(instanceId, overlayDirs);
-			if (overlayData) {
-				this.tenantDataStore.saveOverlayBuffer(tenantId, tenantRow.workloadId, overlayData);
-				this.log?.info({ tenantId, workloadId: tenantRow.workloadId }, "Saved overlay data for tenant");
-			}
-		}
-
-		if (idleAction === "hibernate") {
-			await this.instanceManager.hibernate(instanceId);
-			applyTenantTransition(this.db, tenantId, workloadId, "releasing", "hibernated");
-		} else {
-			await this.instanceManager.destroy(instanceId);
-			applyTenantTransition(this.db, tenantId, workloadId, "releasing", "destroyed");
-		}
-
-		// Clear instanceId on tenant row (lastSnapshotId is preserved by hibernate)
-		this.db
-			.update(tenants)
-			.set({ instanceId: null })
-			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-			.run();
-
-		this.activityLog.log({
-			event: "tenant.released",
-			tenantId,
-			instanceId,
-			workloadId: tenantRow.workloadId,
-			nodeId: this.nodeId,
-		});
-	}
-
-	private async restoreAndClaim(
+	/** Restores an instance from a snapshot reference. */
+	private async restoreInstance(
 		ref: SnapshotRef,
 		tenantId: TenantId,
-		workloadId: WorkloadId,
-		source: ClaimSource,
-		start: number,
-	): Promise<ClaimResult> {
-		// Create the instance row immediately so it's visible in the UI
-		// while waiting for the CRIU restore mutex.
-		const prepared = this.instanceManager.prepareRestore(ref, tenantId);
-
-		// Link the instance to the tenant row right away (still in "claiming" status)
-		this.db
-			.update(tenants)
-			.set({ instanceId: prepared.instanceId })
-			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-			.run();
-
+	): Promise<InstanceHandle> {
 		this.eventBus?.emit({
 			type: "tenant.claiming",
 			tenantId,
-			workloadId,
-			source,
+			workloadId: ref.workloadId,
+			source: "snapshot",
 			snapshotId: ref.id,
 		});
 
-		let handle;
+		const prepared = this.instanceManager.prepareRestore(ref, tenantId);
+		let handle: InstanceHandle;
 		try {
 			handle = await this.serializedRestore(ref.id, () =>
 				this.instanceManager.executeRestore(ref, prepared.instanceId, prepared.workloadId, tenantId),
 			);
 		} catch (err) {
 			this.log?.error(
-				{ tenantId, workloadId, source, snapshotId: ref.id, err },
+				{ tenantId, workloadId: ref.workloadId, snapshotId: ref.id, err },
 				"Restore failed during claim",
 			);
 			throw err;
 		}
 
-		this.completeClaim(tenantId, workloadId, handle.instanceId);
-		this.updateInstanceClaimed(handle.instanceId);
-
-		const endpoint = await this.safeGetEndpoint(handle);
-		const latencyMs = performance.now() - start;
-
-		this.log?.info(
-			{ tenantId, instanceId: handle.instanceId, workloadId, source, endpoint, latencyMs: Math.round(latencyMs) },
-			"Claim completed",
-		);
-
-		this.logClaim(tenantId, handle.instanceId, workloadId, source);
-		this.startIdleWatch(handle.instanceId, workloadId);
-
-		return {
-			tenantId,
-			instanceId: handle.instanceId,
-			endpoint,
-			source,
-			latencyMs,
-		};
+		return handle;
 	}
 
 	/**
@@ -425,60 +418,29 @@ export class TenantManager {
 	}
 
 	/**
-	 * Registers the tenant as "claiming" before the restore/create begins.
-	 * Inserts a new row if none exists, or transitions an existing row.
+	 * Inserts or updates the tenant identity row (no status, no instanceId).
 	 */
-	private markClaiming(
+	private upsertTenantIdentity(
 		tenantId: TenantId,
 		workloadId: WorkloadId,
-		existing: { tenantId: TenantId; status?: string | null } | undefined,
 	): void {
-		if (existing) {
-			applyTenantTransition(this.db, tenantId, workloadId, existing.status as TenantStatus, "claim");
-		} else {
+		const existing = this.db
+			.select()
+			.from(tenants)
+			.where(eq(tenants.tenantId, tenantId))
+			.get();
+
+		if (!existing) {
 			this.db
 				.insert(tenants)
 				.values({
 					tenantId,
 					workloadId,
-					status: "claiming" as TenantStatus,
+					lastActivity: new Date(),
 					createdAt: new Date(),
 				})
 				.run();
 		}
-	}
-
-	/**
-	 * Reverts the tenant from "claiming" back to "idle" when a claim fails.
-	 */
-	private revertClaiming(tenantId: TenantId, workloadId: WorkloadId): void {
-		try {
-			applyTenantTransition(this.db, tenantId, workloadId, "claiming", "claim_failed");
-			this.db
-				.update(tenants)
-				.set({ instanceId: null })
-				.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-				.run();
-		} catch {
-			// Best-effort — tenant may have been modified by concurrent operations
-		}
-	}
-
-	/**
-	 * Completes a claim: sets the instance and transitions claiming → active.
-	 */
-	private completeClaim(
-		tenantId: TenantId,
-		workloadId: WorkloadId,
-		instanceId: InstanceId,
-	): void {
-		applyTenantTransition(this.db, tenantId, workloadId, "claiming", "claimed");
-
-		this.db
-			.update(tenants)
-			.set({ instanceId, lastActivity: new Date() })
-			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-			.run();
 	}
 
 	/** Sets claimedAt and lastActivity on the instance row. */

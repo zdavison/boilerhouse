@@ -1,7 +1,7 @@
 import { eq, and, notInArray, count, sum, sql } from "drizzle-orm";
 import type { Meter } from "@opentelemetry/api";
 import type { DrizzleDb } from "@boilerhouse/db";
-import { instances, tenants, snapshots, workloads } from "@boilerhouse/db";
+import { instances, tenants, claims, snapshots, workloads } from "@boilerhouse/db";
 import type { NodeId, InstanceStatus, WorkloadId } from "@boilerhouse/core";
 import { instrumentTenants, type TenantMetrics } from "./metrics/tenants";
 import { instrumentInstances, type InstanceMetrics } from "./metrics/instances";
@@ -70,9 +70,10 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 					workload: workloads.name,
 					count: count(),
 				})
-				.from(tenants)
+				.from(claims)
+				.innerJoin(tenants, eq(claims.tenantId, tenants.tenantId))
 				.innerJoin(workloads, eq(tenants.workloadId, workloads.workloadId))
-				.where(eq(tenants.status, "active"))
+				.where(eq(claims.status, "active"))
 				.groupBy(workloads.name)
 				.all();
 			return rows.map((r) => ({ workload: r.workload, count: r.count }));

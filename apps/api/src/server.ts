@@ -4,7 +4,7 @@ import { FakeRuntime, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhous
 import type { Runtime, RuntimeType, Workload } from "@boilerhouse/core";
 import { PodmanRuntime } from "@boilerhouse/runtime-podman";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
-import { workloads as workloadsTable, tenants } from "@boilerhouse/db";
+import { workloads as workloadsTable, claims } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
 import {
 	createLogger,
@@ -26,7 +26,7 @@ import { BootstrapLogStore } from "./bootstrap-log-store";
 import { createApp } from "./app";
 import { recoverState } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
-import { applyWorkloadTransition, forceWorkloadStatus } from "./transitions";
+import { applyWorkloadTransition } from "./transitions";
 import { SecretStore } from "./secret-store";
 
 const log = createLogger("server");
@@ -172,26 +172,26 @@ eventBus.on((event) => {
 });
 
 idleMonitor.onIdle(async (instanceId, action) => {
-	const tenantRow = db
-		.select({ tenantId: tenants.tenantId, workloadId: tenants.workloadId })
-		.from(tenants)
-		.where(eq(tenants.instanceId, instanceId))
+	const claimRow = db
+		.select({ tenantId: claims.tenantId })
+		.from(claims)
+		.where(eq(claims.instanceId, instanceId))
 		.get();
 
-	if (!tenantRow) {
-		log.warn({ instanceId }, "Idle timeout: instance has no tenant — skipping");
+	if (!claimRow) {
+		log.warn({ instanceId }, "Idle timeout: instance has no claim — skipping");
 		return;
 	}
 
-	log.info({ instanceId, tenantId: tenantRow.tenantId, workloadId: tenantRow.workloadId, action }, "Idle timeout: releasing tenant");
-	await tenantManager.release(tenantRow.tenantId, tenantRow.workloadId);
+	log.info({ instanceId, tenantId: claimRow.tenantId, action }, "Idle timeout: releasing tenant");
+	await tenantManager.release(claimRow.tenantId);
 });
 
 // Recover state before accepting requests
 const report = await recoverState(runtime, db, nodeId, activityLog);
 
 log.info(
-	{ recovered: report.recovered, destroyed: report.destroyed, tenantsReset: report.tenantsReset },
+	{ recovered: report.recovered, destroyed: report.destroyed, claimsReset: report.claimsReset },
 	"Recovery complete",
 );
 
@@ -210,8 +210,8 @@ const goldenCreator = new GoldenCreator(
 			// Set status to creating (new workloads already are; error workloads need retry)
 			if (row.status === "error") {
 				applyWorkloadTransition(db, row.workloadId, "error", "retry");
-			} else if (row.status !== "creating") {
-				forceWorkloadStatus(db, row.workloadId, "creating");
+			} else if (row.status === "ready") {
+				applyWorkloadTransition(db, row.workloadId, "ready", "recover");
 			}
 
 			goldenCreator.enqueue(row.workloadId, row.config as Workload);
@@ -257,7 +257,7 @@ const app = createApp({
 	goldenCreator,
 	bootstrapLogStore,
 	resourceLimiter,
-	secretStore,
+	secretStore: secretStore!,
 	log: createLogger("routes"),
 	tracer,
 	meter,

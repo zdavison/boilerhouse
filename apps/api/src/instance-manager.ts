@@ -14,12 +14,11 @@ import type {
 } from "@boilerhouse/core";
 import { generateInstanceId, canTransition, InvalidTransitionError } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
-import { instances, snapshots, tenants, workloads } from "@boilerhouse/db";
+import { instances, snapshots, tenants, claims as claimsTable, workloads } from "@boilerhouse/db";
 import {
 	applyInstanceTransition,
 	forceInstanceStatus,
 	applySnapshotTransition,
-	applyTenantTransition,
 } from "./transitions";
 import type { Logger } from "@boilerhouse/o11y";
 import type { EventBus } from "./event-bus";
@@ -110,24 +109,8 @@ export class InstanceManager {
 
 		applyInstanceTransition(this.db, instanceId, "destroying", "destroyed");
 
-		if (row.tenantId) {
-			const tenantRow = this.db
-				.select({ status: tenants.status })
-				.from(tenants)
-				.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
-				.get();
-
-			if (tenantRow?.status === "active") {
-				applyTenantTransition(this.db, row.tenantId, row.workloadId, "active", "release");
-				applyTenantTransition(this.db, row.tenantId, row.workloadId, "releasing", "destroyed");
-
-				this.db
-					.update(tenants)
-					.set({ instanceId: null })
-					.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
-					.run();
-			}
-		}
+		// Clean up claim if this instance was claimed
+		this.db.delete(claimsTable).where(eq(claimsTable.instanceId, instanceId)).run();
 
 		this.activityLog.log({
 			event: "instance.destroyed",
@@ -221,10 +204,12 @@ export class InstanceManager {
 
 		applyInstanceTransition(this.db, instanceId, "hibernating", "hibernated");
 
+		// Update tenant's lastSnapshotId so re-claims can restore from this snapshot.
+		// Note: claim management (deleting/transitioning the claim row) is
+		// TenantManager.release()'s responsibility, not hibernate()'s.
 		if (row.tenantId) {
-			// Delete the previous tenant snapshot (keep only the latest)
 			const tenantRow = this.db
-				.select({ lastSnapshotId: tenants.lastSnapshotId, status: tenants.status })
+				.select({ lastSnapshotId: tenants.lastSnapshotId })
 				.from(tenants)
 				.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
 				.get();
@@ -241,20 +226,6 @@ export class InstanceManager {
 				.set({ lastSnapshotId: correctedRef.id })
 				.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
 				.run();
-
-			// If tenant is still "active", this hibernate was called directly
-			// (not through the tenant release flow). Transition the tenant to
-			// "released" and clear its instanceId so it can be re-claimed.
-			if (tenantRow?.status === "active") {
-				applyTenantTransition(this.db, row.tenantId, row.workloadId, "active", "release");
-				applyTenantTransition(this.db, row.tenantId, row.workloadId, "releasing", "hibernated");
-
-				this.db
-					.update(tenants)
-					.set({ instanceId: null })
-					.where(and(eq(tenants.tenantId, row.tenantId), eq(tenants.workloadId, row.workloadId)))
-					.run();
-			}
 		}
 
 		this.activityLog.log({
