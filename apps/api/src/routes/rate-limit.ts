@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 
-interface RateLimitOptions {
+export interface RateLimitOptions {
 	/** Maximum requests per window. @default 60 */
 	max?: number;
 	/** Window size in milliseconds. @default 60_000 */
@@ -12,10 +12,17 @@ interface Entry {
 	resetAt: number;
 }
 
+export interface RateLimitResult {
+	limited: boolean;
+	headers: Record<string, string>;
+	retryAfter?: number;
+}
+
 /**
- * IP-based sliding-window rate limiter. Returns 429 when exceeded.
+ * Creates a standalone sliding-window rate limiter keyed by IP.
+ * Returns a check function for use in route handlers.
  */
-export function rateLimit(opts: RateLimitOptions = {}) {
+export function createRateLimiter(opts: RateLimitOptions = {}) {
 	const max = opts.max ?? 60;
 	const windowMs = opts.windowMs ?? 60_000;
 	const buckets = new Map<string, Entry>();
@@ -29,12 +36,7 @@ export function rateLimit(opts: RateLimitOptions = {}) {
 	}, windowMs * 2);
 	cleanup.unref();
 
-	return new Elysia({ name: "rate-limit" }).onRequest(({ request, set }) => {
-		const ip =
-			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-			request.headers.get("x-real-ip") ??
-			"unknown";
-
+	return function check(ip: string): RateLimitResult {
 		const now = Date.now();
 		let entry = buckets.get(ip);
 
@@ -45,13 +47,42 @@ export function rateLimit(opts: RateLimitOptions = {}) {
 
 		entry.count++;
 
-		set.headers["X-RateLimit-Limit"] = String(max);
-		set.headers["X-RateLimit-Remaining"] = String(Math.max(0, max - entry.count));
-		set.headers["X-RateLimit-Reset"] = String(Math.ceil(entry.resetAt / 1000));
+		const headers: Record<string, string> = {
+			"X-RateLimit-Limit": String(max),
+			"X-RateLimit-Remaining": String(Math.max(0, max - entry.count)),
+			"X-RateLimit-Reset": String(Math.ceil(entry.resetAt / 1000)),
+		};
 
 		if (entry.count > max) {
+			return {
+				limited: true,
+				headers,
+				retryAfter: Math.ceil((entry.resetAt - now) / 1000),
+			};
+		}
+
+		return { limited: false, headers };
+	};
+}
+
+/**
+ * IP-based sliding-window rate limiter Elysia plugin. Returns 429 when exceeded.
+ */
+export function rateLimit(opts: RateLimitOptions = {}) {
+	const check = createRateLimiter(opts);
+
+	return new Elysia({ name: "rate-limit" }).onRequest(({ request, set }) => {
+		const ip =
+			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+			request.headers.get("x-real-ip") ??
+			"unknown";
+
+		const result = check(ip);
+		Object.assign(set.headers, result.headers);
+
+		if (result.limited) {
 			set.status = 429;
-			set.headers["Retry-After"] = String(Math.ceil((entry.resetAt - now) / 1000));
+			set.headers["Retry-After"] = String(result.retryAfter);
 			return { error: "Too many requests" };
 		}
 	});

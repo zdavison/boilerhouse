@@ -40,6 +40,13 @@ export interface TriggerDefinition {
 	config: WebhookConfig | SlackConfig | TelegramConfig | CronConfig;
 }
 
+export interface RateLimitConfig {
+	/** Maximum requests per window. @default 60 */
+	max: number;
+	/** Window size in milliseconds. @default 60_000 */
+	windowMs?: number;
+}
+
 export interface WebhookConfig {
 	/** URL path to listen on.
 	 * @example "/hooks/deploy-agent"
@@ -50,6 +57,9 @@ export interface WebhookConfig {
 	 * If set, requests must include X-Signature-256 header.
 	 */
 	secret?: string;
+
+	/** Rate limit for this trigger's endpoint. */
+	rateLimit?: RateLimitConfig;
 }
 
 export interface SlackConfig {
@@ -65,6 +75,9 @@ export interface SlackConfig {
 	 * @example "xoxb-..."
 	 */
 	botToken: string;
+
+	/** Rate limit for this trigger's endpoint. */
+	rateLimit?: RateLimitConfig;
 }
 
 export interface TelegramConfig {
@@ -83,6 +96,9 @@ export interface TelegramConfig {
 	 * @example ["message", "callback_query"]
 	 */
 	updateTypes?: string[];
+
+	/** Rate limit for this trigger's endpoint. */
+	rateLimit?: RateLimitConfig;
 }
 
 export interface CronConfig {

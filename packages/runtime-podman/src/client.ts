@@ -46,6 +46,7 @@ export interface ContainerCreateSpec {
 		cpu?: { quota?: number; period?: number };
 		memory?: { limit?: number };
 	};
+	storage_opt?: Record<string, string>;
 	portmappings?: Array<{
 		container_port: number;
 		host_port: number;
@@ -58,6 +59,12 @@ export interface ContainerCreateSpec {
 		options?: string[];
 	}>;
 	netns?: { nsmode: string };
+	/**
+	 * PID namespace mode for the container.
+	 * Use `{ nsmode: "private" }` to give each container its own PID namespace,
+	 * preventing processes from seeing (or ptracing) processes in other containers.
+	 */
+	pidns?: { nsmode: string };
 	/**
 	 * Extra `/etc/hosts` entries for the container.
 	 * @example ["host.containers.internal:host-gateway"]
@@ -480,6 +487,9 @@ export class PodmanClient {
 		if (spec.netns) {
 			body.netns = spec.netns;
 		}
+		if (spec.pidns) {
+			body.pidns = spec.pidns;
+		}
 		if (spec.cap_drop && spec.cap_drop.length > 0) {
 			body.cap_drop = spec.cap_drop;
 		}
@@ -494,6 +504,9 @@ export class PodmanClient {
 		}
 		if (spec.resource_limits) {
 			body.resource_limits = spec.resource_limits;
+		}
+		if (spec.storage_opt) {
+			body.storage_opt = spec.storage_opt;
 		}
 		if (spec.mounts && spec.mounts.length > 0) {
 			body.mounts = spec.mounts;

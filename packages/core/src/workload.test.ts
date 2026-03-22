@@ -54,7 +54,6 @@ describe("validateWorkload()", () => {
 			},
 			filesystem: {
 				overlay_dirs: ["/var/data", "/tmp"],
-				bind_mounts: [{ host: "/srv/shared-assets", guest: "/assets", readonly: true }],
 			},
 			idle: {
 				watch_dirs: ["/var/data", "/tmp/work"],
@@ -84,7 +83,6 @@ describe("validateWorkload()", () => {
 		expect(workload.network.expose).toHaveLength(1);
 		expect(workload.network.expose![0]!.guest).toBe(8080);
 		expect(workload.filesystem!.overlay_dirs).toEqual(["/var/data", "/tmp"]);
-		expect(workload.filesystem!.bind_mounts).toHaveLength(1);
 		expect(workload.idle.watch_dirs).toEqual(["/var/data", "/tmp/work"]);
 		expect(workload.health!.http_get).toEqual({ path: "/health", port: 8080 });
 		expect(workload.entrypoint!.cmd).toBe("/usr/bin/my-service");
@@ -507,7 +505,6 @@ describe("defineWorkload() + resolveWorkloadConfig()", () => {
 			},
 			filesystem: {
 				overlay_dirs: ["/var/data"],
-				bind_mounts: [{ host: "/srv/shared", guest: "/assets", readonly: true }],
 			},
 			idle: {
 				watch_dirs: ["/var/data"],

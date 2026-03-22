@@ -23,4 +23,5 @@ export type {
 	SlackConfig,
 	TelegramConfig,
 	CronConfig,
+	RateLimitConfig,
 } from "./config";

@@ -20,7 +20,7 @@ import type {
 	CronConfig,
 } from "@boilerhouse/triggers";
 import type { RouteDeps } from "./deps";
-import { rateLimit } from "./rate-limit";
+import { createRateLimiter } from "./rate-limit";
 
 /**
  * Creates DispatcherDeps that wire directly into the API server's managers.
@@ -150,13 +150,44 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		});
 	}
 
-	// Mount all adapter routes as Elysia routes
-	const app = new Elysia({ name: "trigger-adapters" })
-		.use(rateLimit({ max: 60, windowMs: 60_000 }));
+	// Build per-path rate limiters from trigger configs.
+	// Webhook and Telegram have one route per trigger; Slack shares /slack/events.
+	const DEFAULT_RATE_LIMIT = { max: 60, windowMs: 60_000 };
+	const pathRateLimiters = new Map<string, ReturnType<typeof createRateLimiter>>();
+
+	for (const t of webhookTriggers) {
+		const rl = t.config.rateLimit ?? DEFAULT_RATE_LIMIT;
+		pathRateLimiters.set(t.config.path, createRateLimiter(rl));
+	}
+	for (const t of telegramTriggers) {
+		const rl = t.config.rateLimit ?? DEFAULT_RATE_LIMIT;
+		pathRateLimiters.set(`/telegram/${t.name}`, createRateLimiter(rl));
+	}
+	if (slackTriggers.length > 0) {
+		const rl = slackTriggers.find((t) => t.config.rateLimit)?.config.rateLimit ?? DEFAULT_RATE_LIMIT;
+		pathRateLimiters.set("/slack/events", createRateLimiter(rl));
+	}
+
+	// Mount all adapter routes as Elysia routes with per-trigger rate limiting
+	const app = new Elysia({ name: "trigger-adapters" });
 
 	const allRoutes = { ...webhookRoutes, ...slackRoutes, ...telegramRoutes };
 	for (const [path, handler] of Object.entries(allRoutes)) {
-		app.post(path, async ({ request }) => handler(request));
+		const limiter = pathRateLimiters.get(path) ?? createRateLimiter(DEFAULT_RATE_LIMIT);
+		app.post(path, async ({ request, set }) => {
+			const ip =
+				request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+				request.headers.get("x-real-ip") ??
+				"unknown";
+			const result = limiter(ip);
+			Object.assign(set.headers, result.headers);
+			if (result.limited) {
+				set.status = 429;
+				set.headers["Retry-After"] = String(result.retryAfter);
+				return { error: "Too many requests" };
+			}
+			return handler(request);
+		});
 	}
 
 	// Graceful shutdown
