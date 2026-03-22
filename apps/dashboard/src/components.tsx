@@ -5,18 +5,29 @@ import { ClipboardCopy, Check } from "lucide-react";
 
 // --- Status Indicator ---
 
+// Symbols use quarter-circle fills to show lifecycle position:
+// ○ (empty) → ◔ (quarter) → ◑ (half) → ◕ (three-quarter) → ● (full)
+// More fill = closer to active. ✕ = terminal/error.
 const STATUS_SYMBOLS: Record<string, string> = {
-	active: "●",
-	online: "●",
-	ready: "●",
-	starting: "◐",
-	creating: "◐",
-	draining: "◐",
-	destroying: "◐",
-	hibernated: "○",
+	// Terminal/error
 	destroyed: "✕",
 	offline: "✕",
 	error: "✕",
+	// Fully active
+	active: "●",
+	online: "●",
+	ready: "●",
+	// Startup progression (increasing fill)
+	starting: "◔",
+	restoring: "◑",
+	// Shutdown to hibernate (decreasing fill → sleep)
+	hibernating: "◕",
+	hibernated: "○",
+	// Destroy flow (decreasing fill → gone)
+	draining: "◕",
+	destroying: "◔",
+	// Provisioning
+	creating: "◔",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -24,10 +35,12 @@ const STATUS_COLORS: Record<string, string> = {
 	online: "text-status-green",
 	ready: "text-status-green",
 	starting: "text-status-yellow",
+	restoring: "text-status-yellow",
 	creating: "text-status-yellow",
-	draining: "text-status-yellow",
-	destroying: "text-status-orange",
+	hibernating: "text-status-blue",
 	hibernated: "text-status-blue",
+	draining: "text-status-orange",
+	destroying: "text-status-orange",
 	destroyed: "text-status-red",
 	offline: "text-status-red",
 	error: "text-status-red",
