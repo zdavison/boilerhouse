@@ -46,6 +46,7 @@ export interface ContainerCreateSpec {
 		cpu?: { quota?: number; period?: number };
 		memory?: { limit?: number };
 	};
+	storage_opt?: Record<string, string>;
 	portmappings?: Array<{
 		container_port: number;
 		host_port: number;
@@ -494,6 +495,9 @@ export class PodmanClient {
 		}
 		if (spec.resource_limits) {
 			body.resource_limits = spec.resource_limits;
+		}
+		if (spec.storage_opt) {
+			body.storage_opt = spec.storage_opt;
 		}
 		if (spec.mounts && spec.mounts.length > 0) {
 			body.mounts = spec.mounts;
