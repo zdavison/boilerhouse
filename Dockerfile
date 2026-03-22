@@ -9,6 +9,7 @@ COPY package.json bun.lock ./
 COPY packages/ packages/
 COPY apps/api/ apps/api/
 COPY workloads/ workloads/
+COPY tests/package.json tests/
 
 RUN bun install --frozen-lockfile --production
 
