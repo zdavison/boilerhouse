@@ -1,0 +1,23 @@
+tests/integration/podman.integration.test.ts
+  39236d7def7b34ca 181-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "128830c7ced75d5a1ae66148da03d47dec2e7a37",
+  "prompts": {
+    "39236d7def7b34ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f1dd6d8-4dab-413f-806b-cde49168cb81",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 0,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    }
+  }
+}
