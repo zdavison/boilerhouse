@@ -9,6 +9,7 @@ interface WsData {
 
 const server = Bun.serve<WsData>({
 	port: Number(process.env.PORT ?? 3001),
+	hostname: process.env.LISTEN_HOST ?? "127.0.0.1",
 	routes: {
 		"/": index,
 	},

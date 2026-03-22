@@ -20,7 +20,29 @@
 		reverse_proxy {$BOILERHOUSE_API_UPSTREAM:127.0.0.1:3000}
 	}
 
-	# Webhook endpoints — public but rate-limited
+	# WebSocket — proxied to API (auth required)
+	@ws {
+		path /ws
+	}
+	route @ws {
+		@missing_token not header Authorization "Bearer {$BOILERHOUSE_AUTH_TOKEN}"
+		respond @missing_token 401
+
+		reverse_proxy {$BOILERHOUSE_API_UPSTREAM:127.0.0.1:3000}
+	}
+
+	# Dashboard — auth required
+	@dashboard {
+		path /dashboard /dashboard/*
+	}
+	route @dashboard {
+		@missing_token not header Authorization "Bearer {$BOILERHOUSE_AUTH_TOKEN}"
+		respond @missing_token 401
+
+		reverse_proxy {$BOILERHOUSE_DASHBOARD_UPSTREAM:127.0.0.1:3001}
+	}
+
+	# Webhook endpoints — public but rate-limited (trigger gateway)
 	@hooks {
 		path /hooks/* /slack/* /telegram/*
 	}
@@ -33,7 +55,15 @@
 			}
 		}
 
-		reverse_proxy {$BOILERHOUSE_API_UPSTREAM:127.0.0.1:3000}
+		reverse_proxy {$BOILERHOUSE_TRIGGER_UPSTREAM:127.0.0.1:3002}
+	}
+
+	# Health check for trigger gateway
+	@trigger_health {
+		path /healthz
+	}
+	route @trigger_health {
+		reverse_proxy {$BOILERHOUSE_TRIGGER_UPSTREAM:127.0.0.1:3002}
 	}
 
 	# Security headers

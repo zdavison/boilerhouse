@@ -30,7 +30,7 @@ import type {
 	CronConfig,
 } from "@boilerhouse/triggers";
 
-const port = Number(process.env.PORT ?? 3001);
+const port = Number(process.env.PORT ?? 3002);
 const apiUrl = process.env.API_URL ?? "http://localhost:3000";
 const configPath = process.env.TRIGGERS_CONFIG;
 
@@ -140,7 +140,7 @@ for (const [path, handler] of Object.entries(allRoutes)) {
 	app.post(path, async ({ request }) => handler(request));
 }
 
-app.listen(port);
+app.listen({ port, hostname: process.env.LISTEN_HOST ?? "127.0.0.1" });
 console.log(`🌐 Trigger gateway listening on port ${port}`);
 console.log(`   Proxying claims to ${apiUrl}`);
 console.log(`   Routes: ${Object.keys(allRoutes).join(", ") || "(none)"}`);
