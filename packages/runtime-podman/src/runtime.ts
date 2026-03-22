@@ -100,7 +100,7 @@ export class PodmanRuntime implements Runtime {
 		const hasEnvoyProxySidecar = !!proxyConfig;
 
 		// Always create a podman pod — containers share the pod's network namespace
-		await this.backend.createPod(instanceId, {
+		const { hostPorts: podHostPorts } = await this.backend.createPod(instanceId, {
 			portmappings,
 			netns: workload.network.access === "none" ? { nsmode: "none" } : undefined,
 		});
@@ -199,7 +199,7 @@ export class PodmanRuntime implements Runtime {
 		this.instances.set(instanceId, {
 			instanceId,
 			running: false,
-			ports: [],
+			ports: podHostPorts,
 			hasEnvoyProxySidecar,
 		});
 
@@ -213,9 +213,6 @@ export class PodmanRuntime implements Runtime {
 
 		instance.running = true;
 		handle.running = true;
-
-		// Resolve published host ports
-		instance.ports = await this.resolveHostPorts(handle.instanceId);
 	}
 
 	async destroy(handle: InstanceHandle): Promise<void> {
@@ -297,7 +294,7 @@ export class PodmanRuntime implements Runtime {
 			protocol: "tcp",
 		}));
 
-		await this.backend.createPod(instanceId, { portmappings });
+		const { hostPorts } = await this.backend.createPod(instanceId, { portmappings });
 
 		// Add Envoy sidecar if proxy config is provided
 		if (proxyConfig) {
@@ -341,12 +338,10 @@ export class PodmanRuntime implements Runtime {
 			await this.backend.startContainer(`${instanceId}-proxy`);
 		}
 
-		const ports = await this.resolveHostPorts(instanceId);
-
 		this.instances.set(instanceId, {
 			instanceId,
 			running: true,
-			ports,
+			ports: hostPorts,
 			hasEnvoyProxySidecar,
 		});
 

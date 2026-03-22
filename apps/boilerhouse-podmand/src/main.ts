@@ -586,7 +586,33 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 			return jsonResponse(res.status, { error: `Failed to create pod: ${msg}` });
 		}
 
-		return jsonResponse(201, { id: (res.body as { Id: string }).Id });
+		const podId = (res.body as { Id: string }).Id;
+
+		// Resolve the dynamically-assigned host ports from the infra container.
+		// Ports are allocated at pod creation time, so we can return them here
+		// and avoid two extra round-trips on every restore/start.
+		let hostPorts: number[] = [];
+		try {
+			const podJson = await client.get(`/libpod/pods/${encodeURIComponent(podId)}/json`);
+			const infraId = (podJson.body as Record<string, unknown>)?.InfraContainerID as string | undefined;
+			if (infraId) {
+				const infraInspect = await client.inspectContainer(infraId);
+				const portsMap = infraInspect.NetworkSettings?.Ports;
+				if (portsMap) {
+					for (const bindings of Object.values(portsMap)) {
+						if (!bindings) continue;
+						for (const binding of bindings) {
+							const port = Number(binding.HostPort);
+							if (port > 0) hostPorts.push(port);
+						}
+					}
+				}
+			}
+		} catch {
+			// Best-effort — caller can fall back to inspecting later if needed
+		}
+
+		return jsonResponse(201, { id: podId, hostPorts });
 	}
 
 	async function handleStartPod(name: string): Promise<Response> {

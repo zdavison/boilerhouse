@@ -116,8 +116,9 @@ export class DaemonBackend implements ContainerBackend {
 		return res as { infraContainerId: string };
 	}
 
-	async createPod(name: string, spec?: { portmappings?: Array<{ container_port: number; host_port: number; protocol?: string }>; netns?: { nsmode: string } }): Promise<void> {
-		await this.request("POST", "/pods", { name, ...spec });
+	async createPod(name: string, spec?: { portmappings?: Array<{ container_port: number; host_port: number; protocol?: string }>; netns?: { nsmode: string } }): Promise<{ hostPorts: number[] }> {
+		const res = await this.request("POST", "/pods", { name, ...spec });
+		return res as { hostPorts: number[] };
 	}
 
 	async startPod(name: string): Promise<void> {

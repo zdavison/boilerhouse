@@ -101,8 +101,11 @@ export interface ContainerBackend {
 
 	// ── Pod operations ──────────────────────────────────────────────────────
 
-	/** Create a podman pod. Containers in the pod share a network namespace. */
-	createPod(name: string, spec?: PodCreateSpec): Promise<void>;
+	/**
+	 * Create a podman pod. Containers in the pod share a network namespace.
+	 * Returns the host ports assigned to the pod (dynamically allocated at creation time).
+	 */
+	createPod(name: string, spec?: PodCreateSpec): Promise<{ hostPorts: number[] }>;
 
 	/** Start all containers in a pod. */
 	startPod(name: string): Promise<void>;
