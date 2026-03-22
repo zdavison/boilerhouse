@@ -68,6 +68,7 @@ export class InstanceManager {
 			})
 			.run();
 
+		const createStart = performance.now();
 		try {
 			const createOptions = this.buildCreateOptions(workload, tenantId);
 			const handle = await this.runtime.create(workload, instanceId, createOptions);
@@ -80,6 +81,7 @@ export class InstanceManager {
 				instanceId,
 				workloadId,
 				nodeId: this.nodeId,
+				metadata: { durationMs: Math.round(performance.now() - createStart) },
 			});
 
 			return handle;
@@ -105,6 +107,7 @@ export class InstanceManager {
 
 		applyInstanceTransition(this.db, instanceId, row.status, "destroy");
 
+		const destroyStart = performance.now();
 		await this.runtime.destroy(handle);
 
 		applyInstanceTransition(this.db, instanceId, "destroying", "destroyed");
@@ -118,6 +121,7 @@ export class InstanceManager {
 			nodeId: this.nodeId,
 			workloadId: row.workloadId,
 			tenantId: row.tenantId,
+			metadata: { durationMs: Math.round(performance.now() - destroyStart) },
 		});
 
 		this.eventBus?.emit({
@@ -157,6 +161,7 @@ export class InstanceManager {
 			tenantId: row.tenantId ?? undefined,
 		});
 
+		const hibernateStart = performance.now();
 		let ref: SnapshotRef;
 		try {
 			ref = await this.runtime.snapshot(handle);
@@ -234,7 +239,7 @@ export class InstanceManager {
 			nodeId: this.nodeId,
 			workloadId: row.workloadId,
 			tenantId: row.tenantId,
-			metadata: { snapshotId: correctedRef.id },
+			metadata: { snapshotId: correctedRef.id, durationMs: Math.round(performance.now() - hibernateStart) },
 		});
 
 		this.eventBus?.emit({
@@ -313,6 +318,7 @@ export class InstanceManager {
 		// Enter restoring state before the CRIU restore begins
 		applyInstanceTransition(this.db, instanceId, "starting", "restoring");
 
+		const restoreStart = performance.now();
 		let handle: InstanceHandle;
 		try {
 			handle = await this.runtime.restore(ref, instanceId, restoreOptions);
@@ -346,6 +352,7 @@ export class InstanceManager {
 			metadata: {
 				snapshotType: ref.type,
 				snapshotId: ref.id,
+				durationMs: Math.round(performance.now() - restoreStart),
 			},
 		});
 

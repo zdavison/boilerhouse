@@ -185,6 +185,10 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 
 	// ── EventBus → counter subscriptions ───────────────────────────────────
 
+	/** Transitional states we time. Map key is instanceId. */
+	const TRANSITIONAL_STATUSES = new Set(["starting", "restoring", "hibernating", "destroying"]);
+	const inFlight = new Map<string, { status: string; startedAt: number; workload: string }>();
+
 	eventBus.on((event) => {
 		if (event.type === "tenant.claimed") {
 			const e = event as { source?: string; workloadId?: string };
@@ -203,11 +207,31 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 		}
 
 		if (event.type === "instance.state") {
-			const e = event as { status?: string; workloadId?: string };
+			const e = event as { instanceId?: string; status?: string; workloadId?: string };
+			const instanceId = String(e.instanceId ?? "");
+			const status = String(e.status ?? "");
+			const wname = workloadName(String(e.workloadId ?? ""));
+
 			instanceMetrics.transitions.add(1, {
-				to: String(e.status ?? ""),
-				workload: workloadName(String(e.workloadId ?? "")),
+				to: status,
+				workload: wname,
 			});
+
+			// Complete any in-flight timing for this instance
+			const pending = inFlight.get(instanceId);
+			if (pending) {
+				inFlight.delete(instanceId);
+				const durationSeconds = (performance.now() - pending.startedAt) / 1000;
+				instanceMetrics.transitionDuration.record(durationSeconds, {
+					from: pending.status,
+					workload: pending.workload,
+				});
+			}
+
+			// Start timing if entering a transitional state
+			if (TRANSITIONAL_STATUSES.has(status)) {
+				inFlight.set(instanceId, { status, startedAt: performance.now(), workload: wname });
+			}
 		}
 	});
 

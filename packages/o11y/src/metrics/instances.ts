@@ -1,9 +1,10 @@
-import type { Meter, Counter, ObservableGauge } from "@opentelemetry/api";
+import type { Meter, Counter, ObservableGauge, Histogram } from "@opentelemetry/api";
 
 export interface InstanceMetrics {
 	instances: ObservableGauge;
 	transitions: Counter;
 	idleTimeouts: Counter;
+	transitionDuration: Histogram;
 }
 
 export interface InstanceMetricsDeps {
@@ -37,5 +38,11 @@ export function instrumentInstances(meter: Meter, deps: InstanceMetricsDeps): In
 		description: "Idle timeout events",
 	});
 
-	return { instances, transitions, idleTimeouts };
+	const transitionDuration = meter.createHistogram("boilerhouse.instance.transition.duration", {
+		description: "Time spent in a transitional instance state before completing (seconds)",
+		unit: "s",
+		advice: { explicitBucketBoundaries: [0.5, 1, 2, 5, 10, 30, 60, 120, 300] },
+	});
+
+	return { instances, transitions, idleTimeouts, transitionDuration };
 }
