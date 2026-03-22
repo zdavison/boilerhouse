@@ -178,6 +178,42 @@ describe.skipIf(!podmanAvailable)("PodmanRuntime (daemon)", () => {
 		await runtime.destroy(handle);
 	});
 
+	// ── Network isolation tests ─────────────────────────────────────────────
+
+	test("container cannot reach host dashboard or trigger gateway ports", async () => {
+		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-test-"));
+		const runtime = new PodmanRuntime({ snapshotDir, socketPath: DAEMON_SOCKET });
+		const instanceId = generateInstanceId();
+		trackInstance(instanceId);
+
+		const handle = await runtime.create(TEST_WORKLOAD_WITH_PORT, instanceId);
+		await runtime.start(handle);
+
+		// Find the default gateway from inside the container — this is the host IP
+		// on the podman bridge, and the address a container would use to reach host services.
+		const gwResult = await runtime.exec(handle, [
+			"sh", "-c", "ip route | awk '/default/{print $3}'",
+		]);
+		expect(gwResult.exitCode).toBe(0);
+		const gateway = gwResult.stdout.trim();
+		expect(gateway).toBeTruthy();
+
+		// Try to connect to dashboard (3001) and trigger gateway (3002) on the host.
+		// Both should be bound to 127.0.0.1 and unreachable from the container.
+		// wget with a 2-second timeout — exit code 1 = connection refused/timeout.
+		const dashboardResult = await runtime.exec(handle, [
+			"wget", "--spider", "--timeout=2", "-q", `http://${gateway}:3001/`,
+		]);
+		expect(dashboardResult.exitCode).not.toBe(0);
+
+		const triggerResult = await runtime.exec(handle, [
+			"wget", "--spider", "--timeout=2", "-q", `http://${gateway}:3002/healthz`,
+		]);
+		expect(triggerResult.exitCode).not.toBe(0);
+
+		await runtime.destroy(handle);
+	});
+
 	// CRIU tests — skip if CRIU is not available
 	const criuAvailable = (() => {
 		if (!podmanAvailable) return false;

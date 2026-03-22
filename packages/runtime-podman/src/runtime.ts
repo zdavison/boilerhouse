@@ -154,6 +154,7 @@ export class PodmanRuntime implements Runtime {
 					limit: workload.resources.memory_mb * 1024 * 1024,
 				},
 			},
+			storage_opt: { size: `${workload.resources.disk_gb ?? 2}G` },
 		};
 
 		// Mount overlay_dirs as tmpfs so CRIU can checkpoint inode handles

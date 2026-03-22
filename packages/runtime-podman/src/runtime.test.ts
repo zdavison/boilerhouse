@@ -201,6 +201,23 @@ describe("PodmanRuntime", () => {
 		rmSync(snapshotDir, { recursive: true, force: true });
 	});
 
+	test("create() passes disk_gb as storage_opt size", async () => {
+		const { mock, captured } = createSpecCapturingDaemon();
+		mockServer = mock;
+
+		const snapshotDir = mkdtempSync(join(tmpdir(), "bh-snap-"));
+		const runtime = new PodmanRuntime({
+			snapshotDir,
+			socketPath: mock.socketPath,
+		});
+
+		await runtime.create(BASE_WORKLOAD, generateInstanceId());
+
+		expect(captured.spec?.storage_opt).toEqual({ size: "1G" });
+
+		rmSync(snapshotDir, { recursive: true, force: true });
+	});
+
 	test("create() emits privileged: false in the container create body", async () => {
 		const { mock, captured } = createSpecCapturingDaemon();
 		mockServer = mock;
