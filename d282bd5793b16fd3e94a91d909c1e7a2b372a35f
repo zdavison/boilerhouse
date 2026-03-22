@@ -1,0 +1,58 @@
+tests/e2e/idle-timeout.e2e.test.ts
+  0e6897682e065ae1 19
+packages/db/drizzle/0010_claims_table.sql
+  9413a43274ad154a 11
+apps/api/src/watch-dirs-poller.test.ts
+  0e6897682e065ae1 82,109,137,167
+tests/e2e/secret-gateway.e2e.test.ts
+  0e6897682e065ae1 3
+apps/api/src/secret-store.ts
+  0e6897682e065ae1 113
+tests/security/run-security-tests.ts
+  0e6897682e065ae1 13,82
+packages/runtime-kubernetes/src/runtime.ts
+  0e6897682e065ae1 24
+apps/api/src/recovery.test.ts
+  0e6897682e065ae1 188
+tests/e2e/e2e-helpers.ts
+  0e6897682e065ae1 9,165-169,172-173
+packages/db/src/schema.ts
+  9413a43274ad154a 158
+packages/o11y/src/instrument.ts
+  0e6897682e065ae1 4,73-74,76
+packages/core/src/state-machine.test.ts
+  0e6897682e065ae1 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "d282bd5793b16fd3e94a91d909c1e7a2b372a35f",
+  "prompts": {
+    "0e6897682e065ae1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad061c0d-08a7-43aa-b374-5010a98d5ab6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 55,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    },
+    "9413a43274ad154a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c9e56e1-c42d-44d5-9599-ba9f93ccbd94",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 4,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
