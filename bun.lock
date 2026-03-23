@@ -33,6 +33,7 @@
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/o11y": "workspace:*",
         "@boilerhouse/runtime-podman": "workspace:*",
+        "@opentelemetry/api": "^1.9.0",
       },
     },
     "apps/cli": {
@@ -105,6 +106,7 @@
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/db": "workspace:*",
         "@opentelemetry/api": "^1.9.0",
+        "@opentelemetry/core": "^1.30.0",
         "@opentelemetry/exporter-prometheus": "^0.57.0",
         "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
         "@opentelemetry/resources": "^1.30.0",
@@ -129,6 +131,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
+        "@opentelemetry/api": "^1.9.0",
       },
     },
     "packages/triggers": {

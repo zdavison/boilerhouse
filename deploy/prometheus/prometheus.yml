@@ -2,6 +2,5 @@ scrape_configs:
   - job_name: boilerhouse
     scrape_interval: 15s
     static_configs:
-      # Use "api:9464" when running in docker-compose,
-      # "localhost:9464" when Prometheus runs on the host.
-      - targets: ["api:9464"]
+      # host.docker.internal resolves to the host when boilerhouse runs outside docker-compose.
+      - targets: ["host.docker.internal:9464"]

@@ -1,0 +1,46 @@
+# Local observability stack: Prometheus (metrics) + Tempo (traces) + Grafana (UI).
+#
+# Boilerhouse itself runs on the host, not in this compose file.
+# Start with: docker compose up -d
+# Then run the API with: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces bun run dev
+#
+# Grafana UI:  http://localhost:3000  (no login required)
+# Prometheus:  http://localhost:9090
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "4318:4318"   # OTLP HTTP — point OTEL_EXPORTER_OTLP_ENDPOINT here
+      - "3200:3200"   # Tempo query API — used by Grafana datasource
+    volumes:
+      - ./deploy/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/tmp/tempo
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - tempo
+
+volumes:
+  tempo-data:

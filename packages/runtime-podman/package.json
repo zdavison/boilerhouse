@@ -8,6 +8,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@boilerhouse/core": "workspace:*"
+		"@boilerhouse/core": "workspace:*",
+		"@opentelemetry/api": "^1.9.0"
 	}
 }

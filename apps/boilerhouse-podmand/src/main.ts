@@ -1,6 +1,7 @@
 import { mkdirSync, existsSync, rmSync, chmodSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Subprocess } from "bun";
+import { context, propagation, trace, SpanStatusCode } from "@opentelemetry/api";
 import { DEFAULT_RUNTIME_SOCKET, DEFAULT_PODMAN_SOCKET, DEFAULT_SNAPSHOT_DIR } from "@boilerhouse/core";
 import { PodmanClient } from "@boilerhouse/runtime-podman";
 import type { ContainerCreateSpec } from "@boilerhouse/runtime-podman";
@@ -498,27 +499,75 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 
 		const { decryptArchive } = await import("@boilerhouse/core");
 
-		const archiveData = await Bun.file(body.archivePath).arrayBuffer();
-		let archive = Buffer.from(archiveData);
+		// Extract W3C trace context from incoming headers so daemon spans are
+		// children of the restore.criu span in the API process.
+		const parentContext = propagation.extract(
+			context.active(),
+			Object.fromEntries(req.headers.entries()),
+		);
+		const daemonTracer = trace.getTracer("boilerhouse");
 
-		// Decrypt if the archive was encrypted at rest
-		if (body.encrypted) {
-			if (!config.encryptionKey) {
-				return jsonResponse(403, {
-					error: "Archive is encrypted but daemon has no encryption key configured",
-				});
+		return context.with(parentContext, async () => {
+			let archive: Buffer;
+
+			archive = await daemonTracer.startActiveSpan("daemon.archive_read", async (span) => {
+				try {
+					const data = await Bun.file(body.archivePath).arrayBuffer();
+					span.setAttribute("archive.size_bytes", data.byteLength);
+					span.setAttribute("archive.encrypted", body.encrypted ?? false);
+					return Buffer.from(data);
+				} catch (err) {
+					span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+					throw err;
+				} finally {
+					span.end();
+				}
+			});
+
+			// Decrypt if the archive was encrypted at rest
+			if (body.encrypted) {
+				if (!config.encryptionKey) {
+					return jsonResponse(403, {
+						error: "Archive is encrypted but daemon has no encryption key configured",
+					});
+				}
+				try {
+					archive = await daemonTracer.startActiveSpan("daemon.archive_decrypt", async (span) => {
+						span.setAttribute("archive.size_bytes", archive.length);
+						try {
+							const decrypted = await decryptArchive(archive, config.encryptionKey!);
+							span.setAttribute("archive.decrypted_size_bytes", decrypted.length);
+							return decrypted;
+						} catch (err) {
+							span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+							throw err;
+						} finally {
+							span.end();
+						}
+					});
+				} catch {
+					return jsonResponse(403, { error: "Archive decryption failed" });
+				}
 			}
-			try {
-				archive = await decryptArchive(archive, config.encryptionKey);
-			} catch {
-				return jsonResponse(403, { error: "Archive decryption failed" });
-			}
-		}
 
-		const podmanId = await client.restoreContainer(archive, body.name, body.publishPorts, body.pod);
-		registerContainer(podmanId, body.name);
+			const podmanId = await daemonTracer.startActiveSpan("daemon.podman_restore", async (span) => {
+				span.setAttribute("container.name", body.name);
+				if (body.pod) span.setAttribute("pod.name", body.pod);
+				try {
+					const id = await client.restoreContainer(archive, body.name, body.publishPorts, body.pod);
+					span.setAttribute("container.id", id);
+					return id;
+				} catch (err) {
+					span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+					throw err;
+				} finally {
+					span.end();
+				}
+			});
 
-		return jsonResponse(200, { id: podmanId });
+			registerContainer(podmanId, body.name);
+			return jsonResponse(200, { id: podmanId });
+		});
 	}
 
 	async function handleExec(identifier: string, req: Request): Promise<Response> {
@@ -699,6 +748,11 @@ if (import.meta.main) {
 	const snapshotDir = process.env.SNAPSHOT_DIR ?? DEFAULT_SNAPSHOT_DIR;
 	const encryptionKey = process.env.BOILERHOUSE_ENCRYPTION_KEY;
 	const workloadsDir = process.env.WORKLOADS_DIR;
+
+	// Initialise OTEL tracing if a collector endpoint is configured.
+	// Metrics (Prometheus) are disabled — the daemon has no metrics endpoint.
+	const { initO11y } = await import("@boilerhouse/o11y");
+	initO11y({ metricsEnabled: false });
 
 	let daemon: { stop: () => void };
 	try {

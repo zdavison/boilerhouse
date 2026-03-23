@@ -2,8 +2,10 @@ import { MeterProvider } from "@opentelemetry/sdk-metrics";
 import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { BasicTracerProvider, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { Resource } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
+import { propagation } from "@opentelemetry/api";
 import type { Meter } from "@opentelemetry/api";
 import type { Tracer } from "@opentelemetry/api";
 
@@ -28,6 +30,12 @@ export interface InitOptions {
 	 * @default false
 	 */
 	tracingEnabled?: boolean;
+	/**
+	 * Whether to start the Prometheus metrics server. Set to false for processes
+	 * that only need tracing (e.g. boilerhouse-podmand).
+	 * @default true
+	 */
+	metricsEnabled?: boolean;
 }
 
 export interface O11yProviders {
@@ -43,14 +51,17 @@ export function initO11y(opts: InitOptions = {}): O11yProviders {
 		[ATTR_SERVICE_VERSION]: "0.0.1",
 	});
 
-	// Metrics — Prometheus exporter serves /metrics
-	const prometheusExporter = new PrometheusExporter({
-		port: opts.metricsPort ?? 9464,
-		host: opts.metricsHost ?? "127.0.0.1",
-	});
+	// Metrics — Prometheus exporter serves /metrics (optional)
+	const metricsEnabled = opts.metricsEnabled ?? true;
+	const prometheusExporter = metricsEnabled
+		? new PrometheusExporter({
+			port: opts.metricsPort ?? 9464,
+			host: opts.metricsHost ?? "127.0.0.1",
+		})
+		: undefined;
 	const meterProvider = new MeterProvider({
 		resource,
-		readers: [prometheusExporter],
+		readers: prometheusExporter ? [prometheusExporter] : [],
 	});
 	const meter = meterProvider.getMeter("boilerhouse");
 
@@ -67,6 +78,10 @@ export function initO11y(opts: InitOptions = {}): O11yProviders {
 		tracerProvider.addSpanProcessor(new BatchSpanProcessor(otlpExporter));
 	}
 	tracerProvider.register();
+
+	// Register W3C trace context propagator globally so span context can be
+	// injected into / extracted from HTTP headers across process boundaries.
+	propagation.setGlobalPropagator(new W3CTraceContextPropagator());
 
 	const tracer = tracerProvider.getTracer("boilerhouse");
 

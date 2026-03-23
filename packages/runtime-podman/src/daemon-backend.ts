@@ -1,4 +1,5 @@
 import * as http from "node:http";
+import { context, propagation } from "@opentelemetry/api";
 import type { ContainerBackend, CheckpointResult, BackendInfo, EnsureImageResult } from "./backend";
 import type { ContainerCreateSpec, ContainerInspect, ExecResult } from "./client";
 import { PodmanRuntimeError } from "./errors";
@@ -154,6 +155,9 @@ export class DaemonBackend implements ContainerBackend {
 				headers["Content-Type"] = "application/json";
 				headers["Content-Length"] = String(bodyData.length);
 			}
+
+			// Propagate active span context so the daemon can create child spans.
+			propagation.inject(context.active(), headers);
 
 			const req = http.request(
 				{

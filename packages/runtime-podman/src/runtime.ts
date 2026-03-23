@@ -1,6 +1,7 @@
 import { mkdtempSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 import type { InstanceId } from "@boilerhouse/core";
 import { generateSnapshotId, generateWorkloadId, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
 import type { SnapshotRef, SnapshotPaths, SnapshotMetadata } from "@boilerhouse/core";
@@ -282,6 +283,7 @@ export class PodmanRuntime implements Runtime {
 	}
 
 	async restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle> {
+		const tracer = trace.getTracer("boilerhouse");
 		const proxyConfig = options?.proxyConfig;
 		const hasEnvoyProxySidecar = !!proxyConfig;
 
@@ -294,48 +296,88 @@ export class PodmanRuntime implements Runtime {
 			protocol: "tcp",
 		}));
 
-		const { hostPorts } = await this.backend.createPod(instanceId, { portmappings });
+		const { hostPorts } = await tracer.startActiveSpan("restore.create_pod", async (span) => {
+			try {
+				const result = await this.backend.createPod(instanceId, { portmappings });
+				span.setAttribute("host.ports", result.hostPorts.join(","));
+				return result;
+			} catch (err) {
+				span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+				throw err;
+			} finally {
+				span.end();
+			}
+		});
 
 		// Add Envoy sidecar if proxy config is provided
 		if (proxyConfig) {
-			await this.backend.ensureImage({ ref: ENVOY_IMAGE }, { name: "envoy-proxy", version: "sidecar" });
+			await tracer.startActiveSpan("restore.setup_envoy", async (span) => {
+				try {
+					await this.backend.ensureImage({ ref: ENVOY_IMAGE }, { name: "envoy-proxy", version: "sidecar" });
 
-			const configPath = await this.backend.writeFile(
-				`${instanceId}-envoy.yaml`,
-				proxyConfig,
-			);
+					const configPath = await this.backend.writeFile(
+						`${instanceId}-envoy.yaml`,
+						proxyConfig,
+					);
 
-			await this.backend.createContainer({
-				name: `${instanceId}-proxy`,
-				image: ENVOY_IMAGE,
-				pod: instanceId,
-				command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"],
-				privileged: false,
-				cap_drop: ["ALL"],
-				no_new_privileges: true,
-				mounts: [{
-					destination: "/etc/envoy/envoy.yaml",
-					type: "bind",
-					source: configPath,
-					options: ["ro"],
-				}],
+					await this.backend.createContainer({
+						name: `${instanceId}-proxy`,
+						image: ENVOY_IMAGE,
+						pod: instanceId,
+						command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"],
+						privileged: false,
+						cap_drop: ["ALL"],
+						no_new_privileges: true,
+						mounts: [{
+							destination: "/etc/envoy/envoy.yaml",
+							type: "bind",
+							source: configPath,
+							options: ["ro"],
+						}],
+					});
+				} catch (err) {
+					span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+					throw err;
+				} finally {
+					span.end();
+				}
 			});
 		}
 
 		// Restore the container into the pod. Port mappings are on the pod
 		// (not the container), so we don't pass publishPorts.
-		await this.backend.restore(
-			ref.paths.vmstate,
-			instanceId,
-			undefined,
-			instanceId,
-			ref.encrypted,
-		);
+		await tracer.startActiveSpan("restore.criu", async (span) => {
+			span.setAttribute("snapshot.id", ref.id);
+			span.setAttribute("snapshot.encrypted", ref.encrypted ?? false);
+			try {
+				await this.backend.restore(
+					ref.paths.vmstate,
+					instanceId,
+					undefined,
+					instanceId,
+					ref.encrypted,
+				);
+			} catch (err) {
+				span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+				throw err;
+			} finally {
+				span.end();
+			}
+		});
 
 		// CRIU restore only starts the workload container — the sidecar
 		// must be started explicitly since it wasn't part of the checkpoint.
 		if (proxyConfig) {
-			await this.backend.startContainer(`${instanceId}-proxy`);
+			await tracer.startActiveSpan("restore.start_envoy", async (span) => {
+				try {
+					await this.backend.startContainer(`${instanceId}-proxy`);
+				} catch (err) {
+					span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+					throw err;
+				} finally {
+					span.end();
+				}
+			});
 		}
 
 		this.instances.set(instanceId, {
