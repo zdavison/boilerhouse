@@ -7,13 +7,6 @@ interface KubernetesCommonConfig {
 	namespace?: string;
 
 	/**
-	 * Directory for storing snapshot data (overlay tars + workload JSON).
-	 * Only required if snapshot/restore is used.
-	 * @example "/var/lib/boilerhouse/snapshots"
-	 */
-	snapshotDir?: string;
-
-	/**
 	 * kubectl context name. Used for exec operations which shell out to kubectl.
 	 * @example "boilerhouse-test"
 	 */
@@ -33,12 +26,6 @@ interface KubernetesCommonConfig {
 	 */
 	workloadsDir?: string;
 
-	/**
-	 * Hex-encoded 32-byte key for encrypting snapshot archives at rest.
-	 * When set, overlay tars are encrypted with AES-256-GCM before writing
-	 * to disk and decrypted on restore.
-	 */
-	encryptionKey?: string;
 }
 
 /** Explicit API URL + bearer token (minikube, external clusters). */

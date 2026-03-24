@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
 import { InvalidTransitionError } from "@boilerhouse/core";
-import { NoGoldenSnapshotError } from "../tenant-manager";
 import { SnapshotNotFoundError } from "../instance-manager";
 
 export const errorHandler = new Elysia({ name: "error-handler" }).onError(
@@ -12,11 +11,6 @@ export const errorHandler = new Elysia({ name: "error-handler" }).onError(
 
 		if (error instanceof SnapshotNotFoundError) {
 			set.status = 404;
-			return { error: error.message };
-		}
-
-		if (error instanceof NoGoldenSnapshotError) {
-			set.status = 503;
 			return { error: error.message };
 		}
 

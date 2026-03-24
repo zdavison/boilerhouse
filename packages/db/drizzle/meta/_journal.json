@@ -78,6 +78,13 @@
       "when": 1774200000000,
       "tag": "0010_claims_table",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1774300000000,
+      "tag": "0011_pool_status",
+      "breakpoints": true
     }
   ]
 }

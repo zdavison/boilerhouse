@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { FakeRuntime } from "./fake-runtime";
-import { generateInstanceId, generateSnapshotId, generateWorkloadId, generateNodeId } from "./types";
-import type { SnapshotRef } from "./snapshot";
+import { generateInstanceId } from "./types";
 import type { Workload } from "./workload";
 
 function minimalWorkload(): Workload {
@@ -43,54 +42,6 @@ describe("FakeRuntime", () => {
 		await expect(runtime.start(handle)).rejects.toThrow(/destroyed/i);
 	});
 
-	test("snapshot() returns a SnapshotRef with paths", async () => {
-		const runtime = new FakeRuntime();
-		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
-		await runtime.start(handle);
-
-		const ref = await runtime.snapshot(handle);
-
-		expect(ref.id).toBeDefined();
-		expect(ref.type).toBe("tenant");
-		expect(ref.paths.memory).toContain("snapshot");
-		expect(ref.paths.vmstate).toContain("snapshot");
-		expect(ref.workloadId).toBeDefined();
-		expect(ref.nodeId).toBeDefined();
-		expect(ref.runtimeMeta.runtimeVersion).toBeDefined();
-	});
-
-	test("restore() from a valid SnapshotRef returns a running handle", async () => {
-		const runtime = new FakeRuntime();
-		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
-		await runtime.start(handle);
-
-		const ref = await runtime.snapshot(handle);
-		const newInstanceId = generateInstanceId();
-		const restored = await runtime.restore(ref, newInstanceId);
-
-		expect(restored.instanceId).toBe(newInstanceId);
-		expect(restored.running).toBe(true);
-	});
-
-	test("restore() from an invalid SnapshotRef throws", async () => {
-		const runtime = new FakeRuntime();
-		const invalidRef: SnapshotRef = {
-			id: generateSnapshotId(),
-			type: "golden",
-			paths: { memory: "/nonexistent/snapshot", vmstate: "/nonexistent/snapshot" },
-			workloadId: generateWorkloadId(),
-			nodeId: generateNodeId(),
-			runtimeMeta: {
-				runtimeVersion: "fake-1.0.0",
-				architecture: "x86_64",
-			},
-		};
-
-		await expect(
-			runtime.restore(invalidRef, generateInstanceId()),
-		).rejects.toThrow(/snapshot not found/i);
-	});
-
 	test("getEndpoint() returns a predictable host:port", async () => {
 		const runtime = new FakeRuntime();
 		const handle = await runtime.create(minimalWorkload(), generateInstanceId());
@@ -115,7 +66,6 @@ describe("FakeRuntime", () => {
 		await runtime.destroy(handle);
 
 		await expect(runtime.start(handle)).rejects.toThrow(/destroyed/i);
-		await expect(runtime.snapshot(handle)).rejects.toThrow(/destroyed/i);
 		await expect(runtime.getEndpoint(handle)).rejects.toThrow(/destroyed/i);
 		// destroy is idempotent — no-op on already-destroyed instances
 		await expect(runtime.destroy(handle)).resolves.toBeUndefined();

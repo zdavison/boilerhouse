@@ -163,7 +163,7 @@ export function WorkloadDetail({
 				</h3>
 				{!isReady && (
 					<p className="text-sm text-status-yellow mb-2">
-						Workload is not ready — claims are disabled until the golden snapshot is created.
+						Workload is not ready — claims are disabled until the pool has warmed its first instance.
 					</p>
 				)}
 				<div className="flex items-center gap-2">

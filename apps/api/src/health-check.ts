@@ -12,6 +12,9 @@ export interface HealthConfig {
 /** A probe-agnostic health check function. Returns `true` when healthy. */
 export type HealthCheckFn = () => Promise<boolean>;
 
+/** A function that runs a health check loop. Resolves when healthy, rejects on timeout. */
+export type HealthChecker = (check: HealthCheckFn, config: HealthConfig, onLog?: (line: string) => void) => Promise<void>;
+
 export class HealthCheckTimeoutError extends Error {
 	constructor(message: string) {
 		super(message);

@@ -6,7 +6,6 @@ import {
 	getGaugeValues,
 	getCounterValues,
 	computePercentile,
-	groupByLabel,
 	type PrometheusMetrics,
 	type PrometheusSample,
 } from "../prometheus";
@@ -81,7 +80,7 @@ function OverviewSection({ metrics }: { metrics: PrometheusMetrics }) {
 	const capacityUsed = sumValues(getGaugeValues(metrics, "boilerhouse_node_capacity_used"));
 	const claimP50 = computePercentile(metrics, "boilerhouse_tenant_claim_duration_seconds", 0.5);
 	const claimP95 = computePercentile(metrics, "boilerhouse_tenant_claim_duration_seconds", 0.95);
-	const goldenQueue = sumValues(getGaugeValues(metrics, "boilerhouse_golden_queue_depth"));
+	const poolDepth = sumValues(getGaugeValues(metrics, "boilerhouse_pool_depth"));
 
 	return (
 		<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -100,8 +99,26 @@ function OverviewSection({ metrics }: { metrics: PrometheusMetrics }) {
 				label="Claim p95"
 				value={claimP95 !== null ? formatDuration(claimP95) : "--"}
 			/>
-			<MetricStatCard label="Golden Queue" value={String(goldenQueue)} />
+			<MetricStatCard label="Pool Depth" value={String(poolDepth)} />
 		</div>
+	);
+}
+
+// ── Pool Section ─────────────────────────────────────────────────────────────
+
+function PoolSection({ metrics }: { metrics: PrometheusMetrics }) {
+	const depthGauges = getGaugeValues(metrics, "boilerhouse_pool_depth");
+	if (depthGauges.length === 0) return <NoData />;
+
+	return (
+		<DataTable headers={["Workload", "Pool Depth"]}>
+			{depthGauges.map((s) => (
+				<DataRow key={s.labels.workload ?? ""}>
+					<td className="px-4 py-2 text-accent">{s.labels.workload ?? "(none)"}</td>
+					<td className="px-4 py-2">{s.value}</td>
+				</DataRow>
+			))}
+		</DataTable>
 	);
 }
 
@@ -168,7 +185,7 @@ function InstancesSection({ metrics }: { metrics: PrometheusMetrics }) {
 	}
 
 	return (
-		<DataTable headers={["Workload", "Node", "Starting", "Active", "Hibernated", "Destroyed"]}>
+		<DataTable headers={["Workload", "Node", "Starting", "Active", "Destroyed"]}>
 			{[...keys.entries()].map(([key, { workload, node }]) => {
 				const r = rows.get(key)!;
 				return (
@@ -177,7 +194,6 @@ function InstancesSection({ metrics }: { metrics: PrometheusMetrics }) {
 						<td className="px-4 py-2 text-muted">{truncateId(node)}</td>
 						<td className="px-4 py-2">{r.starting ?? 0}</td>
 						<td className="px-4 py-2">{r.active ?? 0}</td>
-						<td className="px-4 py-2">{r.hibernated ?? 0}</td>
 						<td className="px-4 py-2">{r.destroyed ?? 0}</td>
 					</DataRow>
 				);
@@ -245,80 +261,6 @@ function InstanceTransitionsSection({ metrics }: { metrics: PrometheusMetrics })
 						<td className="px-4 py-2 text-accent">{workload || "(none)"}</td>
 						<td className="px-4 py-2">{p50 !== null ? formatDuration(p50) : "--"}</td>
 						<td className="px-4 py-2">{p95 !== null ? formatDuration(p95) : "--"}</td>
-					</DataRow>
-				);
-			})}
-		</DataTable>
-	);
-}
-
-// ── Snapshots Section ───────────────────────────────────────────────────────
-
-function SnapshotsSection({ metrics }: { metrics: PrometheusMetrics }) {
-	const creates = getCounterValues(metrics, "boilerhouse_snapshot_creates");
-	if (creates.length === 0) return <NoData />;
-
-	const grouped = groupByLabel(creates, "workload");
-
-	return (
-		<DataTable headers={["Workload", "Type", "Creates (ok)", "Creates (error)", "Create p95"]}>
-			{[...grouped.entries()].map(([workload, samples]) => {
-				const byType = groupByLabel(samples, "type");
-				return [...byType.entries()].map(([type, typeSamples]) => {
-					const ok = sumValues(typeSamples.filter((s) => s.labels.outcome === "ok"));
-					const err = sumValues(typeSamples.filter((s) => s.labels.outcome === "error"));
-					const p95 = computePercentile(
-						metrics, "boilerhouse_snapshot_create_duration_seconds", 0.95,
-						{ workload, type },
-					);
-					return (
-						<DataRow key={`${workload}-${type}`}>
-							<td className="px-4 py-2 text-accent">{workload || "(none)"}</td>
-							<td className="px-4 py-2">{type}</td>
-							<td className="px-4 py-2">{ok}</td>
-							<td className="px-4 py-2">{err > 0 ? <span className="text-status-red">{err}</span> : 0}</td>
-							<td className="px-4 py-2">{p95 !== null ? formatDuration(p95) : "--"}</td>
-						</DataRow>
-					);
-				});
-			})}
-		</DataTable>
-	);
-}
-
-// ── Disk Usage Section ──────────────────────────────────────────────────────
-
-function DiskUsageSection({ metrics }: { metrics: PrometheusMetrics }) {
-	const diskTotal = getGaugeValues(metrics, "boilerhouse_snapshot_disk_total");
-	const diskAvg = getGaugeValues(metrics, "boilerhouse_snapshot_disk_avg_per_tenant");
-	const snapshotCount = getGaugeValues(metrics, "boilerhouse_snapshot_count");
-
-	if (diskTotal.length === 0 && snapshotCount.length === 0) return <NoData />;
-
-	const workloads = new Set<string>();
-	for (const s of diskTotal) workloads.add(s.labels.workload ?? "");
-	for (const s of diskAvg) workloads.add(s.labels.workload ?? "");
-
-	return (
-		<DataTable headers={["Workload", "Golden Total", "Tenant Total", "All Snapshots", "Count", "Avg/Tenant"]}>
-			{[...workloads].map((w) => {
-				const goldenBytes = sumValues(
-					diskTotal.filter((s) => s.labels.workload === w && s.labels.type === "golden"),
-				);
-				const tenantBytes = sumValues(
-					diskTotal.filter((s) => s.labels.workload === w && s.labels.type === "tenant"),
-				);
-				const allBytes = sumValues(diskTotal.filter((s) => s.labels.workload === w));
-				const count = sumValues(snapshotCount.filter((s) => s.labels.workload === w));
-				const avg = diskAvg.find((s) => s.labels.workload === w)?.value ?? 0;
-				return (
-					<DataRow key={w}>
-						<td className="px-4 py-2 text-accent">{w || "(none)"}</td>
-						<td className="px-4 py-2">{formatBytes(goldenBytes)}</td>
-						<td className="px-4 py-2">{formatBytes(tenantBytes)}</td>
-						<td className="px-4 py-2">{formatBytes(allBytes)}</td>
-						<td className="px-4 py-2">{count}</td>
-						<td className="px-4 py-2">{formatBytes(avg)}</td>
 					</DataRow>
 				);
 			})}
@@ -447,6 +389,9 @@ export function MetricsPage() {
 
 			<OverviewSection metrics={metrics} />
 
+			<SectionHeader>Pool</SectionHeader>
+			<PoolSection metrics={metrics} />
+
 			<SectionHeader>Tenants</SectionHeader>
 			<TenantsSection metrics={metrics} />
 
@@ -458,12 +403,6 @@ export function MetricsPage() {
 
 			<SectionHeader>Capacity</SectionHeader>
 			<CapacitySection metrics={metrics} />
-
-			<SectionHeader>Snapshots</SectionHeader>
-			<SnapshotsSection metrics={metrics} />
-
-			<SectionHeader>Disk Usage</SectionHeader>
-			<DiskUsageSection metrics={metrics} />
 
 			<SectionHeader>HTTP</SectionHeader>
 			<HttpSection metrics={metrics} />

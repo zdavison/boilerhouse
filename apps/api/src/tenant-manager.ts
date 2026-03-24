@@ -1,12 +1,10 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type {
 	InstanceId,
 	InstanceHandle,
 	WorkloadId,
 	NodeId,
 	TenantId,
-	SnapshotId,
-	SnapshotRef,
 	Endpoint,
 	ClaimStatus,
 	Workload,
@@ -16,18 +14,18 @@ import {
 	InvalidTransitionError,
 } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
-import { instances, snapshots, tenants, workloads, claims, snapshotRefFrom } from "@boilerhouse/db";
+import { instances, tenants, workloads, claims } from "@boilerhouse/db";
 import type { Logger } from "@boilerhouse/o11y";
 import { applyClaimTransition } from "./transitions";
 import { instanceHandleFrom } from "./instance-manager";
 import type { InstanceManager } from "./instance-manager";
-import type { SnapshotManager } from "./snapshot-manager";
 import type { TenantDataStore } from "./tenant-data";
 import type { IdleMonitor } from "./idle-monitor";
 import type { WatchDirsPoller } from "./watch-dirs-poller";
 import type { EventBus } from "./event-bus";
+import type { PoolManager } from "./pool-manager";
 
-export type ClaimSource = "existing" | "snapshot" | "cold+data" | "golden" | "cold";
+export type ClaimSource = "existing" | "cold+data" | "cold" | "pool" | "pool+data";
 
 export interface ClaimResult {
 	tenantId: TenantId;
@@ -37,28 +35,12 @@ export interface ClaimResult {
 	latencyMs: number;
 }
 
-export class NoGoldenSnapshotError extends Error {
-	constructor(workloadId: WorkloadId, nodeId: NodeId) {
-		super(
-			`No golden snapshot found for workload ${workloadId} on node ${nodeId}`,
-		);
-		this.name = "NoGoldenSnapshotError";
-	}
-}
-
 export class TenantManager {
 	/** Per-tenant+workload lock to prevent duplicate claims from concurrent requests. */
 	private readonly inflightClaims = new Map<string, Promise<ClaimResult>>();
-	/**
-	 * Per-snapshot mutex for CRIU restores.
-	 * CRIU cannot restore the same checkpoint archive concurrently —
-	 * concurrent restores from the same golden snapshot must be serialized.
-	 */
-	private readonly restoreLocks = new Map<string, Promise<void>>();
 
 	constructor(
 		private readonly instanceManager: InstanceManager,
-		private readonly snapshotManager: SnapshotManager,
 		private readonly db: DrizzleDb,
 		private readonly activityLog: ActivityLog,
 		private readonly nodeId: NodeId,
@@ -67,6 +49,7 @@ export class TenantManager {
 		private readonly log?: Logger,
 		private readonly eventBus?: EventBus,
 		private readonly watchDirsPoller?: WatchDirsPoller,
+		private readonly poolManager?: PoolManager,
 	) {}
 
 	/**
@@ -74,16 +57,10 @@ export class TenantManager {
 	 *
 	 * The claim row acts as a concurrency guard via UNIQUE constraint on tenantId.
 	 *
-	 * When the runtime supports golden snapshots, follows the restore hierarchy:
+	 * Claim hierarchy:
 	 * 1. Existing active claim
-	 * 2. Tenant snapshot (hot restore)
-	 * 3. Golden + data overlay (cold restore with data)
-	 * 4. Golden snapshot (fresh)
-	 *
-	 * When golden snapshots are not supported:
-	 * 1. Existing active claim
-	 * 2. Tenant snapshot (restore)
-	 * 3. Cold boot from workload definition
+	 * 2. Pool path (if poolManager is configured)
+	 * 3. Cold boot fallback
 	 */
 	async claim(tenantId: TenantId, workloadId: WorkloadId): Promise<ClaimResult> {
 		const key = `${tenantId}:${workloadId}`;
@@ -105,7 +82,7 @@ export class TenantManager {
 			.where(eq(claims.tenantId, tenantId)).get();
 
 		if (existingClaim?.status === "active" && existingClaim.instanceId) {
-			// Verify the instance is actually running (it may have been hibernated/destroyed directly)
+			// Verify the instance is actually running (it may have been destroyed directly)
 			const instanceRow = this.db.select({ status: instances.status })
 				.from(instances)
 				.where(eq(instances.instanceId, existingClaim.instanceId))
@@ -124,7 +101,7 @@ export class TenantManager {
 				};
 			}
 
-			// Instance is gone/hibernated — delete stale claim and proceed
+			// Instance is gone — delete stale claim and proceed
 			this.db.delete(claims).where(eq(claims.claimId, existingClaim.claimId)).run();
 		} else if (existingClaim?.status === "creating" || existingClaim?.status === "releasing") {
 			throw new InvalidTransitionError("claim", existingClaim.status, "created");
@@ -138,8 +115,27 @@ export class TenantManager {
 		this.db.insert(claims).values({ claimId, tenantId, status: "creating", createdAt: new Date() }).run();
 
 		try {
-			// 4. Get or create the instance (same restore hierarchy as before)
-			const handle = await this.createInstance(tenantId, workloadId);
+			// 4. Pool path (if configured) — acquire a pre-warmed instance
+			if (this.poolManager) {
+				const instance = await this.poolManager.acquire(workloadId);
+				const hasData = this.tenantDataStore.hasOverlay(tenantId, workloadId);
+				await this.tenantDataStore.injectOverlay(instance, tenantId, workloadId);
+				this.updateInstanceClaimed(instance.instanceId);
+				// Clear pool status — instance is now a regular active instance
+				this.db.update(instances).set({ poolStatus: null }).where(eq(instances.instanceId, instance.instanceId)).run();
+				this.db.update(claims).set({ instanceId: instance.instanceId, status: "active" }).where(eq(claims.claimId, claimId)).run();
+				this.db.update(tenants).set({ lastActivity: new Date() }).where(eq(tenants.tenantId, tenantId)).run();
+				const endpoint = await this.safeGetEndpoint(instance);
+				const latencyMs = performance.now() - start;
+				const source: ClaimSource = hasData ? "pool+data" : "pool";
+				this.logClaim(tenantId, instance.instanceId, workloadId, source);
+				this.startIdleWatch(instance.instanceId, workloadId);
+				this.poolManager.replenish(workloadId).catch(() => {});
+				return { tenantId, instanceId: instance.instanceId, endpoint, source, latencyMs };
+			}
+
+			// 4b. Cold boot fallback
+			const handle = await this.createViaColdBoot(tenantId, workloadId);
 
 			// 5. Transition claim to active
 			this.db.update(claims)
@@ -163,12 +159,10 @@ export class TenantManager {
 	}
 
 	/**
-	 * Releases a tenant's instance according to the workload's idle policy.
+	 * Releases a tenant's instance.
 	 *
-	 * When `idle.action` is `"hibernate"`, the runtime snapshots the instance
-	 * (CRIU checkpoint on Podman, overlay tar on Kubernetes) and the tenant
-	 * can be restored from it on re-claim. When `"destroy"`, the instance is
-	 * removed entirely.
+	 * Extracts overlay data from the running container, destroys the instance,
+	 * and replenishes the pool if a PoolManager is configured.
 	 *
 	 * No-op if the tenant has no active claim.
 	 */
@@ -196,31 +190,12 @@ export class TenantManager {
 
 		if (!tenantRow) return;
 
-		// Look up the workload config to determine idle action
-		const workloadRow = this.db
-			.select()
-			.from(workloads)
-			.where(eq(workloads.workloadId, tenantRow.workloadId))
-			.get();
-
-		const idleAction = workloadRow?.config?.idle?.action ?? "hibernate";
-
-		// Save overlay data from the running container before hibernate/destroy
-		const workloadConfig = workloadRow?.config as Workload | undefined;
-		const overlayDirs = workloadConfig?.filesystem?.overlay_dirs;
-		if (overlayDirs?.length) {
-			const overlayData = await this.instanceManager.extractOverlay(instanceId, overlayDirs);
-			if (overlayData) {
-				this.tenantDataStore.saveOverlayBuffer(tenantId, tenantRow.workloadId, overlayData);
-				this.log?.info({ tenantId, workloadId: tenantRow.workloadId }, "Saved overlay data for tenant");
-			}
-		}
-
-		if (idleAction === "hibernate") {
-			// hibernate() also updates tenant.lastSnapshotId and deletes the old snapshot
-			await this.instanceManager.hibernate(instanceId);
-		} else {
-			await this.instanceManager.destroy(instanceId);
+		// Extract overlay data from the running container, then destroy and replenish pool
+		const handle: InstanceHandle = { instanceId, running: true };
+		await this.tenantDataStore.extractOverlay(handle, tenantId, tenantRow.workloadId);
+		await this.instanceManager.destroy(instanceId);
+		if (this.poolManager) {
+			this.poolManager.replenish(tenantRow.workloadId).catch(() => {});
 		}
 
 		// Delete the claim — tenant identity (with lastSnapshotId) persists
@@ -235,76 +210,10 @@ export class TenantManager {
 		});
 	}
 
-	/** Creates an instance via the restore hierarchy and returns handle with source. */
-	private async createInstance(
-		tenantId: TenantId,
-		workloadId: WorkloadId,
-	): Promise<InstanceHandle & { source: ClaimSource }> {
-		// Check for tenant snapshot
-		const tenantRow = this.db
-			.select()
-			.from(tenants)
-			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
-			.get();
-
-		if (tenantRow?.lastSnapshotId) {
-			const snapshotRef = this.getSnapshotRef(tenantRow.lastSnapshotId);
-			if (snapshotRef) {
-				this.log?.info({ tenantId, workloadId, source: "snapshot", snapshotId: snapshotRef.id }, "Claiming via tenant snapshot");
-				const handle = await this.restoreInstance(snapshotRef, tenantId);
-				this.updateInstanceClaimed(handle.instanceId);
-				return { ...handle, source: "snapshot" };
-			}
-		}
-
-		if (this.snapshotManager.capabilities.goldenSnapshots) {
-			return this.createViaGolden(tenantId, workloadId, tenantRow);
-		}
-
-		return this.createViaColdBoot(tenantId, workloadId, tenantRow);
-	}
-
-	/** Golden snapshot create path (steps 3–4): overlay restore or fresh golden. */
-	private async createViaGolden(
-		tenantId: TenantId,
-		workloadId: WorkloadId,
-		tenantRow: { tenantId: TenantId } | undefined,
-	): Promise<InstanceHandle & { source: ClaimSource }> {
-		// Check for data overlay (cold+data path)
-		const overlayPath = tenantRow
-			? this.tenantDataStore.restoreOverlay(tenantId, workloadId)
-			: null;
-
-		if (overlayPath) {
-			const goldenRef = this.snapshotManager.getGolden(workloadId, this.nodeId);
-			if (!goldenRef) {
-				throw new NoGoldenSnapshotError(workloadId, this.nodeId);
-			}
-
-			this.log?.info({ tenantId, workloadId, source: "cold+data", snapshotId: goldenRef.id }, "Claiming via golden + data overlay");
-			const handle = await this.restoreInstance(goldenRef, tenantId);
-			this.updateInstanceClaimed(handle.instanceId);
-			await this.instanceManager.injectOverlay(handle.instanceId, overlayPath);
-			return { ...handle, source: "cold+data" };
-		}
-
-		// Fresh from golden
-		const goldenRef = this.snapshotManager.getGolden(workloadId, this.nodeId);
-		if (!goldenRef) {
-			throw new NoGoldenSnapshotError(workloadId, this.nodeId);
-		}
-
-		this.log?.info({ tenantId, workloadId, source: "golden", snapshotId: goldenRef.id }, "Claiming via golden snapshot");
-		const handle = await this.restoreInstance(goldenRef, tenantId);
-		this.updateInstanceClaimed(handle.instanceId);
-		return { ...handle, source: "golden" };
-	}
-
 	/** Cold boot create path: create a fresh instance from the workload definition. */
 	private async createViaColdBoot(
 		tenantId: TenantId,
 		workloadId: WorkloadId,
-		tenantRow: { tenantId: TenantId } | undefined,
 	): Promise<InstanceHandle & { source: ClaimSource }> {
 		const workloadRow = this.db
 			.select()
@@ -315,6 +224,12 @@ export class TenantManager {
 		if (!workloadRow) {
 			throw new Error(`Workload not found: ${workloadId}`);
 		}
+
+		const tenantRow = this.db
+			.select()
+			.from(tenants)
+			.where(eq(tenants.tenantId, tenantId))
+			.get();
 
 		// Check for data overlay (cold boot + data path)
 		const overlayPath = tenantRow
@@ -339,82 +254,11 @@ export class TenantManager {
 		return { ...handle, source };
 	}
 
-	/** Restores an instance from a snapshot reference. */
-	private async restoreInstance(
-		ref: SnapshotRef,
-		tenantId: TenantId,
-	): Promise<InstanceHandle> {
-		this.eventBus?.emit({
-			type: "tenant.claiming",
-			tenantId,
-			workloadId: ref.workloadId,
-			source: "snapshot",
-			snapshotId: ref.id,
-		});
-
-		const prepared = this.instanceManager.prepareRestore(ref, tenantId);
-		let handle: InstanceHandle;
-		try {
-			handle = await this.serializedRestore(ref.id, () =>
-				this.instanceManager.executeRestore(ref, prepared.instanceId, prepared.workloadId, tenantId),
-			);
-		} catch (err) {
-			this.log?.error(
-				{ tenantId, workloadId: ref.workloadId, snapshotId: ref.id, err },
-				"Restore failed during claim",
-			);
-			throw err;
-		}
-
-		return handle;
-	}
-
-	/**
-	 * Serializes restore operations that share the same snapshot.
-	 * CRIU cannot restore the same checkpoint archive concurrently, and
-	 * needs a brief cooldown between restores for overlay cleanup.
-	 */
-	private async serializedRestore<T>(snapshotId: string, fn: () => Promise<T>): Promise<T> {
-		const tail = this.restoreLocks.get(snapshotId) ?? Promise.resolve();
-
-		let resolve!: () => void;
-		const next = new Promise<void>((r) => { resolve = r; });
-		this.restoreLocks.set(snapshotId, next);
-
-		// Wait for all prior restores of this snapshot to finish
-		await tail.catch(() => {});
-
-		try {
-			return await fn();
-		} catch (err) {
-			// Brief cooldown after failure — CRIU overlay cleanup is async
-			await new Promise((r) => setTimeout(r, 500));
-			throw err;
-		} finally {
-			resolve();
-			if (this.restoreLocks.get(snapshotId) === next) {
-				this.restoreLocks.delete(snapshotId);
-			}
-		}
-	}
-
 	/** Returns the endpoint, or null for containers with no exposed ports. */
 	private async safeGetEndpoint(handle: InstanceHandle): Promise<Endpoint | null> {
 		const endpoint = await this.instanceManager.getEndpoint(handle);
 		if (endpoint.ports.length === 0) return null;
 		return endpoint;
-	}
-
-	private getSnapshotRef(snapshotId: SnapshotId): SnapshotRef | null {
-		const row = this.db
-			.select()
-			.from(snapshots)
-			.where(eq(snapshots.snapshotId, snapshotId))
-			.get();
-
-		if (!row) return null;
-
-		return snapshotRefFrom(row);
 	}
 
 	/**

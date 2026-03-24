@@ -7,6 +7,7 @@ import { instrumentTenants, type TenantMetrics } from "./metrics/tenants";
 import { instrumentInstances, type InstanceMetrics } from "./metrics/instances";
 import { instrumentSnapshots, type SnapshotMetrics } from "./metrics/snapshots";
 import { instrumentCapacity, type CapacityMetrics } from "./metrics/capacity";
+import { instrumentPool, type PoolMetrics } from "./metrics/pool";
 
 /** Statuses that don't consume a runtime slot. */
 const FREE_STATUSES: InstanceStatus[] = ["destroyed", "hibernated"];
@@ -21,9 +22,9 @@ interface ResourceLimiterLike {
 	queueDepth(nodeId: NodeId): number;
 }
 
-/** Minimal GoldenCreator interface for queue depth. */
-interface GoldenCreatorLike {
-	readonly pending: number;
+/** Minimal PoolManager interface for pool depth. */
+interface PoolManagerLike {
+	getPoolDepth(workloadId: string): number;
 }
 
 export interface InstrumentDeps {
@@ -32,7 +33,7 @@ export interface InstrumentDeps {
 	nodeId: NodeId;
 	maxInstances: number;
 	resourceLimiter?: ResourceLimiterLike;
-	goldenCreator?: GoldenCreatorLike;
+	poolManager?: PoolManagerLike;
 }
 
 export interface AllMetrics {
@@ -40,6 +41,7 @@ export interface AllMetrics {
 	instances: InstanceMetrics;
 	snapshots: SnapshotMetrics;
 	capacity: CapacityMetrics;
+	pool: PoolMetrics;
 }
 
 /**
@@ -50,7 +52,7 @@ export interface AllMetrics {
  * All `workload` labels use human-readable workload names (not UUIDs).
  */
 export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllMetrics {
-	const { eventBus, db, nodeId, maxInstances, resourceLimiter, goldenCreator } = deps;
+	const { eventBus, db, nodeId, maxInstances, resourceLimiter } = deps;
 
 	/** Resolves a workloadId to its human-readable name. */
 	function workloadName(workloadId: string): string {
@@ -106,7 +108,7 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 	// ── Snapshot metrics ───────────────────────────────────────────────────
 	const snapshotMetrics = instrumentSnapshots(meter, {
 		getGoldenQueueDepth() {
-			return goldenCreator?.pending ?? 0;
+			return 0;
 		},
 		getDiskTotals() {
 			const rows = db
@@ -183,6 +185,24 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 		},
 	});
 
+	// ── Pool metrics ───────────────────────────────────────────────────────
+	const poolMetrics = instrumentPool(meter, {
+		getPoolDepths() {
+			// Count ready pool instances per workload
+			const rows = db
+				.select({
+					workload: workloads.name,
+					count: count(),
+				})
+				.from(instances)
+				.innerJoin(workloads, eq(instances.workloadId, workloads.workloadId))
+				.where(eq(instances.poolStatus, "ready"))
+				.groupBy(workloads.name)
+				.all();
+			return rows.map((r) => ({ workload: r.workload, depth: r.count }));
+		},
+	});
+
 	// ── EventBus → counter subscriptions ───────────────────────────────────
 
 	/** Transitional states we time. Map key is instanceId. */
@@ -240,5 +260,6 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 		instances: instanceMetrics,
 		snapshots: snapshotMetrics,
 		capacity: capacityMetrics,
+		pool: poolMetrics,
 	};
 }

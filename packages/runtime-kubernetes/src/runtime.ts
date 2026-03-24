@@ -1,20 +1,14 @@
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { generateSnapshotId, generateWorkloadId, generateNodeId } from "@boilerhouse/core";
 import type {
 	Runtime,
-	RuntimeCapabilities,
 	InstanceHandle,
 	Endpoint,
 	ExecResult,
 	CreateOptions,
-	SnapshotRef,
-	SnapshotPaths,
-	SnapshotMetadata,
 	Workload,
 	InstanceId,
 } from "@boilerhouse/core";
-import { encryptArchive, decryptArchive } from "@boilerhouse/core";
 import type { KubernetesConfig } from "./types";
 import { KubeClient } from "./client";
 import { workloadToPod, MANAGED_LABEL, ENVOY_IMAGE } from "./translator";
@@ -35,13 +29,9 @@ interface ManagedPod {
 }
 
 export class KubernetesRuntime implements Runtime {
-	readonly capabilities: RuntimeCapabilities = { goldenSnapshots: false };
-
 	private readonly client: KubeClient;
 	private readonly namespace: string;
-	private readonly snapshotDir: string | undefined;
 	private readonly context: string | undefined;
-	private readonly encryptionKey: string | undefined;
 	private readonly imageProvider: MinikubeImageProvider | undefined;
 	private readonly pods = new Map<string, ManagedPod>();
 
@@ -63,9 +53,7 @@ export class KubernetesRuntime implements Runtime {
 			this.namespace = config.namespace ?? "boilerhouse";
 		}
 
-		this.snapshotDir = config.snapshotDir;
 		this.context = config.context;
-		this.encryptionKey = config.encryptionKey;
 
 		const minikubeProfile = config.minikubeProfile ?? config.context;
 		if (minikubeProfile) {
@@ -202,163 +190,6 @@ export class KubernetesRuntime implements Runtime {
 
 		this.pods.delete(handle.instanceId);
 		handle.running = false;
-	}
-
-	async snapshot(handle: InstanceHandle): Promise<SnapshotRef> {
-		if (!this.snapshotDir) {
-			throw new KubernetesRuntimeError("snapshotDir is required for snapshot operations");
-		}
-
-		const managed = this.pods.get(handle.instanceId);
-		if (!managed) {
-			throw new KubernetesRuntimeError(`Pod not tracked: ${handle.instanceId}`);
-		}
-
-		const snapshotId = generateSnapshotId();
-		const archiveDir = join(this.snapshotDir, snapshotId);
-		mkdirSync(archiveDir, { recursive: true, mode: 0o700 });
-
-		// Save workload definition for later restore
-		writeFileSync(
-			join(archiveDir, "workload.json"),
-			JSON.stringify(managed.workload),
-		);
-
-		// Tar overlay directories from the container
-		const overlayDirs = managed.workload.filesystem?.overlay_dirs;
-		if (overlayDirs && overlayDirs.length > 0) {
-			const tarCmd = ["tar", "czf", "-", ...overlayDirs];
-			const result = await this.client.exec(
-				this.namespace,
-				handle.instanceId,
-				["sh", "-c", `${tarCmd.join(" ")} | base64`],
-				this.context,
-			);
-
-			if (result.exitCode === 0 && result.stdout.trim()) {
-				let tarData = Buffer.from(result.stdout.trim(), "base64");
-
-				// Encrypt the overlay archive at rest
-				if (this.encryptionKey) {
-					tarData = await encryptArchive(tarData, this.encryptionKey);
-				}
-
-				writeFileSync(join(archiveDir, "overlay.tar.gz"), tarData);
-			}
-		}
-
-		const overlayPath = join(archiveDir, "overlay.tar.gz");
-
-		const paths: SnapshotPaths = {
-			memory: overlayPath,
-			vmstate: overlayPath,
-		};
-
-		const runtimeMeta: SnapshotMetadata = {
-			runtimeVersion: "kubernetes",
-			architecture: process.arch === "x64" ? "x86_64" : process.arch,
-			exposedPorts: managed.workload.network?.expose?.map((p) => p.guest),
-		};
-
-		return {
-			id: snapshotId,
-			type: "tenant",
-			paths,
-			workloadId: generateWorkloadId(),
-			nodeId: generateNodeId(),
-			runtimeMeta,
-			encrypted: !!this.encryptionKey,
-		};
-	}
-
-	async restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle> {
-		const proxyConfig = options?.proxyConfig;
-
-		// Read workload.json from the snapshot directory
-		const snapshotDir = join(ref.paths.memory, "..");
-		const workloadPath = join(snapshotDir, "workload.json");
-
-		let workload: Workload;
-		try {
-			workload = JSON.parse(readFileSync(workloadPath, "utf-8")) as Workload;
-		} catch {
-			throw new KubernetesRuntimeError(
-				`Cannot read workload.json from snapshot directory: ${snapshotDir}`,
-			);
-		}
-
-		// Ensure image is available and create pod
-		const { imageRef, localBuild } = await this.ensureImage(workload, () => {});
-
-		if (proxyConfig && this.imageProvider) {
-			await this.imageProvider.ensureImage(
-				{ ref: ENVOY_IMAGE },
-				{ name: "envoy-proxy", version: "sidecar" },
-				() => {},
-			);
-		}
-
-		const { pod, service, networkPolicy } = workloadToPod(
-			workload, instanceId, this.namespace, imageRef, proxyConfig,
-		);
-		if (localBuild) {
-			pod.spec.containers[0]!.imagePullPolicy = "Never";
-		}
-
-		// Create ConfigMap before pod
-		if (proxyConfig) {
-			await this.client.createConfigMap(this.namespace, {
-				apiVersion: "v1",
-				kind: "ConfigMap",
-				metadata: { name: `${instanceId}-proxy`, namespace: this.namespace },
-				data: { "envoy.yaml": proxyConfig },
-			});
-		}
-
-		await this.client.createPod(this.namespace, pod);
-
-		if (service) {
-			await this.client.createService(this.namespace, service).catch(() => {});
-		}
-
-		if (networkPolicy) {
-			await this.client.createNetworkPolicy(this.namespace, networkPolicy).catch(() => {});
-		}
-
-		// Wait for pod to be running
-		await this.client.waitForPodRunning(this.namespace, instanceId);
-
-		// Restore overlay data if present
-		const overlayPath = join(snapshotDir, "overlay.tar.gz");
-		try {
-			let overlayData = readFileSync(overlayPath);
-			if (overlayData.length > 0) {
-				// Decrypt if the snapshot was encrypted at rest
-				if (ref.encrypted) {
-					if (!this.encryptionKey) {
-						throw new KubernetesRuntimeError(
-							"Snapshot is encrypted but no encryption key is configured",
-						);
-					}
-					overlayData = await decryptArchive(overlayData, this.encryptionKey);
-				}
-
-				const b64 = overlayData.toString("base64");
-				await this.client.exec(
-					this.namespace,
-					instanceId,
-					["sh", "-c", `echo '${b64}' | base64 -d | tar xzf - -C /`],
-					this.context,
-				);
-			}
-		} catch (err) {
-			// Re-throw known errors, ignore missing overlay file
-			if (err instanceof KubernetesRuntimeError) throw err;
-			if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-		}
-
-		this.pods.set(instanceId, { instanceId, running: true, workload, portForwards: new Map() });
-		return { instanceId, running: true };
 	}
 
 	async exec(handle: InstanceHandle, command: string[]): Promise<ExecResult> {

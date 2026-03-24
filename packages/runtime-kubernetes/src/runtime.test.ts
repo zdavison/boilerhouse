@@ -156,11 +156,6 @@ describe("KubernetesRuntime", () => {
 		}
 	});
 
-	test("capabilities.goldenSnapshots is false", () => {
-		setup();
-		expect(runtime.capabilities.goldenSnapshots).toBe(false);
-	});
-
 	test("available() returns true when namespace is Active", async () => {
 		setup();
 		expect(await runtime.available()).toBe(true);

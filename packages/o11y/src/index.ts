@@ -18,6 +18,8 @@ export { instrumentSnapshots } from "./metrics/snapshots";
 export type { SnapshotMetrics, SnapshotMetricsDeps } from "./metrics/snapshots";
 export { instrumentCapacity } from "./metrics/capacity";
 export type { CapacityMetrics, CapacityMetricsDeps } from "./metrics/capacity";
+export { instrumentPool } from "./metrics/pool";
+export type { PoolMetrics, PoolMetricsDeps } from "./metrics/pool";
 
 // Unified EventBus → metrics wiring
 export { instrumentFromEventBus } from "./instrument";
@@ -26,7 +28,6 @@ export type { InstrumentDeps, AllMetrics } from "./instrument";
 // Tracing — manager wrappers
 export { wrapTenantManager } from "./tracing/tenants";
 export { wrapInstanceManager } from "./tracing/instances";
-export { wrapSnapshotManager } from "./tracing/snapshots";
 
 // Tracing — HTTP plugin
 export { httpTracing } from "./tracing/http";

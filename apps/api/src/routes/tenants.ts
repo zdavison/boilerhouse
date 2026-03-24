@@ -3,7 +3,6 @@ import { eq, and } from "drizzle-orm";
 import type { TenantId } from "@boilerhouse/core";
 import { InvalidTransitionError } from "@boilerhouse/core";
 import { tenants, workloads, instances, snapshots, claims } from "@boilerhouse/db";
-import { NoGoldenSnapshotError } from "../tenant-manager";
 import type { RouteDeps } from "./deps";
 
 /**
@@ -53,10 +52,6 @@ export function tenantRoutes(deps: RouteDeps) {
 					workloadRow.workloadId,
 				);
 			} catch (err) {
-				if (err instanceof NoGoldenSnapshotError) {
-					set.status = 503;
-					return { error: err.message };
-				}
 				if (err instanceof InvalidTransitionError) {
 					set.status = 409;
 					return { error: err.message };

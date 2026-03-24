@@ -159,6 +159,18 @@ export const WorkloadSchema = Type.Object({
 	),
 	/** Arbitrary key-value pairs passed through to the API. */
 	metadata: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+	pool: Type.Optional(Type.Object({
+		/**
+		 * Number of pre-warmed instances to maintain in the pool.
+		 * @default 3
+		 */
+		size: Type.Number({ minimum: 0, default: 3 }),
+		/**
+		 * Maximum number of instances to start in parallel when refilling the pool.
+		 * @default 2
+		 */
+		max_fill_concurrency: Type.Number({ exclusiveMinimum: 0, default: 2 }),
+	})),
 });
 
 // ── Types derived from schema ────────────────────────────────────────────────
@@ -170,6 +182,7 @@ export type PortExpose = Static<typeof PortExposeSchema>;
 export type HttpGetProbe = Static<typeof HttpGetProbeSchema>;
 export type ExecProbe = Static<typeof ExecProbeSchema>;
 export type CredentialRule = Static<typeof CredentialRuleSchema>;
+export type PoolConfig = NonNullable<Workload["pool"]>;
 
 // ── Error class ──────────────────────────────────────────────────────────────
 
@@ -314,6 +327,7 @@ export interface WorkloadConfig {
 		workdir?: string;
 	};
 	metadata?: Record<string, unknown>;
+	pool?: { size?: number; max_fill_concurrency?: number };
 }
 
 /**
@@ -367,6 +381,7 @@ export function resolveWorkloadConfig(config: WorkloadConfig): Workload {
 	if (config.health) raw.health = config.health;
 	if (config.entrypoint) raw.entrypoint = config.entrypoint;
 	if (config.metadata) raw.metadata = config.metadata;
+	if (config.pool) raw.pool = config.pool;
 
 	Value.Default(WorkloadSchema, raw);
 	checkImageMutualExclusivity(raw);

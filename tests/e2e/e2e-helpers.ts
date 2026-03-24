@@ -138,7 +138,7 @@ export async function startE2EServer(
 		...(runtimeName === "fake" ? { healthChecker: async () => {} } : {}),
 		secretStore,
 	});
-	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-e2e", db);
+	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-e2e", db, runtime);
 
 	let idleMonitor: IdleMonitor | undefined;
 	let watchDirsPoller: WatchDirsPoller | undefined;

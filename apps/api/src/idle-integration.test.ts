@@ -21,8 +21,6 @@ import {
 	workloads,
 } from "@boilerhouse/db";
 import { InstanceManager } from "./instance-manager";
-import { SnapshotManager } from "./snapshot-manager";
-import type { HealthChecker } from "./snapshot-manager";
 import { TenantDataStore } from "./tenant-data";
 import { TenantManager } from "./tenant-manager";
 import { IdleMonitor } from "./idle-monitor";
@@ -45,13 +43,10 @@ const TEST_WORKLOAD_DESTROY: Workload = {
 	idle: { action: "destroy", timeout_seconds: 0.05 },
 };
 
-const alwaysHealthy: HealthChecker = async () => {};
-
 let db: DrizzleDb;
 let runtime: FakeRuntime;
 let log: ActivityLog;
 let instanceManager: InstanceManager;
-let snapshotManager: SnapshotManager;
 let tenantDataStore: TenantDataStore;
 let tenantManager: TenantManager;
 let idleMonitor: IdleMonitor;
@@ -94,15 +89,11 @@ beforeEach(() => {
 		.run();
 
 	instanceManager = new InstanceManager(runtime, db, log, nodeId);
-	snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-		healthChecker: alwaysHealthy,
-	});
-	tenantDataStore = new TenantDataStore(storagePath, db);
+	tenantDataStore = new TenantDataStore(storagePath, db, runtime);
 	idleMonitor = new IdleMonitor({ defaultPollIntervalMs: POLL_INTERVAL });
 
 	tenantManager = new TenantManager(
 		instanceManager,
-		snapshotManager,
 		db,
 		log,
 		nodeId,
@@ -128,10 +119,9 @@ afterEach(() => {
 });
 
 describe("IdleMonitor + TenantManager integration", () => {
-	test("idle fires 'hibernate' → instance status becomes 'hibernated'", async () => {
+	test("idle fires → instance is destroyed", async () => {
 		const workloadId = generateWorkloadId();
 		seedWorkload(workloadId, TEST_WORKLOAD_HIBERNATE);
-		await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 
 		const tenantId = generateTenantId();
 		const result = await tenantManager.claim(tenantId, workloadId);
@@ -145,13 +135,12 @@ describe("IdleMonitor + TenantManager integration", () => {
 			.where(eq(instances.instanceId, result.instanceId))
 			.get();
 
-		expect(row!.status).toBe("hibernated");
+		expect(row!.status).toBe("destroyed");
 	});
 
 	test("idle fires 'destroy' → instance status becomes 'destroyed'", async () => {
 		const workloadId = generateWorkloadId();
 		seedWorkload(workloadId, TEST_WORKLOAD_DESTROY);
-		await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_DESTROY);
 
 		const tenantId = generateTenantId();
 		const result = await tenantManager.claim(tenantId, workloadId);
@@ -171,30 +160,29 @@ describe("IdleMonitor + TenantManager integration", () => {
 	test("claim then immediately release → idle handler does NOT fire", async () => {
 		const workloadId = generateWorkloadId();
 		seedWorkload(workloadId, TEST_WORKLOAD_HIBERNATE);
-		await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 
 		const tenantId = generateTenantId();
 		const result = await tenantManager.claim(tenantId, workloadId);
 		await tenantManager.release(tenantId);
 
-		// Instance is already hibernated by explicit release
+		// Instance is already destroyed by explicit release
 		const beforeRow = db
 			.select()
 			.from(instances)
 			.where(eq(instances.instanceId, result.instanceId))
 			.get();
-		expect(beforeRow!.status).toBe("hibernated");
+		expect(beforeRow!.status).toBe("destroyed");
 
 		// Wait past the idle timeout — handler should NOT fire (unwatch prevented it)
 		await sleep(80);
 
-		// Status should still be hibernated (not double-processed)
+		// Status should still be destroyed (not double-processed)
 		const afterRow = db
 			.select()
 			.from(instances)
 			.where(eq(instances.instanceId, result.instanceId))
 			.get();
-		expect(afterRow!.status).toBe("hibernated");
+		expect(afterRow!.status).toBe("destroyed");
 	});
 
 	test("workload's idle config (timeout_seconds, action) is used by the monitor", async () => {
@@ -209,7 +197,6 @@ describe("IdleMonitor + TenantManager integration", () => {
 
 		const workloadId = generateWorkloadId();
 		seedWorkload(workloadId, longTimeoutWorkload);
-		await snapshotManager.createGolden(workloadId, longTimeoutWorkload);
 
 		const tenantId = generateTenantId();
 		const result = await tenantManager.claim(tenantId, workloadId);

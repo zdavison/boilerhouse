@@ -17,6 +17,7 @@ import type {
 	InstanceId,
 	TenantId,
 	InstanceStatus,
+	PoolStatus,
 	SnapshotId,
 	SnapshotType,
 	SnapshotStatus,
@@ -78,6 +79,7 @@ export const instances = sqliteTable(
 		runtimeMeta: jsonObject<Record<string, unknown>>("runtime_meta"),
 		lastActivity: timestamp("last_activity"),
 		claimedAt: timestamp("claimed_at"),
+		poolStatus: text("pool_status").$type<PoolStatus>(),
 		createdAt: timestamp("created_at").notNull(),
 	},
 	(table) => [

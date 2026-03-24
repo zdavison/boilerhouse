@@ -4,12 +4,10 @@ import { createTestDatabase, ActivityLog } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
 import { InstanceManager } from "./instance-manager";
-import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";
 import { TenantDataStore } from "./tenant-data";
 import { EventBus } from "./event-bus";
 import { ResourceLimiter } from "./resource-limits";
-import { GoldenCreator } from "./golden-creator";
 import { BootstrapLogStore } from "./bootstrap-log-store";
 import { SecretStore } from "./secret-store";
 import { createApp } from "./app";
@@ -42,13 +40,9 @@ export function createTestApp(overrides?: Partial<RouteDeps>): TestContext {
 
 	const log = createLogger("test");
 	const instanceManager = new InstanceManager(runtime, db, activityLog, nodeId, eventBus, log);
-	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-		healthChecker: async () => {},
-	});
-	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-test", db);
+	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-test", db, runtime);
 	const tenantManager = new TenantManager(
 		instanceManager,
-		snapshotManager,
 		db,
 		activityLog,
 		nodeId,
@@ -60,7 +54,6 @@ export function createTestApp(overrides?: Partial<RouteDeps>): TestContext {
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
 	const bootstrapLogStore = new BootstrapLogStore(db);
-	const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
 	const secretStore = new SecretStore(db, randomBytes(32).toString("hex"));
 
 	const deps: RouteDeps = {
@@ -70,9 +63,7 @@ export function createTestApp(overrides?: Partial<RouteDeps>): TestContext {
 		activityLog,
 		instanceManager,
 		tenantManager,
-		snapshotManager,
 		eventBus,
-		goldenCreator,
 		bootstrapLogStore,
 		resourceLimiter,
 		secretStore,

@@ -27,6 +27,7 @@ function seedWorkload(ctx: ReturnType<typeof createTestApp>) {
 			name: "tenant-test",
 			version: "1.0.0",
 			config: MINIMAL_WORKLOAD,
+			status: "ready",
 			createdAt: new Date(),
 			updatedAt: new Date(),
 		})
@@ -35,13 +36,10 @@ function seedWorkload(ctx: ReturnType<typeof createTestApp>) {
 }
 
 describe("POST /api/v1/tenants/:id/claim", () => {
-	test("claims a tenant with a golden snapshot", async () => {
+	test("claims a tenant via cold boot", async () => {
 		const ctx = createTestApp();
 		const workloadId = seedWorkload(ctx);
 		const tenantId = generateTenantId();
-
-		// Create a golden snapshot first
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
 
 		const events: DomainEvent[] = [];
 		ctx.eventBus.on((e) => events.push(e));
@@ -62,30 +60,8 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		expect(body.tenantId).toBe(tenantId);
 		expect(body.instanceId).toBeDefined();
 		expect(body.endpoint).toBeDefined();
-		expect(body.source).toBe("golden");
+		expect(body.source).toBe("cold");
 		expect(body.latencyMs).toBeGreaterThanOrEqual(0);
-
-		expect(events).toHaveLength(2);
-		expect(events[0]!.type).toBe("tenant.claiming");
-		expect(events[1]!.type).toBe("tenant.claimed");
-	});
-
-	test("returns 503 when no golden snapshot exists", async () => {
-		const ctx = createTestApp();
-		seedWorkload(ctx);
-		const tenantId = generateTenantId();
-
-		const res = await apiRequest(
-			ctx.app,
-			`/api/v1/tenants/${tenantId}/claim`,
-			{
-				method: "POST",
-				body: JSON.stringify({ workload: "tenant-test" }),
-				headers: { "content-type": "application/json" },
-			},
-		);
-
-		expect(res.status).toBe(503);
 	});
 
 	test("returns 404 for nonexistent workload name", async () => {
@@ -122,14 +98,11 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		expect(res.status).toBe(422);
 	});
 
-	test("full multi-tenant lifecycle: claim, release, re-claim, new tenant from golden", async () => {
+	test("full multi-tenant lifecycle: claim, release, re-claim, new tenant", async () => {
 		const ctx = createTestApp();
 		const workloadId = seedWorkload(ctx);
 
-		// 1-2. Golden snapshot created
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
-
-		// 3-4. Tenant 'zac' claims → restored from golden
+		// Tenant 'zac' claims → cold boot
 		const claim1 = await apiRequest(
 			ctx.app,
 			`/api/v1/tenants/${ZAC_ID}/claim`,
@@ -141,10 +114,10 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		);
 		expect(claim1.status).toBe(200);
 		const body1 = await claim1.json();
-		expect(body1.source).toBe("golden");
+		expect(body1.source).toBe("cold");
 		const zacInstanceId1 = body1.instanceId;
 
-		// 5-6. Tenant 'zac' releases → creates tenant snapshot
+		// Tenant 'zac' releases → hibernates
 		const release1 = await apiRequest(
 			ctx.app,
 			`/api/v1/tenants/${ZAC_ID}/release`,
@@ -156,30 +129,7 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		);
 		expect(release1.status).toBe(200);
 
-		// Verify a tenant snapshot was created for zac
-		const snapshotsRes1 = await apiRequest(ctx.app, "/api/v1/snapshots");
-		const allSnapshots1 = await snapshotsRes1.json();
-		const zacSnap = allSnapshots1.find(
-			(s: { type: string; tenantId: string }) => s.type === "tenant" && s.tenantId === ZAC_ID,
-		);
-		expect(zacSnap).toBeDefined();
-
-		// 7-8. Tenant 'zac' re-claims → restored from tenant snapshot
-		const claim2 = await apiRequest(
-			ctx.app,
-			`/api/v1/tenants/${ZAC_ID}/claim`,
-			{
-				method: "POST",
-				body: JSON.stringify({ workload: "tenant-test" }),
-				headers: { "content-type": "application/json" },
-			},
-		);
-		expect(claim2.status).toBe(200);
-		const body2 = await claim2.json();
-		expect(body2.source).toBe("snapshot");
-		expect(body2.instanceId).not.toBe(zacInstanceId1);
-
-		// 9-10. New tenant 'zac2' claims → restored from golden (not tenant:zac)
+		// New tenant 'zac2' claims → cold boot (independent)
 		const claim3 = await apiRequest(
 			ctx.app,
 			`/api/v1/tenants/${ZAC2_ID}/claim`,
@@ -191,32 +141,20 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		);
 		expect(claim3.status).toBe(200);
 		const body3 = await claim3.json();
-		expect(body3.source).toBe("golden");
-		expect(body3.instanceId).not.toBe(body2.instanceId);
+		expect(body3.source).toBe("cold");
+		expect(body3.instanceId).not.toBe(zacInstanceId1);
 
-		// Verify instance parentage via API: zac2's instance has no tenant snapshot
-		const snapshotsRes2 = await apiRequest(ctx.app, "/api/v1/snapshots");
-		const allSnapshots2 = await snapshotsRes2.json();
-		const zac2Snap = allSnapshots2.find(
-			(s: { type: string; tenantId: string }) => s.type === "tenant" && s.tenantId === ZAC2_ID,
-		);
-		expect(zac2Snap).toBeUndefined();
-
-		// Verify both instances are active with correct tenantIds
+		// Verify both tenants have distinct active instances
 		const instancesRes = await apiRequest(ctx.app, "/api/v1/instances?status=active");
 		const activeInstances = await instancesRes.json();
-		const zacInst = activeInstances.find((i: { tenantId: string }) => i.tenantId === ZAC_ID);
 		const zac2Inst = activeInstances.find((i: { tenantId: string }) => i.tenantId === ZAC2_ID);
-		expect(zacInst).toBeDefined();
 		expect(zac2Inst).toBeDefined();
 	});
 
-	test("re-claims after instance is hibernated directly", async () => {
+	test("re-claims after instance is destroyed directly", async () => {
 		const ctx = createTestApp();
 		const workloadId = seedWorkload(ctx);
 		const tenantId = generateTenantId();
-
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
 
 		// First claim
 		const claim1 = await apiRequest(
@@ -231,15 +169,15 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		expect(claim1.status).toBe(200);
 		const { instanceId } = await claim1.json();
 
-		// Hibernate via instance endpoint (not tenant release)
-		const hibRes = await apiRequest(
+		// Destroy the instance directly
+		const destroyRes = await apiRequest(
 			ctx.app,
-			`/api/v1/instances/${instanceId}/hibernate`,
+			`/api/v1/instances/${instanceId}/destroy`,
 			{ method: "POST" },
 		);
-		expect(hibRes.status).toBe(200);
+		expect(destroyRes.status).toBe(200);
 
-		// Re-claim same tenant
+		// Re-claim should succeed via cold boot
 		const claim2 = await apiRequest(
 			ctx.app,
 			`/api/v1/tenants/${tenantId}/claim`,
@@ -251,63 +189,7 @@ describe("POST /api/v1/tenants/:id/claim", () => {
 		);
 		expect(claim2.status).toBe(200);
 		const body2 = await claim2.json();
-		expect(body2.tenantId).toBe(tenantId);
-		expect(body2.source).toBe("snapshot");
-	});
-
-	test("re-claims after instance is destroyed directly", async () => {
-		const ctx = createTestApp();
-		const workloadId = seedWorkload(ctx);
-
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
-
-		// Claim → hibernate (establish a tenant snapshot)
-		const claim1 = await apiRequest(
-			ctx.app,
-			`/api/v1/tenants/${ZAC_ID}/claim`,
-			{
-				method: "POST",
-				body: JSON.stringify({ workload: "tenant-test" }),
-				headers: { "content-type": "application/json" },
-			},
-		);
-		expect(claim1.status).toBe(200);
-		const { instanceId: inst1 } = await claim1.json();
-
-		await apiRequest(ctx.app, `/api/v1/instances/${inst1}/hibernate`, { method: "POST" });
-
-		// Re-claim, then destroy
-		const claim2 = await apiRequest(
-			ctx.app,
-			`/api/v1/tenants/${ZAC_ID}/claim`,
-			{
-				method: "POST",
-				body: JSON.stringify({ workload: "tenant-test" }),
-				headers: { "content-type": "application/json" },
-			},
-		);
-		const { instanceId: inst2 } = await claim2.json();
-
-		const destroyRes = await apiRequest(
-			ctx.app,
-			`/api/v1/instances/${inst2}/destroy`,
-			{ method: "POST" },
-		);
-		expect(destroyRes.status).toBe(200);
-
-		// Re-claim should succeed
-		const claim3 = await apiRequest(
-			ctx.app,
-			`/api/v1/tenants/${ZAC_ID}/claim`,
-			{
-				method: "POST",
-				body: JSON.stringify({ workload: "tenant-test" }),
-				headers: { "content-type": "application/json" },
-			},
-		);
-		expect(claim3.status).toBe(200);
-		const body3 = await claim3.json();
-		expect(body3.source).toBe("snapshot");
+		expect(body2.source).toBe("cold");
 	});
 });
 
@@ -317,7 +199,6 @@ describe("POST /api/v1/tenants/:id/release", () => {
 		const workloadId = seedWorkload(ctx);
 		const tenantId = generateTenantId();
 
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
 		await ctx.tenantManager.claim(tenantId, workloadId);
 
 		const events: DomainEvent[] = [];
@@ -337,12 +218,10 @@ describe("POST /api/v1/tenants/:id/release", () => {
 		const body = await res.json();
 		expect(body.released).toBe(true);
 
-		expect(events).toHaveLength(3);
+		expect(events).toHaveLength(2);
 		expect(events[0]!.type).toBe("instance.state");
-		expect((events[0] as any).status).toBe("hibernating");
-		expect(events[1]!.type).toBe("instance.state");
-		expect((events[1] as any).status).toBe("hibernated");
-		expect(events[2]!.type).toBe("tenant.released");
+		expect((events[0] as any).status).toBe("destroyed");
+		expect(events[1]!.type).toBe("tenant.released");
 	});
 
 	test("returns 404 for nonexistent tenant", async () => {
@@ -364,12 +243,11 @@ describe("POST /api/v1/tenants/:id/release", () => {
 });
 
 describe("GET /api/v1/tenants/:id", () => {
-	test("returns tenant details with instance and snapshots", async () => {
+	test("returns tenant details with instance", async () => {
 		const ctx = createTestApp();
 		const workloadId = seedWorkload(ctx);
 		const tenantId = generateTenantId();
 
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
 		const claim = await ctx.tenantManager.claim(tenantId, workloadId);
 
 		const res = await apiRequest(
@@ -407,8 +285,6 @@ describe("GET /api/v1/tenants", () => {
 	test("returns list of tenants", async () => {
 		const ctx = createTestApp();
 		const workloadId = seedWorkload(ctx);
-
-		await ctx.snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
 
 		const t1 = generateTenantId();
 		const t2 = generateTenantId();
