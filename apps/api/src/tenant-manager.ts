@@ -120,7 +120,7 @@ export class TenantManager {
 				const instance = await this.poolManager.acquire(workloadId);
 				const hasData = this.tenantDataStore.hasOverlay(tenantId, workloadId);
 				await this.tenantDataStore.injectOverlay(instance, tenantId, workloadId);
-				this.updateInstanceClaimed(instance.instanceId);
+				this.updateInstanceClaimed(instance.instanceId, tenantId);
 				// Clear pool status — instance is now a regular active instance
 				this.db.update(instances).set({ poolStatus: null }).where(eq(instances.instanceId, instance.instanceId)).run();
 				this.db.update(claims).set({ instanceId: instance.instanceId, status: "active" }).where(eq(claims.claimId, claimId)).run();
@@ -245,7 +245,7 @@ export class TenantManager {
 			tenantId,
 		);
 
-		this.updateInstanceClaimed(handle.instanceId);
+		this.updateInstanceClaimed(handle.instanceId, tenantId);
 
 		if (overlayPath) {
 			await this.instanceManager.injectOverlay(handle.instanceId, overlayPath);
@@ -287,12 +287,12 @@ export class TenantManager {
 		}
 	}
 
-	/** Sets claimedAt and lastActivity on the instance row. */
-	private updateInstanceClaimed(instanceId: InstanceId): void {
+	/** Sets tenantId, claimedAt and lastActivity on the instance row. */
+	private updateInstanceClaimed(instanceId: InstanceId, tenantId: TenantId): void {
 		const now = new Date();
 		this.db
 			.update(instances)
-			.set({ claimedAt: now, lastActivity: now })
+			.set({ tenantId, claimedAt: now, lastActivity: now })
 			.where(eq(instances.instanceId, instanceId))
 			.run();
 	}
