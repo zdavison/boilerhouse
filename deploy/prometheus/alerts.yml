@@ -1,0 +1,11 @@
+groups:
+  - name: boilerhouse
+    rules:
+      - alert: PoolExhausted
+        expr: boilerhouse_pool_depth == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pool exhausted for workload {{ $labels.workload }}"
+          description: "The warm instance pool for workload {{ $labels.workload }} has been empty for more than 30 seconds. New claims will fall back to cold boot until the pool is replenished."

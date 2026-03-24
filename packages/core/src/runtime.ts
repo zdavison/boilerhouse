@@ -1,7 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { InstanceIdSchema } from "./types";
 import type { InstanceId } from "./types";
-import type { SnapshotRef } from "./snapshot";
 import type { Workload } from "./workload";
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -29,6 +28,15 @@ export interface ExecResult {
 	stderr: string;
 }
 
+/** Pool lifecycle status for a pre-warmed instance. Null means not in pool. */
+export type PoolStatus = "warming" | "ready" | "acquired" | null;
+
+/** Options for executing a command inside an instance. */
+export interface ExecOptions {
+	/** Optional stdin stream piped into the command. */
+	stdin?: import("node:stream").Readable;
+}
+
 export interface InstanceHandle {
 	/** The unique instance identifier. */
 	instanceId: InstanceId;
@@ -39,17 +47,6 @@ export interface InstanceHandle {
 }
 
 export type Endpoint = Static<typeof EndpointSchema>;
-
-// ── Runtime capabilities ─────────────────────────────────────────────────────
-
-export interface RuntimeCapabilities {
-	/**
-	 * Whether the runtime supports golden snapshots (CRIU checkpoint/restore).
-	 * When false, workloads skip golden snapshot creation and go straight to
-	 * "ready". Claim always cold-boots; release always destroys after snapshot.
-	 */
-	goldenSnapshots: boolean;
-}
 
 // ── Create options ──────────────────────────────────────────────────────────
 
@@ -67,7 +64,6 @@ export interface CreateOptions {
 // ── Runtime interface ────────────────────────────────────────────────────────
 
 export interface Runtime {
-	readonly capabilities: RuntimeCapabilities;
 	/** Create a new instance from a workload definition (cold boot). */
 	create(workload: Workload, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle>;
 
@@ -77,22 +73,8 @@ export interface Runtime {
 	/** Destroy an instance and clean up all resources. */
 	destroy(handle: InstanceHandle): Promise<void>;
 
-	/**
-	 * Create a snapshot of a running instance.
-	 * Returns a reference that can be passed to `restore()`.
-	 */
-	snapshot(handle: InstanceHandle): Promise<SnapshotRef>;
-
-	/**
-	 * Restore an instance from a snapshot.
-	 * Returns a running instance handle.
-	 *
-	 * @param options - Optional create options (e.g. proxyConfig for sidecar).
-	 */
-	restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle>;
-
 	/** Execute a command inside the instance. */
-	exec(handle: InstanceHandle, command: string[]): Promise<ExecResult>;
+	exec(handle: InstanceHandle, command: string[], options?: ExecOptions): Promise<ExecResult>;
 
 	/** Get the connectivity info for reaching the instance. */
 	getEndpoint(handle: InstanceHandle): Promise<Endpoint>;

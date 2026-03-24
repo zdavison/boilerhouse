@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Flame, Package, HardDrive, ScrollText, BarChart3, Zap, Camera } from "lucide-react";
+import { Flame, Package, HardDrive, ScrollText, BarChart3, Zap } from "lucide-react";
 import { createRoot } from "react-dom/client";
 import { useHashRoute, matchRoute, useWebSocket } from "./hooks";
 import { WorkloadList } from "./pages/WorkloadList";
@@ -9,12 +9,10 @@ import { NodeList } from "./pages/NodeList";
 import { ActivityLog } from "./pages/ActivityLog";
 import { MetricsPage } from "./pages/MetricsPage";
 import { TriggerList } from "./pages/TriggerList";
-import { SnapshotList } from "./pages/SnapshotList";
 
 const ENTITY_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
 	{ path: "/workloads", label: "workloads", icon: Package },
 	{ path: "/triggers", label: "triggers", icon: Zap },
-	{ path: "/entities/snapshots", label: "snapshots", icon: Camera },
 ];
 
 const INFRA_ITEMS: { path: string; label: string; icon: LucideIcon }[] = [
@@ -49,8 +47,6 @@ function App() {
 		content = <MetricsPage key={tick} />;
 	} else if (path === "/logs") {
 		content = <ActivityLog key={tick} />;
-	} else if (path === "/entities/snapshots") {
-		content = <SnapshotList key={tick} />;
 	} else {
 		content = (
 			<div className="text-center py-20 text-muted">

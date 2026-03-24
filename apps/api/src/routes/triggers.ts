@@ -2,7 +2,6 @@ import { Elysia, t } from "elysia";
 import { eq } from "drizzle-orm";
 import { triggers, workloads } from "@boilerhouse/db";
 import { generateTriggerId, type TriggerId, InvalidTransitionError } from "@boilerhouse/core";
-import { NoGoldenSnapshotError } from "../tenant-manager";
 import type { RouteDeps } from "./deps";
 import type { TenantId } from "@boilerhouse/core";
 
@@ -211,10 +210,6 @@ export function triggerRoutes(deps: RouteDeps) {
 				try {
 					claim = await deps.tenantManager.claim(tenantId, workloadRow.workloadId);
 				} catch (err) {
-					if (err instanceof NoGoldenSnapshotError) {
-						set.status = 503;
-						return { error: err.message };
-					}
 					if (err instanceof InvalidTransitionError) {
 						set.status = 409;
 						return { error: err.message };

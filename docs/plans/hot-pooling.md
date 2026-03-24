@@ -439,3 +439,300 @@ claims are instant. When pool drains and node is at capacity, claims block until
 
 5. **Observability**: Queue depth and wait time as metrics. Alert when queue depth exceeds a
    threshold (signals the node is undersized or needs horizontal scaling).
+
+---
+
+## Task Plan
+
+### Phase 1 — Hot-Pooling alongside CRIU
+
+#### 1.1 DB: add `poolStatus` column to instances table
+
+Add `poolStatus` column to the `instances` table in `packages/db/src/schema.ts` and generate a migration.
+
+```typescript
+poolStatus: text("pool_status").$type<"warming" | "ready" | "acquired" | null>()
+```
+
+**TDD tests (write first):**
+- `poolStatus` defaults to `null` on insert
+- `poolStatus` can be set to `"warming"`, `"ready"`, `"acquired"`
+- `poolStatus` can be set back to `null`
+- Querying instances by `poolStatus = "ready"` returns only ready pool instances
+- Existing instance tests still pass (column is nullable, no breakage)
+
+---
+
+#### 1.2 Core: add `pool` config to workload schema
+
+Add optional `pool` block to the workload TypeBox schema in `packages/core/src/workload.ts`.
+
+```typescript
+pool: Type.Optional(Type.Object({
+  size: Type.Number({ default: 3 }),
+  max_fill_concurrency: Type.Number({ default: 2 }),
+}))
+```
+
+**TDD tests (write first):**
+- Workload without `pool` field is valid and `pool` is `undefined`
+- Workload with `pool: { size: 5 }` parses correctly; `max_fill_concurrency` defaults to `2`
+- Workload with `pool: { size: 0 }` is valid (edge case: no pool)
+- Invalid values (negative size, non-integer) are rejected by schema validation
+- Existing workload parse tests still pass
+
+---
+
+#### 1.3 Core: add `stdin` support to `Runtime.exec`
+
+Extend the `exec` method in `packages/core/src/runtime.ts` to accept an optional `stdin` stream, needed for overlay injection.
+
+```typescript
+exec(handle: InstanceHandle, command: string[], options?: { stdin?: NodeJS.ReadableStream }): Promise<ExecResult>
+```
+
+Update `FakeRuntime` to accept and handle the new parameter.
+
+**TDD tests (write first):**
+- `exec` without `stdin` option still works (backwards compatible)
+- `FakeRuntime.exec` with `stdin` option records that stdin was provided
+- `ExecResult` is returned correctly regardless of stdin presence
+
+---
+
+#### 1.4 API: add `injectOverlay` and `extractOverlay` to `TenantDataStore`
+
+Add two new methods to `apps/api/src/tenant-data.ts` that operate on a running container via `runtime.exec`.
+
+```typescript
+async injectOverlay(handle: InstanceHandle, tenantId: TenantId, workloadId: WorkloadId): Promise<void>
+// No-op if tenant has no stored overlay.
+// Otherwise: stream tar.gz from disk → runtime.exec(handle, ["tar", "-xz", "-C", "/"], { stdin })
+
+async extractOverlay(handle: InstanceHandle, tenantId: TenantId, workloadId: WorkloadId): Promise<void>
+// No-op if workload has no overlay_dirs.
+// Otherwise: exec tar -cz overlay_dirs → save stdout buffer to storage
+```
+
+**TDD tests (write first):**
+- `injectOverlay` is a no-op when tenant has no stored overlay
+- `injectOverlay` calls `runtime.exec` with `tar -xz -C /` and pipes the overlay tar as stdin
+- `injectOverlay` resolves without error on successful exec
+- `extractOverlay` is a no-op when workload has no `filesystem.overlay_dirs`
+- `extractOverlay` calls `runtime.exec` with `tar -cz <dirs>` and saves the stdout buffer
+- `extractOverlay` overwrites any previously stored overlay for the tenant
+
+---
+
+#### 1.5 API: implement `PoolManager`
+
+Create `apps/api/src/pool-manager.ts`.
+
+```typescript
+class PoolManager {
+  // Start one instance, run health checks, transition workload → "ready",
+  // leave instance in pool as "ready". Replaces GoldenCreator as the workload readiness gate.
+  async prime(workloadId: WorkloadId): Promise<void>
+
+  // Atomically take one instance from the pool. Prefers ready instances;
+  // awaits a warming instance if none are ready; starts a new one if pool is empty.
+  // Always returns a handle — never returns null.
+  async acquire(workloadId: WorkloadId): Promise<InstanceHandle>
+
+  // Start enough new instances to reach target pool size, up to max_fill_concurrency in parallel.
+  // Runs in the background; does not block the claim path.
+  async replenish(workloadId: WorkloadId): Promise<void>
+
+  // Destroy all warming and ready pool instances for a workload (e.g. image update).
+  async drain(workloadId: WorkloadId): Promise<void>
+}
+```
+
+**TDD tests (write first)** — use `FakeRuntime` + `createTestDatabase`:
+- `prime()` creates one instance with `poolStatus = "ready"` and transitions workload to `"ready"`
+- `prime()` destroys the instance and throws if health checks fail
+- `acquire()` returns the single ready instance and sets its `poolStatus = "acquired"`
+- `acquire()` waits for a warming instance when no ready instances exist
+- `acquire()` starts a new instance when pool is completely empty
+- `acquire()` is safe under concurrent callers (two simultaneous acquires get two different instances)
+- `replenish()` fills pool from 1 to target size (default 3)
+- `replenish()` respects `max_fill_concurrency` (starts at most N in parallel)
+- `replenish()` is a no-op when pool is already at target size
+- `drain()` destroys all warming and ready instances
+- `drain()` does not destroy acquired or active instances
+
+---
+
+#### 1.6 API: update `TenantManager.claim` to use pool first
+
+Modify `apps/api/src/tenant-manager.ts` to try `PoolManager.acquire()` before falling back to the existing CRIU restore hierarchy.
+
+```typescript
+async claim(tenantId, workloadId): Promise<ClaimResult> {
+  // 1. Return existing active claim (unchanged)
+  const existing = await this.findActiveClaim(tenantId)
+  if (existing) return { source: "existing", ...existing }
+
+  // 2. Acquire from pool — always returns an instance
+  if (this.poolManager) {
+    const instance = await this.poolManager.acquire(workloadId)
+    await this.tenantData.injectOverlay(instance, tenantId, workloadId)
+    await this.activateClaim(tenantId, instance)
+    this.poolManager.replenish(workloadId)  // fire-and-forget
+    const hasData = await this.tenantData.hasOverlay(tenantId, workloadId)
+    return { source: hasData ? "pool+data" : "pool", endpoint: ... }
+  }
+
+  // 3. Existing CRIU hierarchy (unchanged, as fallback while transitioning)
+  ...
+}
+```
+
+**TDD tests (write first):**
+- `claim()` uses `poolManager.acquire()` when pool is configured
+- `claim()` calls `injectOverlay` after acquiring from pool
+- `claim()` returns `source: "pool"` when tenant has no stored overlay
+- `claim()` returns `source: "pool+data"` when tenant has a stored overlay
+- `claim()` calls `replenish()` fire-and-forget after acquiring
+- `claim()` still returns existing active claim when one exists (pool not consulted)
+- When `poolManager` is absent, falls back to CRIU hierarchy unchanged
+
+---
+
+#### 1.7 API: wire `replenish` and `extractOverlay` into release path
+
+Update `TenantManager.release()` and the workload registration path.
+
+- `release()`: call `tenantData.extractOverlay()` before destroying, then `poolManager.replenish()` after (fire-and-forget)
+- Workload registration: call `poolManager.prime()` instead of `goldenCreator.create()`
+
+**TDD tests (write first):**
+- `release()` calls `extractOverlay` before destroying instance
+- `release()` calls `poolManager.replenish()` after destroy
+- `release()` does not call `snapshot()` or `hibernate()` when pool is active
+- Workload registration triggers `poolManager.prime()` (not `goldenCreator`)
+- `prime()` failure on workload registration leaves workload in non-ready state
+
+---
+
+### Phase 2 — Remove CRIU
+
+#### 2.1 Remove `GoldenCreator` and `SnapshotManager`
+
+**Delete:**
+- `apps/api/src/golden-creator.ts` + `golden-creator.test.ts`
+- `apps/api/src/snapshot-manager.ts` + `snapshot-manager.test.ts`
+
+**Update:**
+- Remove from `createApp()` deps and `RouteDeps` interface
+- Remove snapshot-related API routes (if any)
+- Keep `snapshots` DB table and data as read-only (stop writing; leave for rollback safety)
+
+**TDD tests (write first):**
+- Workload reaches `"ready"` via `PoolManager.prime()` — no snapshot row written
+- API returns 404 for snapshot endpoints (if they existed)
+
+---
+
+#### 2.2 Remove `hibernate()`, `snapshot()`, `restore()` from `Runtime`
+
+**`packages/core/src/runtime.ts` — remove:**
+- `snapshot(handle): Promise<SnapshotRef>`
+- `restore(ref, instanceId, options?): Promise<InstanceHandle>`
+- `capabilities: RuntimeCapabilities` (and the `RuntimeCapabilities` type)
+
+**Also remove:**
+- `BOILERHOUSE_CRIU_AVAILABLE` env var and all conditional logic
+- `InstanceManager.hibernate()`
+- `snapshotLocks` map in `TenantManager`
+- `lastSnapshotId` reads/writes on tenant rows
+- CRIU fallback in `TenantManager.claim`
+
+**TDD tests (write first):**
+- `FakeRuntime` has no `snapshot` or `restore` methods (compile-time)
+- `InstanceManager` has no `hibernate()` method
+- `TenantManager.claim` never calls `snapshot()` or `restore()`
+- `BOILERHOUSE_CRIU_AVAILABLE=true` has no effect — no code paths check it
+- All existing tests pass without the env var set
+
+---
+
+#### 2.3 Dashboard: remove snapshot UI
+
+**Remove:**
+- `SnapshotList.tsx` page, `/entities/snapshots` route, `Camera` nav icon
+- `SnapshotSummary` type and `fetchSnapshots()` in `api.ts`
+- `GoldenSnapshotNode` type and golden snapshot tree rendering in `WorkloadList.tsx`
+- Snapshot metrics in `MetricsPage.tsx` (golden queue depth, snapshot creates, disk usage)
+- Golden activity colouring in `ActivityLog.tsx`
+
+**TDD tests (write first):**
+- `app.tsx` routes do not include `/entities/snapshots`
+- `api.ts` does not export `fetchSnapshots` or `SnapshotSummary`
+- `WorkloadList.tsx` renders without golden nodes or yellow labels
+- `MetricsPage.tsx` renders without snapshot metrics sections
+- `ActivityLog.tsx` applies no golden colouring to any event type
+
+---
+
+#### 2.4 Dashboard: add pool-aware UI
+
+**Changes:**
+- `WorkloadDetail.tsx` — change not-ready message to "claims are disabled until the pool has warmed its first instance"
+- `MetricsPage.tsx` — add pool metrics: depth per workload, replenish rate, acquire latency (`"pool"` vs `"pool+data"`)
+- `ActivityLog.tsx` — update claim source labels: `"pool"` and `"pool+data"` (replacing snapshot/golden labels)
+- `api.ts` — add `fetchPoolStatus()` returning pool depth per workload
+
+**TDD tests (write first):**
+- `WorkloadDetail` renders "until the pool has warmed" message when workload is not ready
+- `MetricsPage` renders pool depth section with per-workload breakdown
+- `ActivityLog` displays `"pool"` and `"pool+data"` source labels
+- `fetchPoolStatus()` parses pool depth response correctly
+
+---
+
+### Phase 3 — Tuning
+
+#### 3.1 Observability: pool depth metric and Grafana panel
+
+- Add `pool_depth` observable gauge (count of `poolStatus = "ready"` instances per workload)
+- Add `pool_acquire_source` counter with label `source: "ready" | "warming" | "cold"`
+- Add "Pool" row to `deploy/grafana/boilerhouse.json` with pool depth time-series and acquire source breakdown
+
+**TDD tests (write first):**
+- Pool depth gauge emits one observation per workload with the correct count
+- Pool depth gauge emits `0` when pool is empty (not omitted)
+- `pool_acquire_source` counter increments for each acquire with the correct label
+- Grafana dashboard JSON contains panels with titles "Pool depth" and "Acquire source"
+
+---
+
+#### 3.2 Observability: alert when pool depth hits zero
+
+Add Prometheus alerting rule:
+
+```yaml
+- alert: PoolExhausted
+  expr: pool_depth == 0
+  for: 30s
+  labels: { severity: warning }
+  annotations:
+    summary: "Pool exhausted for workload {{ $labels.workload_id }}"
+```
+
+**TDD tests (write first):**
+- Alert rule YAML is valid Prometheus alerting rule syntax (`promtool check rules`)
+- Alert fires when `pool_depth == 0` for 30s
+- Alert does not fire when `pool_depth > 0`
+
+---
+
+#### 3.3 API startup: pre-warm pools for all ready workloads
+
+On API startup, call `poolManager.replenish(workloadId)` (fire-and-forget) for each workload in `"ready"` state, so warm instances are available immediately after a restart.
+
+**TDD tests (write first):**
+- On startup with two ready workloads, `replenish()` is called once per workload
+- On startup with no ready workloads, `replenish()` is not called
+- Workloads in `"pending"` or `"error"` state are not pre-warmed
+- Pre-warm is fire-and-forget: startup does not await replenish completion

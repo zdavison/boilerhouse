@@ -5,7 +5,7 @@ import { workloads, instances, snapshots } from "@boilerhouse/db";
 import type { RouteDeps } from "./deps";
 
 export function workloadRoutes(deps: RouteDeps) {
-	const { db, goldenCreator, bootstrapLogStore } = deps;
+	const { db, bootstrapLogStore, poolManager } = deps;
 
 	return new Elysia({ name: "workloads" })
 		.post("/workloads", async ({ request, set }) => {
@@ -60,8 +60,20 @@ export function workloadRoutes(deps: RouteDeps) {
 				})
 				.run();
 
-			// Enqueue golden snapshot creation in the background
-			goldenCreator.enqueue(workloadId, workload);
+			// Enqueue workload preparation in the background
+			if (poolManager) {
+				const pm = poolManager;
+				pm.prime(workloadId).catch((err: unknown) => {
+					const message = err instanceof Error ? err.message : String(err);
+					db.update(workloads).set({ status: "error", statusDetail: message, updatedAt: new Date() }).where(eq(workloads.workloadId, workloadId)).run();
+				});
+			} else {
+				// No pool manager — transition workload directly to ready
+				db.update(workloads)
+					.set({ status: "ready", updatedAt: new Date() })
+					.where(eq(workloads.workloadId, workloadId))
+					.run();
+			}
 
 			set.status = 201;
 			return {
@@ -172,7 +184,7 @@ export function workloadRoutes(deps: RouteDeps) {
 			if (row.status === "creating") {
 				set.status = 409;
 				return {
-					error: `Cannot delete workload '${params.name}': golden snapshot is still being created`,
+					error: `Cannot delete workload '${params.name}': workload is still being initialised`,
 				};
 			}
 

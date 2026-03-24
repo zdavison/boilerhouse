@@ -53,6 +53,7 @@ export {
 	type ExecProbe,
 	type CredentialRule,
 	type WorkloadConfig,
+	type PoolConfig,
 	type SecretRef,
 	WorkloadSchema,
 	validateWorkload,
@@ -96,11 +97,12 @@ export {
 
 export {
 	type Runtime,
-	type RuntimeCapabilities,
 	type CreateOptions,
+	type ExecOptions,
 	type InstanceHandle,
 	type Endpoint,
 	type ExecResult,
+	type PoolStatus,
 	InstanceHandleSchema,
 	EndpointSchema,
 } from "./runtime";

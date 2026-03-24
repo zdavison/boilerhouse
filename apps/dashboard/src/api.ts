@@ -123,22 +123,6 @@ export interface InstanceEndpoint {
 	endpoint: { host: string; ports: number[] };
 }
 
-export interface SnapshotSummary {
-	snapshotId: string;
-	/** @example "golden" */
-	type: "golden" | "tenant";
-	/** @example "ready" */
-	status: string;
-	statusDetail: string | null;
-	instanceId: string;
-	tenantId: string | null;
-	workloadId: string;
-	/** @example "minimal" */
-	workloadName: string | null;
-	nodeId: string;
-	sizeBytes: number;
-	createdAt: string;
-}
 
 export interface ActivityLogEntry {
 	id: number;
@@ -239,11 +223,6 @@ export const api = {
 
 	fetchWorkload: (name: string) => get<WorkloadDetail>(`/workloads/${encodeURIComponent(name)}`),
 
-	fetchSnapshots: () => get<SnapshotSummary[]>("/snapshots"),
-
-	fetchWorkloadSnapshots: (name: string) =>
-		get<SnapshotSummary[]>(`/workloads/${encodeURIComponent(name)}/snapshots`),
-
 	fetchBootstrapLogs: (name: string) =>
 		get<BootstrapLogEntry[]>(`/workloads/${encodeURIComponent(name)}/logs`),
 
@@ -264,11 +243,6 @@ export const api = {
 	fetchNodes: () => get<NodeSummary[]>("/nodes"),
 
 	fetchNode: (id: string) => get<NodeDetail>(`/nodes/${encodeURIComponent(id)}`),
-
-	hibernateInstance: (id: string) =>
-		post<{ instanceId: string; status: string; snapshotId: string }>(
-			`/instances/${encodeURIComponent(id)}/hibernate`,
-		),
 
 	destroyInstance: (id: string) =>
 		post<{ instanceId: string; status: string }>(

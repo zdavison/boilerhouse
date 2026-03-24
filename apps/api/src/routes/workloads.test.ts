@@ -37,7 +37,7 @@ describe("POST /api/v1/workloads", () => {
 		expect(body.workloadId).toBeDefined();
 	});
 
-	test("returns status 'creating' and enqueues golden snapshot", async () => {
+	test("returns status 'creating' immediately and transitions to 'ready' (no pool)", async () => {
 		const { app, db } = createTestApp();
 
 		const res = await apiRequest(app, "/api/v1/workloads", {
@@ -50,12 +50,11 @@ describe("POST /api/v1/workloads", () => {
 		const body = await res.json();
 		expect(body.status).toBe("creating");
 
-		// Golden snapshot is created asynchronously — wait for it
-		await new Promise((r) => setTimeout(r, 100));
+		// Without a pool manager, workload transitions to ready synchronously
+		await new Promise((r) => setTimeout(r, 50));
 
-		const snapshotRows = db.select().from(snapshots).all();
-		expect(snapshotRows).toHaveLength(1);
-		expect(snapshotRows[0]!.type).toBe("golden");
+		const workloadRow = db.select().from(workloads).all();
+		expect(workloadRow[0]!.status).toBe("ready");
 	});
 
 	test("returns 400 for invalid JSON", async () => {
@@ -194,35 +193,6 @@ describe("GET /api/v1/workloads/:name/snapshots", () => {
 		expect(await res.json()).toEqual([]);
 	});
 
-	test("returns snapshots for workload", async () => {
-		const { app, db, snapshotManager } = createTestApp();
-
-		const workloadId = generateWorkloadId();
-		db.insert(workloads)
-			.values({
-				workloadId,
-				name: "snap-list",
-				version: "1.0.0",
-				config: MINIMAL_WORKLOAD,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			})
-			.run();
-
-		await snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
-
-		const res = await apiRequest(app, "/api/v1/workloads/snap-list/snapshots");
-		const body = await res.json();
-
-		expect(res.status).toBe(200);
-		expect(body).toHaveLength(1);
-		expect(body[0].type).toBe("golden");
-		expect(body[0].snapshotId).toBeDefined();
-		expect(body[0].tenantId).toBeNull();
-		expect(body[0].sizeBytes).toBeDefined();
-		expect(body[0].createdAt).toBeDefined();
-	});
-
 	test("returns 404 for nonexistent workload", async () => {
 		const { app } = createTestApp();
 		const res = await apiRequest(app, "/api/v1/workloads/nope/snapshots");
@@ -343,43 +313,6 @@ describe("DELETE /api/v1/workloads/:name", () => {
 		});
 
 		expect(res.status).toBe(404);
-	});
-
-	test("deletes associated snapshots when workload is deleted", async () => {
-		const { app, db, snapshotManager } = createTestApp();
-
-		const workloadId = generateWorkloadId();
-		db.insert(workloads)
-			.values({
-				workloadId,
-				name: "snap-app",
-				version: "1.0.0",
-				config: MINIMAL_WORKLOAD,
-				createdAt: new Date(),
-				updatedAt: new Date(),
-			})
-			.run();
-
-		// Create a golden snapshot
-		await snapshotManager.createGolden(workloadId, MINIMAL_WORKLOAD);
-
-		const snapshotsBefore = db
-			.select()
-			.from(snapshots)
-			.all();
-		expect(snapshotsBefore.length).toBeGreaterThan(0);
-
-		const res = await apiRequest(app, "/api/v1/workloads/snap-app", {
-			method: "DELETE",
-		});
-
-		expect(res.status).toBe(200);
-
-		const snapshotsAfter = db
-			.select()
-			.from(snapshots)
-			.all();
-		expect(snapshotsAfter.length).toBe(0);
 	});
 
 	test("allows deletion when all instances are destroyed", async () => {

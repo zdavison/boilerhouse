@@ -21,23 +21,16 @@ function shortId(id: string): string {
 }
 
 /**
- * Maps event names to colors consistent with the workloads page:
- * - green: created, claimed, restored from snapshot
- * - yellow: released, restored from golden
- * - blue: hibernated
+ * Maps event names to colors:
+ * - green: created, claimed
+ * - yellow: released
  * - red: destroyed, error
+ * - blue: other instance/trigger events
  */
 function eventColor(entry: ActivityLogEntry): string {
 	switch (entry.event) {
 		case "instance.created":
 			return "text-status-green";
-		case "instance.restored": {
-			const snapshotType = entry.metadata?.snapshotType;
-			if (snapshotType === "golden") return "text-status-yellow";
-			return "text-status-blue";
-		}
-		case "instance.hibernated":
-			return "text-status-blue";
 		case "instance.destroyed":
 			return "text-status-red";
 		case "instance.error":
@@ -57,6 +50,19 @@ function eventColor(entry: ActivityLogEntry): string {
 	}
 }
 
+/**
+ * Returns a Tailwind color class for a metadata value based on key and value.
+ * Highlights claim source values: green for pool hits, blue for cold boots.
+ */
+function metadataValueColor(key: string, value: string): string {
+	if (key === "source") {
+		if (value === "pool" || value === "pool+data") return "text-status-green";
+		if (value === "cold" || value === "cold+data") return "text-status-blue";
+		if (value === "existing") return "text-status-yellow";
+	}
+	return "text-muted-light";
+}
+
 /** Renders key=value metadata pairs inline. */
 function MetadataInline({ metadata }: { metadata: Record<string, unknown> }) {
 	const entries = Object.entries(metadata);
@@ -69,7 +75,7 @@ function MetadataInline({ metadata }: { metadata: Record<string, unknown> }) {
 					{i > 0 && " "}
 					<span className="text-muted">{k}</span>
 					<span className="text-muted">=</span>
-					<span className="text-muted-light">{String(v)}</span>
+					<span className={metadataValueColor(k, String(v))}>{String(v)}</span>
 				</span>
 			))}
 		</span>

@@ -1,15 +1,11 @@
 import type { InstanceId } from "./types";
-import { generateSnapshotId, generateWorkloadId, generateNodeId } from "./types";
-import type { SnapshotRef } from "./snapshot";
 import type { Workload } from "./workload";
-import type { Runtime, RuntimeCapabilities, InstanceHandle, Endpoint, ExecResult, CreateOptions } from "./runtime";
+import type { Runtime, InstanceHandle, Endpoint, ExecResult, ExecOptions, CreateOptions } from "./runtime";
 
 type RuntimeOperation =
 	| "create"
 	| "start"
 	| "destroy"
-	| "snapshot"
-	| "restore"
 	| "exec"
 	| "getEndpoint"
 	| "list";
@@ -22,7 +18,7 @@ export interface FakeRuntimeOptions {
 	latencyMs?: number;
 	/**
 	 * Set of operations that should throw an injected failure.
-	 * @example new Set(["start", "snapshot"])
+	 * @example new Set(["start"])
 	 */
 	failOn?: Set<RuntimeOperation>;
 	/**
@@ -30,11 +26,6 @@ export interface FakeRuntimeOptions {
 	 * @default { exitCode: 0, stdout: "", stderr: "" }
 	 */
 	execResult?: ExecResult;
-	/**
-	 * Whether golden snapshots are supported.
-	 * @default true
-	 */
-	goldenSnapshots?: boolean;
 }
 
 interface FakeInstance {
@@ -46,19 +37,18 @@ interface FakeInstance {
 }
 
 export class FakeRuntime implements Runtime {
-	readonly capabilities: RuntimeCapabilities;
 	private instances = new Map<string, FakeInstance>();
-	private snapshots = new Map<string, SnapshotRef>();
 	private nextPort = 30000;
 	private readonly latencyMs: number;
 	private readonly failOn: Set<RuntimeOperation>;
 	private execResult: ExecResult;
+	/** The options passed to the most recent exec() call. */
+	lastExecOptions?: ExecOptions;
 
 	constructor(options?: FakeRuntimeOptions) {
 		this.latencyMs = options?.latencyMs ?? 0;
 		this.failOn = options?.failOn ?? new Set();
 		this.execResult = options?.execResult ?? { exitCode: 0, stdout: "", stderr: "" };
-		this.capabilities = { goldenSnapshots: options?.goldenSnapshots ?? true };
 	}
 
 	async create(
@@ -98,63 +88,15 @@ export class FakeRuntime implements Runtime {
 		handle.running = false;
 	}
 
-	async snapshot(handle: InstanceHandle): Promise<SnapshotRef> {
-		await this.maybeDelay("snapshot");
-		this.requireInstance(handle.instanceId);
-		const id = generateSnapshotId();
-		const ref: SnapshotRef = {
-			id,
-			type: "tenant",
-			paths: {
-				memory: `/fake-snapshots/${id}/snapshot`,
-				vmstate: `/fake-snapshots/${id}/snapshot`,
-			},
-			workloadId: generateWorkloadId(),
-			nodeId: generateNodeId(),
-			runtimeMeta: {
-				runtimeVersion: "fake-1.0.0",
-				architecture: "x86_64",
-			},
-		};
-		this.snapshots.set(id, ref);
-		return ref;
-	}
-
-	async restore(
-		ref: SnapshotRef,
-		instanceId: InstanceId,
-		_options?: CreateOptions,
-	): Promise<InstanceHandle> {
-		await this.maybeDelay("restore");
-		if (!this.snapshots.has(ref.id)) {
-			throw new Error(`Snapshot not found: ${ref.id}`);
-		}
-		const ports = ref.runtimeMeta.exposedPorts ?? [this.nextPort++];
-		const instance: FakeInstance = {
-			instanceId,
-			workload: {
-				workload: { name: "restored", version: "0.0.0" },
-				image: { ref: "restored:latest" },
-				resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 },
-				network: { access: "none" },
-				idle: { action: "hibernate" },
-			},
-			running: true,
-			destroyed: false,
-			ports,
-		};
-		this.instances.set(instanceId, instance);
-		return { instanceId, running: true };
-	}
-
 	/** Override the result returned by exec() after construction. Useful in tests. */
 	setExecResult(result: ExecResult): void {
 		this.execResult = result;
 	}
 
-	async exec(handle: InstanceHandle, _command: string[]): Promise<ExecResult> {
+	async exec(handle: InstanceHandle, _command: string[], options?: ExecOptions): Promise<ExecResult> {
 		await this.maybeDelay("exec");
 		this.requireInstance(handle.instanceId);
+		this.lastExecOptions = options;
 		return { ...this.execResult };
 	}
 

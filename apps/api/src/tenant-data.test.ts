@@ -7,9 +7,11 @@ import {
 	type WorkloadId,
 	type NodeId,
 	type TenantId,
+	FakeRuntime,
 	generateWorkloadId,
 	generateNodeId,
 	generateTenantId,
+	generateInstanceId,
 } from "@boilerhouse/core";
 import {
 	createTestDatabase,
@@ -17,10 +19,12 @@ import {
 	tenants,
 	nodes,
 	workloads,
+	instances,
 } from "@boilerhouse/db";
 import { TenantDataStore } from "./tenant-data";
 
 let db: DrizzleDb;
+let runtime: FakeRuntime;
 let storagePath: string;
 let store: TenantDataStore;
 let nodeId: NodeId;
@@ -30,9 +34,10 @@ let overlaySourceDir: string;
 
 beforeEach(() => {
 	db = createTestDatabase();
+	runtime = new FakeRuntime();
 	storagePath = mkdtempSync(join(tmpdir(), "tenant-data-test-"));
 	overlaySourceDir = mkdtempSync(join(tmpdir(), "tenant-overlay-src-"));
-	store = new TenantDataStore(storagePath, db);
+	store = new TenantDataStore(storagePath, db, runtime);
 
 	nodeId = generateNodeId();
 	workloadId = generateWorkloadId();
@@ -134,6 +139,129 @@ describe("TenantDataStore", () => {
 		test("returns null when no overlay exists", () => {
 			const result = store.restoreOverlay(tenantId, workloadId);
 			expect(result).toBeNull();
+		});
+	});
+
+	describe("hasOverlay()", () => {
+		test("returns true when overlay exists", () => {
+			const srcPath = join(overlaySourceDir, "overlay.tar.gz");
+			writeFileSync(srcPath, "fake-overlay-data");
+			store.saveOverlay(tenantId, workloadId, srcPath);
+
+			expect(store.hasOverlay(tenantId, workloadId)).toBe(true);
+		});
+
+		test("returns false when no overlay exists", () => {
+			expect(store.hasOverlay(tenantId, workloadId)).toBe(false);
+		});
+	});
+
+	describe("injectOverlay()", () => {
+		test("calls runtime.exec with tar -xz when overlay exists", async () => {
+			const srcPath = join(overlaySourceDir, "overlay.tar.gz");
+			writeFileSync(srcPath, "fake-overlay-data");
+			store.saveOverlay(tenantId, workloadId, srcPath);
+
+			// Create a fake running instance
+			const instanceId = generateInstanceId();
+			db.insert(instances).values({
+				instanceId,
+				workloadId,
+				nodeId,
+				status: "starting",
+				createdAt: new Date(),
+			}).run();
+			const handle = await runtime.create(
+				{ workload: { name: "t", version: "1" }, image: { ref: "t:l" }, resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 }, network: { access: "none" }, idle: { action: "destroy" } },
+				instanceId,
+			);
+			await runtime.start(handle);
+
+			await store.injectOverlay(handle, tenantId, workloadId);
+
+			expect(runtime.lastExecOptions).toBeDefined();
+			expect(runtime.lastExecOptions!.stdin).toBeDefined();
+		});
+
+		test("no-op when no overlay exists", async () => {
+			const instanceId = generateInstanceId();
+			db.insert(instances).values({
+				instanceId,
+				workloadId,
+				nodeId,
+				status: "starting",
+				createdAt: new Date(),
+			}).run();
+			const handle = await runtime.create(
+				{ workload: { name: "t", version: "1" }, image: { ref: "t:l" }, resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 }, network: { access: "none" }, idle: { action: "destroy" } },
+				instanceId,
+			);
+			await runtime.start(handle);
+
+			// No overlay stored — should be a no-op (exec not called)
+			runtime.lastExecOptions = undefined;
+			await store.injectOverlay(handle, tenantId, workloadId);
+			expect(runtime.lastExecOptions).toBeUndefined();
+		});
+	});
+
+	describe("extractOverlay()", () => {
+		test("calls runtime.exec with tar -cz and saves result buffer", async () => {
+			// Seed workload with overlay_dirs
+			db.update(workloads).set({
+				config: {
+					workload: { name: "test", version: "1.0.0" },
+					image: { ref: "test:latest" },
+					resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 },
+					network: { access: "none" },
+					idle: { action: "hibernate" },
+					filesystem: { overlay_dirs: ["/app/data"] },
+				},
+			}).run();
+
+			runtime.setExecResult({ exitCode: 0, stdout: "fake-tar-content", stderr: "" });
+
+			const instanceId = generateInstanceId();
+			db.insert(instances).values({
+				instanceId,
+				workloadId,
+				nodeId,
+				status: "starting",
+				createdAt: new Date(),
+			}).run();
+			const handle = await runtime.create(
+				{ workload: { name: "t", version: "1" }, image: { ref: "t:l" }, resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 }, network: { access: "none" }, idle: { action: "destroy" } },
+				instanceId,
+			);
+			await runtime.start(handle);
+
+			await store.extractOverlay(handle, tenantId, workloadId);
+
+			// Verify overlay was saved
+			const row = db.select().from(tenants).where(eq(tenants.tenantId, tenantId)).get();
+			expect(row!.dataOverlayRef).toBeDefined();
+			expect(existsSync(row!.dataOverlayRef!)).toBe(true);
+		});
+
+		test("no-op when workload has no overlay_dirs", async () => {
+			const instanceId = generateInstanceId();
+			db.insert(instances).values({
+				instanceId,
+				workloadId,
+				nodeId,
+				status: "starting",
+				createdAt: new Date(),
+			}).run();
+			const handle = await runtime.create(
+				{ workload: { name: "t", version: "1" }, image: { ref: "t:l" }, resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 }, network: { access: "none" }, idle: { action: "destroy" } },
+				instanceId,
+			);
+			await runtime.start(handle);
+
+			runtime.lastExecOptions = undefined;
+			await store.extractOverlay(handle, tenantId, workloadId);
+			// exec not called since no overlay_dirs
+			expect(runtime.lastExecOptions).toBeUndefined();
 		});
 	});
 });

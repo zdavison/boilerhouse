@@ -4,7 +4,7 @@ import { FakeRuntime, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhous
 import type { Runtime, RuntimeType, Workload } from "@boilerhouse/core";
 import { PodmanRuntime } from "@boilerhouse/runtime-podman";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
-import { workloads as workloadsTable, claims } from "@boilerhouse/db";
+import { claims } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
 import {
 	createLogger,
@@ -12,22 +12,21 @@ import {
 	instrumentFromEventBus,
 	wrapTenantManager,
 	wrapInstanceManager,
-	wrapSnapshotManager,
 } from "@boilerhouse/o11y";
 import { InstanceManager } from "./instance-manager";
-import { SnapshotManager } from "./snapshot-manager";
 import { TenantManager } from "./tenant-manager";
 import { TenantDataStore } from "./tenant-data";
 import { IdleMonitor } from "./idle-monitor";
 import { WatchDirsPoller } from "./watch-dirs-poller";
 import { EventBus } from "./event-bus";
-import { GoldenCreator } from "./golden-creator";
 import { BootstrapLogStore } from "./bootstrap-log-store";
+import { PoolManager } from "./pool-manager";
 import { createApp } from "./app";
 import { recoverState } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { applyWorkloadTransition } from "./transitions";
 import { SecretStore } from "./secret-store";
+import { prewarmPools } from "./startup-prewarm";
 
 const log = createLogger("server");
 
@@ -140,15 +139,18 @@ const instanceManager = new InstanceManager(
 	createLogger("InstanceManager"),
 	secretStore,
 );
-const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-	secretStore,
-});
-const tenantDataStore = new TenantDataStore(storagePath, db);
+const tenantDataStore = new TenantDataStore(storagePath, db, runtime);
 const idleMonitor = new IdleMonitor({ defaultPollIntervalMs: 5000 });
 const watchDirsPoller = new WatchDirsPoller(instanceManager, idleMonitor);
+const bootstrapLogStore = new BootstrapLogStore(db);
+
+const poolManager = new PoolManager(runtime, db, nodeId, {
+	bootstrapLogStore,
+	eventBus,
+});
+
 const tenantManager = new TenantManager(
 	instanceManager,
-	snapshotManager,
 	db,
 	activityLog,
 	nodeId,
@@ -157,6 +159,7 @@ const tenantManager = new TenantManager(
 	createLogger("TenantManager"),
 	eventBus,
 	watchDirsPoller,
+	poolManager,
 );
 
 const resourceLimiter = new ResourceLimiter(db, { maxInstances });
@@ -195,33 +198,8 @@ log.info(
 	"Recovery complete",
 );
 
-const bootstrapLogStore = new BootstrapLogStore(db);
-const goldenCreator = new GoldenCreator(
-	db, snapshotManager, eventBus, bootstrapLogStore,
-	createLogger("GoldenCreator"),
-);
-
-// Enqueue golden snapshot creation for workloads that need it
-{
-	const allWorkloads = db.select().from(workloadsTable).all();
-	let enqueued = 0;
-	for (const row of allWorkloads) {
-		if (!snapshotManager.goldenExists(row.workloadId, nodeId)) {
-			// Set status to creating (new workloads already are; error workloads need retry)
-			if (row.status === "error") {
-				applyWorkloadTransition(db, row.workloadId, "error", "retry");
-			} else if (row.status === "ready") {
-				applyWorkloadTransition(db, row.workloadId, "ready", "recover");
-			}
-
-			goldenCreator.enqueue(row.workloadId, row.config as Workload);
-			enqueued++;
-		}
-	}
-	if (enqueued > 0) {
-		log.info({ count: enqueued }, "Golden snapshots enqueued for background creation");
-	}
-}
+// Pre-warm pools for all workloads that need it at startup (fire-and-forget)
+prewarmPools(db, poolManager);
 
 // Start OTEL providers (metrics + tracing)
 const { meter, tracer } = initO11y({
@@ -236,13 +214,12 @@ instrumentFromEventBus(meter, {
 	nodeId,
 	maxInstances,
 	resourceLimiter,
-	goldenCreator,
+	poolManager,
 });
 
 // Wrap managers with tracing spans
 const tracedTenantManager = wrapTenantManager(tenantManager, tracer);
 const tracedInstanceManager = wrapInstanceManager(instanceManager, tracer);
-const tracedSnapshotManager = wrapSnapshotManager(snapshotManager, tracer);
 
 const app = createApp({
 	db,
@@ -252,12 +229,11 @@ const app = createApp({
 	apiKey,
 	instanceManager: tracedInstanceManager,
 	tenantManager: tracedTenantManager,
-	snapshotManager: tracedSnapshotManager,
 	eventBus,
-	goldenCreator,
 	bootstrapLogStore,
 	resourceLimiter,
 	secretStore: secretStore!,
+	poolManager,
 	log: createLogger("routes"),
 	tracer,
 	meter,

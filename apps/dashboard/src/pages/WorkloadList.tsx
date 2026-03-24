@@ -1,10 +1,9 @@
 import { useState, useCallback } from "react";
-import { ChevronDown, ChevronRight, Plug, Moon, Trash2, UserPlus, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Plug, Trash2, UserPlus, Loader2 } from "lucide-react";
 import { useApi } from "../hooks";
 import {
 	api,
 	type WorkloadSummary,
-	type SnapshotSummary,
 	type InstanceSummary,
 	type ClaimResult,
 } from "../api";
@@ -22,109 +21,32 @@ interface InstanceNode {
 	instance: InstanceSummary;
 }
 
-interface TenantSnapshotNode {
-	snapshot: SnapshotSummary;
-	instances: InstanceNode[];
-}
-
-interface GoldenSnapshotNode {
-	snapshot: SnapshotSummary;
-	unclaimedInstances: InstanceNode[];
-	tenantSnapshots: TenantSnapshotNode[];
-}
-
 interface WorkloadTreeNode {
 	workload: WorkloadSummary;
-	golden: GoldenSnapshotNode | null;
-	/** Claimed instances whose tenantId doesn't match any tenant snapshot */
-	orphanInstances: InstanceNode[];
+	instances: InstanceNode[];
 }
 
 // --- Tree builder ---
 
 function buildWorkloadTree(
 	workloads: WorkloadSummary[],
-	snapshots: SnapshotSummary[],
 	instances: InstanceSummary[],
 ): WorkloadTreeNode[] {
-	const snapshotsByWorkload = new Map<string, SnapshotSummary[]>();
-	for (const s of snapshots) {
-		const list = snapshotsByWorkload.get(s.workloadId) ?? [];
-		list.push(s);
-		snapshotsByWorkload.set(s.workloadId, list);
-	}
-
 	const instancesByWorkload = new Map<string, InstanceSummary[]>();
 	for (const inst of instances) {
-		if (inst.status === "destroyed" || inst.status === "hibernated") continue;
+		if (inst.status === "destroyed") continue;
 		const list = instancesByWorkload.get(inst.workloadId) ?? [];
 		list.push(inst);
 		instancesByWorkload.set(inst.workloadId, list);
 	}
 
-	return workloads.map((workload) => {
-		const wSnapshots = snapshotsByWorkload.get(workload.workloadId) ?? [];
-		const wInstances = instancesByWorkload.get(workload.workloadId) ?? [];
-
-		const goldenSnap = wSnapshots.find((s) => s.type === "golden") ?? null;
-		const tenantSnaps = wSnapshots.filter((s) => s.type === "tenant");
-
-		const tenantSnapByTenantId = new Map<string, SnapshotSummary>();
-		for (const ts of tenantSnaps) {
-			if (ts.tenantId) {
-				tenantSnapByTenantId.set(ts.tenantId, ts);
-			}
-		}
-
-		const unclaimed: InstanceNode[] = [];
-		const orphans: InstanceNode[] = [];
-		const tenantInstanceMap = new Map<string, InstanceNode[]>();
-
-		for (const inst of wInstances) {
-			if (!inst.tenantId) {
-				unclaimed.push({ instance: inst });
-			} else {
-				const matchingSnap = tenantSnapByTenantId.get(inst.tenantId);
-				if (matchingSnap) {
-					const list = tenantInstanceMap.get(matchingSnap.snapshotId) ?? [];
-					list.push({ instance: inst });
-					tenantInstanceMap.set(matchingSnap.snapshotId, list);
-				} else {
-					// Claimed but no tenant snapshot yet — group under golden
-					// (these were restored from the golden snapshot)
-					unclaimed.push({ instance: inst });
-				}
-			}
-		}
-
-		const tenantSnapshotNodes: TenantSnapshotNode[] = tenantSnaps.map((ts) => ({
-			snapshot: ts,
-			instances: tenantInstanceMap.get(ts.snapshotId) ?? [],
-		}));
-
-		const golden: GoldenSnapshotNode | null = goldenSnap
-			? {
-					snapshot: goldenSnap,
-					unclaimedInstances: unclaimed,
-					tenantSnapshots: tenantSnapshotNodes,
-				}
-			: null;
-
-		return {
-			workload,
-			golden,
-			orphanInstances: golden ? orphans : [...unclaimed, ...orphans],
-		};
-	});
+	return workloads.map((workload) => ({
+		workload,
+		instances: (instancesByWorkload.get(workload.workloadId) ?? []).map((inst) => ({ instance: inst })),
+	}));
 }
 
 // --- Formatting ---
-
-function formatSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function formatDate(dateStr: string): string {
 	return new Date(dateStr).toLocaleDateString();
@@ -248,53 +170,8 @@ function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?
 const GUTTER_W = 24;
 /** Width of the status icon column. */
 const STATUS_W = 16;
-/** Width of the label column (golden, tenant:xxx). */
-const LABEL_W = 112;
-/** Width of the short-ID column. */
-const ID_W = 72;
-/** Width of the size column (right-aligned). */
-const SIZE_W = 80;
 /** Width of the date column (right-aligned). */
 const DATE_W = 88;
-/** Indent for instance rows (past the snapshot label column). */
-const INST_INDENT = 16;
-
-// --- Snapshot Row (used for both golden and tenant snapshots) ---
-
-function SnapshotRow({
-	snapshot,
-	isGolden,
-}: {
-	snapshot: SnapshotSummary;
-	isGolden?: boolean;
-}) {
-	const label = isGolden ? "golden" : `tenant:${snapshot.tenantId ?? "?"}`;
-	const labelColor = isGolden ? "text-status-yellow" : "text-status-blue";
-
-	return (
-		<div className={`flex items-center h-7 px-2 text-sm font-mono border-b border-border/10 ${isGolden ? "bg-status-yellow/5" : ""}`}>
-			<span style={{ width: GUTTER_W }} className="shrink-0" />
-			<span style={{ width: STATUS_W }} className="shrink-0 flex items-center">
-				<StatusIndicator status={snapshot.status} detail={snapshot.statusDetail ?? undefined} />
-			</span>
-			<span style={{ width: LABEL_W }} className={`shrink-0 font-medium ${labelColor}`}>
-				{label}
-			</span>
-			<span style={{ width: ID_W }} className="shrink-0 text-muted-light" title={snapshot.snapshotId}>
-				{shortId(snapshot.snapshotId)}
-			</span>
-
-			<span className="flex-1" />
-
-			<span style={{ width: SIZE_W }} className="shrink-0 text-muted text-xs tabular-nums text-right">
-				{formatSize(snapshot.sizeBytes)}
-			</span>
-			<span style={{ width: DATE_W }} className="shrink-0 text-muted text-xs tabular-nums text-right">
-				{formatDate(snapshot.createdAt)}
-			</span>
-		</div>
-	);
-}
 
 // --- Instance Row ---
 
@@ -306,7 +183,7 @@ function InstanceRow({
 	busy,
 }: {
 	instance: InstanceSummary;
-	onAction: (id: string, action: "hibernate" | "destroy") => void;
+	onAction: (id: string, action: "destroy") => void;
 	onConnect: (id: string, workloadName: string) => void;
 	workloadName: string;
 	/** When true, action buttons are replaced with a spinner. */
@@ -314,7 +191,7 @@ function InstanceRow({
 }) {
 	return (
 		<div className="flex items-center h-7 px-2 text-sm font-mono border-b border-border/10">
-			<span style={{ width: GUTTER_W + STATUS_W + INST_INDENT }} className="shrink-0 flex items-center justify-end pr-2">
+			<span style={{ width: GUTTER_W + STATUS_W }} className="shrink-0 flex items-center justify-end pr-2">
 				<StatusIndicator status={instance.status} detail={instance.statusDetail ?? undefined} />
 			</span>
 			<span className="text-muted-light" title={instance.instanceId}>
@@ -334,10 +211,7 @@ function InstanceRow({
 				) : (
 					<div className="flex items-center gap-0.5">
 						{instance.status === "active" && (
-							<>
-								<IconButton icon={Plug} title="Connect" variant="info" onClick={() => onConnect(instance.instanceId, workloadName)} />
-								<IconButton icon={Moon} title="Hibernate" variant="info" onClick={() => onAction(instance.instanceId, "hibernate")} />
-							</>
+							<IconButton icon={Plug} title="Connect" variant="info" onClick={() => onConnect(instance.instanceId, workloadName)} />
 						)}
 						<IconButton icon={Trash2} title="Destroy" variant="danger" onClick={() => onAction(instance.instanceId, "destroy")} />
 					</div>
@@ -365,12 +239,12 @@ function WorkloadGroup({
 	node: WorkloadTreeNode;
 	expanded: boolean;
 	onToggle: () => void;
-	onAction: (id: string, action: "hibernate" | "destroy") => void;
+	onAction: (id: string, action: "destroy") => void;
 	onConnect: (id: string, workloadName: string) => void;
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
 }) {
-	const { workload, golden, orphanInstances } = node;
+	const { workload, instances } = node;
 	const Chevron = expanded ? ChevronDown : ChevronRight;
 
 	return (
@@ -399,6 +273,9 @@ function WorkloadGroup({
 					{workload.name}
 				</a>
 				<span className="text-muted-light text-xs font-mono ml-2">v{workload.version}</span>
+				{workload.status !== "ready" && (
+					<span className="text-xs text-muted font-mono ml-2">({workload.status})</span>
+				)}
 
 				<span className="flex-1" />
 
@@ -410,37 +287,7 @@ function WorkloadGroup({
 			{/* Expanded children */}
 			{expanded && (
 				<div className="mt-1">
-					{golden && (
-						<>
-							<SnapshotRow snapshot={golden.snapshot} isGolden />
-							{golden.unclaimedInstances.map((inst) => (
-								<InstanceRow
-									key={inst.instance.instanceId}
-									instance={inst.instance}
-									onAction={onAction}
-									onConnect={onConnect}
-									workloadName={workload.name}
-									busy={busyInstances.has(inst.instance.instanceId)}
-								/>
-							))}
-							{golden.tenantSnapshots.map((ts) => (
-								<div key={ts.snapshot.snapshotId}>
-									<SnapshotRow snapshot={ts.snapshot} />
-									{ts.instances.map((inst) => (
-										<InstanceRow
-											key={inst.instance.instanceId}
-											instance={inst.instance}
-											onAction={onAction}
-											onConnect={onConnect}
-											workloadName={workload.name}
-											busy={busyInstances.has(inst.instance.instanceId)}
-										/>
-									))}
-								</div>
-							))}
-						</>
-					)}
-					{orphanInstances.map((inst) => (
+					{instances.map((inst) => (
 						<InstanceRow
 							key={inst.instance.instanceId}
 							instance={inst.instance}
@@ -460,7 +307,6 @@ function WorkloadGroup({
 
 export function WorkloadList({ navigate }: { navigate: (path: string) => void }) {
 	const workloadsApi = useApi<WorkloadSummary[]>(api.fetchWorkloads);
-	const snapshotsApi = useApi<SnapshotSummary[]>(api.fetchSnapshots);
 	const instancesApi = useApi<InstanceSummary[]>(useCallback(() => api.fetchInstances(), []));
 
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -468,8 +314,8 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 	const [connectTarget, setConnectTarget] = useState<{ instanceId: string; workloadName: string } | null>(null);
 	const [busyInstances, setBusyInstances] = useState<Set<string>>(new Set());
 
-	const loading = workloadsApi.loading || snapshotsApi.loading || instancesApi.loading;
-	const error = workloadsApi.error || snapshotsApi.error || instancesApi.error;
+	const loading = workloadsApi.loading || instancesApi.loading;
+	const error = workloadsApi.error || instancesApi.error;
 
 	// Expand all workloads by default once data loads
 	if (!initialized && workloadsApi.data) {
@@ -483,7 +329,6 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 
 	const tree = buildWorkloadTree(
 		workloadsApi.data,
-		snapshotsApi.data ?? [],
 		instancesApi.data ?? [],
 	);
 
@@ -498,15 +343,13 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 
 	function refetchAll() {
 		workloadsApi.refetch();
-		snapshotsApi.refetch();
 		instancesApi.refetch();
 	}
 
-	async function handleAction(instanceId: string, action: "hibernate" | "destroy") {
+	async function handleAction(instanceId: string, action: "destroy") {
 		setBusyInstances((prev) => new Set(prev).add(instanceId));
 		try {
-			if (action === "hibernate") await api.hibernateInstance(instanceId);
-			else await api.destroyInstance(instanceId);
+			await api.destroyInstance(instanceId);
 			refetchAll();
 		} catch (err) {
 			alert(err instanceof Error ? err.message : "Action failed");

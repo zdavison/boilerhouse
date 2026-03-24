@@ -99,38 +99,15 @@ describe("GET /api/v1/instances/:id", () => {
 });
 
 describe("POST /api/v1/instances/:id/hibernate", () => {
-	test("hibernates an active instance", async () => {
+	test("route is not mounted — returns 404", async () => {
 		const ctx = createTestApp();
 		const workloadId = seedWorkload(ctx);
 
 		const handle = await ctx.instanceManager.create(workloadId, MINIMAL_WORKLOAD);
 
-		const events: DomainEvent[] = [];
-		ctx.eventBus.on((e) => events.push(e));
-
 		const res = await apiRequest(
 			ctx.app,
 			`/api/v1/instances/${handle.instanceId}/hibernate`,
-			{ method: "POST" },
-		);
-		const body = await res.json();
-
-		expect(res.status).toBe(200);
-		expect(body.status).toBe("hibernated");
-		expect(body.snapshotId).toBeDefined();
-
-		expect(events).toHaveLength(2);
-		expect(events[0]!.type).toBe("instance.state");
-		expect((events[0] as any).status).toBe("hibernating");
-		expect(events[1]!.type).toBe("instance.state");
-		expect((events[1] as any).status).toBe("hibernated");
-	});
-
-	test("returns 404 for nonexistent instance", async () => {
-		const ctx = createTestApp();
-		const res = await apiRequest(
-			ctx.app,
-			"/api/v1/instances/nonexistent/hibernate",
 			{ method: "POST" },
 		);
 

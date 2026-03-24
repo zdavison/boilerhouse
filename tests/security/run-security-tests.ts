@@ -95,7 +95,7 @@ async function startSecurityServer() {
 		healthChecker: async () => {},
 		secretStore,
 	});
-	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-sec", db);
+	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-sec", db, runtime);
 	const tenantManager = new TenantManager(
 		instanceManager,
 		snapshotManager,

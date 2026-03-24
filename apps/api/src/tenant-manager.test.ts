@@ -23,18 +23,8 @@ import {
 	workloads,
 } from "@boilerhouse/db";
 import { InstanceManager } from "./instance-manager";
-import { SnapshotManager } from "./snapshot-manager";
-import type { HealthChecker } from "./snapshot-manager";
 import { TenantDataStore } from "./tenant-data";
-import { TenantManager, NoGoldenSnapshotError } from "./tenant-manager";
-
-const TEST_WORKLOAD_HIBERNATE: Workload = {
-	workload: { name: "test", version: "1.0.0" },
-	image: { ref: "test:latest" },
-	resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 },
-	network: { access: "none" },
-	idle: { action: "hibernate" },
-};
+import { TenantManager } from "./tenant-manager";
 
 const TEST_WORKLOAD_DESTROY: Workload = {
 	workload: { name: "test-destroy", version: "1.0.0" },
@@ -44,13 +34,18 @@ const TEST_WORKLOAD_DESTROY: Workload = {
 	idle: { action: "destroy" },
 };
 
-const alwaysHealthy: HealthChecker = async () => {};
+const TEST_WORKLOAD_HIBERNATE: Workload = {
+	workload: { name: "test", version: "1.0.0" },
+	image: { ref: "test:latest" },
+	resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 },
+	network: { access: "none" },
+	idle: { action: "hibernate" },
+};
 
 let db: DrizzleDb;
 let runtime: FakeRuntime;
 let log: ActivityLog;
 let instanceManager: InstanceManager;
-let snapshotManager: SnapshotManager;
 let tenantDataStore: TenantDataStore;
 let tenantManager: TenantManager;
 let nodeId: NodeId;
@@ -89,13 +84,9 @@ beforeEach(() => {
 		.run();
 
 	instanceManager = new InstanceManager(runtime, db, log, nodeId);
-	snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-		healthChecker: alwaysHealthy,
-	});
-	tenantDataStore = new TenantDataStore(storagePath, db);
+	tenantDataStore = new TenantDataStore(storagePath, db, runtime);
 	tenantManager = new TenantManager(
 		instanceManager,
-		snapshotManager,
 		db,
 		log,
 		nodeId,
@@ -105,15 +96,22 @@ beforeEach(() => {
 
 describe("TenantManager", () => {
 	describe("claim()", () => {
+		test("no prior state → cold boots new instance (source: 'cold')", async () => {
+			const tenantId = generateTenantId();
+
+			const result = await tenantManager.claim(tenantId, workloadId);
+
+			expect(result.source).toBe("cold");
+			expect(result.instanceId).toBeTruthy();
+			expect(result.tenantId).toBe(tenantId);
+		});
+
 		test("tenant has active instance → returns existing (source: 'existing')", async () => {
 			const tenantId = generateTenantId();
 
-			// Create golden snapshot first
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-
 			// First claim creates a fresh instance
 			const first = await tenantManager.claim(tenantId, workloadId);
-			expect(first.source).toBe("golden");
+			expect(first.source).toBe("cold");
 
 			// Second claim returns the existing instance
 			const second = await tenantManager.claim(tenantId, workloadId);
@@ -121,129 +119,8 @@ describe("TenantManager", () => {
 			expect(second.instanceId).toBe(first.instanceId);
 		});
 
-		test("tenant snapshot exists (lastSnapshotId) → hot restore (source: 'snapshot')", async () => {
-			const tenantId = generateTenantId();
-
-			// Create golden, claim, then release (hibernate creates a tenant snapshot)
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId);
-
-			// Verify tenant has a lastSnapshotId
-			const tenantRow = db
-				.select()
-				.from(tenants)
-				.where(eq(tenants.tenantId, tenantId))
-				.get();
-			expect(tenantRow!.lastSnapshotId).toBeTruthy();
-
-			// Re-claim should restore from tenant snapshot
-			const result = await tenantManager.claim(tenantId, workloadId);
-			expect(result.source).toBe("snapshot");
-		});
-
-		test("tenant data overlay exists → cold restore from golden (source: 'cold+data')", async () => {
-			const tenantId = generateTenantId();
-
-			// Create golden snapshot
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-
-			// Create tenant row with overlay but no snapshot
-			db.insert(tenants)
-				.values({ tenantId, workloadId, createdAt: new Date() })
-				.run();
-
-			// Save an overlay file
-			const overlayDir = mkdtempSync(join(tmpdir(), "overlay-src-"));
-			const overlayPath = join(overlayDir, "overlay.tar.gz");
-			writeFileSync(overlayPath, "fake-data");
-			tenantDataStore.saveOverlay(tenantId, workloadId, overlayPath);
-
-			const result = await tenantManager.claim(tenantId, workloadId);
-			expect(result.source).toBe("cold+data");
-		});
-
-		test("no prior state → fresh from golden (source: 'golden')", async () => {
-			const tenantId = generateTenantId();
-
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-
-			const result = await tenantManager.claim(tenantId, workloadId);
-			expect(result.source).toBe("golden");
-		});
-
-		test("no golden snapshot → throws NoGoldenSnapshotError", async () => {
-			const tenantId = generateTenantId();
-
-			await expect(
-				tenantManager.claim(tenantId, workloadId),
-			).rejects.toBeInstanceOf(NoGoldenSnapshotError);
-		});
-
-		test("no golden snapshots capability → cold boots new instance (source: 'cold')", async () => {
-			const noGoldenRuntime = new FakeRuntime({ goldenSnapshots: false });
-			const noGoldenIM = new InstanceManager(noGoldenRuntime, db, log, nodeId);
-			const noGoldenSM = new SnapshotManager(noGoldenRuntime, db, nodeId, {
-				healthChecker: alwaysHealthy,
-			});
-			const noGoldenTM = new TenantManager(
-				noGoldenIM,
-				noGoldenSM,
-				db,
-				log,
-				nodeId,
-				tenantDataStore,
-			);
-
-			const tenantId = generateTenantId();
-			const result = await noGoldenTM.claim(tenantId, workloadId);
-
-			expect(result.source).toBe("cold");
-			expect(result.instanceId).toBeTruthy();
-			expect(result.tenantId).toBe(tenantId);
-		});
-
-		test("no golden snapshots + idle.action='hibernate' → still hibernates and restores", async () => {
-			const noGoldenRuntime = new FakeRuntime({ goldenSnapshots: false });
-			const noGoldenIM = new InstanceManager(noGoldenRuntime, db, log, nodeId);
-			const noGoldenSM = new SnapshotManager(noGoldenRuntime, db, nodeId, {
-				healthChecker: alwaysHealthy,
-			});
-			const noGoldenTM = new TenantManager(
-				noGoldenIM,
-				noGoldenSM,
-				db,
-				log,
-				nodeId,
-				tenantDataStore,
-			);
-
-			const tenantId = generateTenantId();
-
-			// First claim → cold boot (no golden snapshots)
-			const first = await noGoldenTM.claim(tenantId, workloadId);
-			expect(first.source).toBe("cold");
-
-			// Release → hibernates (snapshot overlay data, destroy pod)
-			await noGoldenTM.release(tenantId);
-
-			const row = db
-				.select()
-				.from(instances)
-				.where(eq(instances.instanceId, first.instanceId))
-				.get();
-			expect(row!.status).toBe("hibernated");
-
-			// Re-claim → restores from tenant snapshot
-			const second = await noGoldenTM.claim(tenantId, workloadId);
-			expect(second.source).toBe("snapshot");
-			expect(second.instanceId).not.toBe(first.instanceId);
-		});
-
 		test("creates tenant row if none exists", async () => {
 			const tenantId = generateTenantId();
-
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 
 			// No tenant row exists yet
 			const before = db
@@ -271,7 +148,6 @@ describe("TenantManager", () => {
 				.values({ tenantId, workloadId, createdAt: new Date() })
 				.run();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const result = await tenantManager.claim(tenantId, workloadId);
 
 			const claimRow = db
@@ -288,7 +164,6 @@ describe("TenantManager", () => {
 		test("sets tenantId on instance row", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const result = await tenantManager.claim(tenantId, workloadId);
 
 			const row = db
@@ -303,8 +178,6 @@ describe("TenantManager", () => {
 		test("exclusivity: second claim returns same instance", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-
 			const first = await tenantManager.claim(tenantId, workloadId);
 			const second = await tenantManager.claim(tenantId, workloadId);
 
@@ -314,8 +187,6 @@ describe("TenantManager", () => {
 
 		test("exclusivity: concurrent claims return same instance (no duplicates)", async () => {
 			const tenantId = generateTenantId();
-
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 
 			// Fire two claims concurrently — the second should not create a duplicate
 			const [first, second] = await Promise.all([
@@ -328,8 +199,6 @@ describe("TenantManager", () => {
 
 		test("exclusivity: claim returns starting instance rather than creating duplicate", async () => {
 			const tenantId = generateTenantId();
-
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 
 			// First claim creates the instance
 			const first = await tenantManager.claim(tenantId, workloadId);
@@ -347,30 +216,27 @@ describe("TenantManager", () => {
 			expect(second.source).toBe("existing");
 		});
 
-		test("concurrent claims from different tenants for same workload all succeed (serialized restore)", async () => {
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
+		test("concurrent claims from different tenants for same workload all succeed", async () => {
+			const tenantList = Array.from({ length: 5 }, () => generateTenantId());
 
-			const tenants = Array.from({ length: 5 }, () => generateTenantId());
-
-			// Fire all claims concurrently — restores must be serialized
+			// Fire all claims concurrently
 			const results = await Promise.all(
-				tenants.map((tid) => tenantManager.claim(tid, workloadId)),
+				tenantList.map((tid) => tenantManager.claim(tid, workloadId)),
 			);
 
 			// Each tenant should get a distinct instance
 			const instanceIds = results.map((r) => r.instanceId);
 			expect(new Set(instanceIds).size).toBe(5);
 
-			// All should succeed (source golden or snapshot, not error)
+			// All should succeed via cold boot
 			for (const r of results) {
-				expect(["golden", "cold"]).toContain(r.source);
+				expect(r.source).toBe("cold");
 			}
 		});
 
 		test("returns endpoint with host + ports", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const result = await tenantManager.claim(tenantId, workloadId);
 
 			expect(result.endpoint).not.toBeNull();
@@ -381,7 +247,6 @@ describe("TenantManager", () => {
 		test("response includes latencyMs >= 0", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			const result = await tenantManager.claim(tenantId, workloadId);
 
 			expect(result.latencyMs).toBeGreaterThanOrEqual(0);
@@ -390,7 +255,6 @@ describe("TenantManager", () => {
 		test("logs 'tenant.claimed' activity with source in metadata", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
 
 			const events = log.queryByTenant(tenantId);
@@ -398,28 +262,30 @@ describe("TenantManager", () => {
 			expect(claimEvent).toBeDefined();
 			expect(claimEvent!.tenantId).toBe(tenantId);
 			expect(claimEvent!.metadata).toEqual(
-				expect.objectContaining({ source: "golden" }),
+				expect.objectContaining({ source: "cold" }),
 			);
+		});
+
+		test("tenant data overlay exists → cold boot with data (source: 'cold+data')", async () => {
+			const tenantId = generateTenantId();
+
+			// Create tenant row with overlay
+			db.insert(tenants)
+				.values({ tenantId, workloadId, createdAt: new Date() })
+				.run();
+
+			// Save an overlay file
+			const overlayDir = mkdtempSync(join(tmpdir(), "overlay-src-"));
+			const overlayPath = join(overlayDir, "overlay.tar.gz");
+			writeFileSync(overlayPath, "fake-data");
+			tenantDataStore.saveOverlay(tenantId, workloadId, overlayPath);
+
+			const result = await tenantManager.claim(tenantId, workloadId);
+			expect(result.source).toBe("cold+data");
 		});
 	});
 
 	describe("release()", () => {
-		test("idle.action='hibernate' → instance hibernated, snapshot created", async () => {
-			const tenantId = generateTenantId();
-
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-			const claimed = await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId);
-
-			const row = db
-				.select()
-				.from(instances)
-				.where(eq(instances.instanceId, claimed.instanceId))
-				.get();
-
-			expect(row!.status).toBe("hibernated");
-		});
-
 		test("idle.action='destroy' → instance destroyed", async () => {
 			const destroyWorkloadId = generateWorkloadId();
 			db.insert(workloads)
@@ -433,15 +299,8 @@ describe("TenantManager", () => {
 				})
 				.run();
 
-			// Create golden for the destroy workload
-			await snapshotManager.createGolden(
-				destroyWorkloadId,
-				TEST_WORKLOAD_DESTROY,
-			);
-
 			const destroyTenantManager = new TenantManager(
 				instanceManager,
-				snapshotManager,
 				db,
 				log,
 				nodeId,
@@ -461,10 +320,24 @@ describe("TenantManager", () => {
 			expect(row!.status).toBe("destroyed");
 		});
 
+		test("release → instance destroyed", async () => {
+			const tenantId = generateTenantId();
+
+			const claimed = await tenantManager.claim(tenantId, workloadId);
+			await tenantManager.release(tenantId);
+
+			const row = db
+				.select()
+				.from(instances)
+				.where(eq(instances.instanceId, claimed.instanceId))
+				.get();
+
+			expect(row!.status).toBe("destroyed");
+		});
+
 		test("deletes claim row on release", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
 			await tenantManager.release(tenantId);
 
@@ -485,22 +358,6 @@ describe("TenantManager", () => {
 			expect(tenantRow).toBeDefined();
 		});
 
-		test("preserves lastSnapshotId on tenant row after hibernate", async () => {
-			const tenantId = generateTenantId();
-
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
-			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId);
-
-			const row = db
-				.select()
-				.from(tenants)
-				.where(eq(tenants.tenantId, tenantId))
-				.get();
-
-			expect(row!.lastSnapshotId).toBeTruthy();
-		});
-
 		test("no active instance → no-op (no throw)", async () => {
 			const tenantId = generateTenantId();
 
@@ -515,7 +372,6 @@ describe("TenantManager", () => {
 		test("logs 'tenant.released' activity", async () => {
 			const tenantId = generateTenantId();
 
-			await snapshotManager.createGolden(workloadId, TEST_WORKLOAD_HIBERNATE);
 			await tenantManager.claim(tenantId, workloadId);
 			await tenantManager.release(tenantId);
 

@@ -1,12 +1,11 @@
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 import type { InstanceId } from "@boilerhouse/core";
-import { generateSnapshotId, generateWorkloadId, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
-import type { SnapshotRef, SnapshotPaths, SnapshotMetadata } from "@boilerhouse/core";
+import { DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
-import type { Runtime, RuntimeCapabilities, InstanceHandle, Endpoint, ExecResult, CreateOptions } from "@boilerhouse/core";
+import type { Runtime, InstanceHandle, Endpoint, ExecResult, CreateOptions } from "@boilerhouse/core";
 import type { PodmanConfig } from "./types";
 import type { ContainerBackend } from "./backend";
 import { PodmanRuntimeError } from "./errors";
@@ -29,7 +28,6 @@ interface ManagedInstance {
 }
 
 export class PodmanRuntime implements Runtime {
-	readonly capabilities: RuntimeCapabilities = { goldenSnapshots: true };
 	private readonly instances = new Map<string, ManagedInstance>();
 	private readonly snapshotDir: string;
 	private readonly backend: ContainerBackend;
@@ -230,166 +228,6 @@ export class PodmanRuntime implements Runtime {
 		handle.running = false;
 	}
 
-	async snapshot(handle: InstanceHandle): Promise<SnapshotRef> {
-		const instance = this.requireInstance(handle.instanceId);
-		const snapshotId = generateSnapshotId();
-
-		const archiveDir = `${this.snapshotDir}/${snapshotId}`;
-		try {
-			mkdirSync(archiveDir, { recursive: true, mode: 0o700 });
-		} catch {
-			throw new PodmanRuntimeError(
-				`Cannot create snapshot directory ${archiveDir} — check that ${this.snapshotDir} exists and is writable`,
-			);
-		}
-
-		// Capture exposed container ports from the pod's infra container.
-		// In a pod, port mappings are on the infra container, not the workload,
-		// so the checkpoint archive won't contain them.
-		const exposedPorts = await this.resolveExposedContainerPorts(handle.instanceId);
-
-		// Wait for all established TCP connections to close before CRIU checkpoint.
-		// CRIU cannot restore TCP connections when the container's IP changes on restore.
-		await this.waitForTcpDrain(handle.instanceId);
-
-		const result = await this.backend.checkpoint(handle.instanceId, archiveDir);
-
-		// Container is stopped after checkpoint
-		instance.running = false;
-		handle.running = false;
-
-		const info = await this.backend.info();
-
-		const paths: SnapshotPaths = {
-			memory: result.archivePath,
-			vmstate: result.archivePath,
-		};
-
-		const runtimeMeta: SnapshotMetadata = {
-			runtimeVersion: info.version,
-			architecture: info.architecture,
-			exposedPorts: exposedPorts.length > 0 ? exposedPorts : undefined,
-		};
-
-		return {
-			id: snapshotId,
-			type: "tenant",
-			paths,
-			workloadId: generateWorkloadId(),
-			nodeId: generateNodeId(),
-			runtimeMeta,
-			encrypted: result.encrypted,
-		};
-	}
-
-	async restore(ref: SnapshotRef, instanceId: InstanceId, options?: CreateOptions): Promise<InstanceHandle> {
-		const tracer = trace.getTracer("boilerhouse");
-		const proxyConfig = options?.proxyConfig;
-		const hasEnvoyProxySidecar = !!proxyConfig;
-
-		const containerPorts = ref.runtimeMeta?.exposedPorts;
-
-		// Always create a pod for the restored instance
-		const portmappings = containerPorts?.map((p) => ({
-			container_port: p,
-			host_port: 0,
-			protocol: "tcp",
-		}));
-
-		const { hostPorts } = await tracer.startActiveSpan("restore.create_pod", async (span) => {
-			try {
-				const result = await this.backend.createPod(instanceId, { portmappings });
-				span.setAttribute("host.ports", result.hostPorts.join(","));
-				return result;
-			} catch (err) {
-				span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-				throw err;
-			} finally {
-				span.end();
-			}
-		});
-
-		// Add Envoy sidecar if proxy config is provided
-		if (proxyConfig) {
-			await tracer.startActiveSpan("restore.setup_envoy", async (span) => {
-				try {
-					await this.backend.ensureImage({ ref: ENVOY_IMAGE }, { name: "envoy-proxy", version: "sidecar" });
-
-					const configPath = await this.backend.writeFile(
-						`${instanceId}-envoy.yaml`,
-						proxyConfig,
-					);
-
-					await this.backend.createContainer({
-						name: `${instanceId}-proxy`,
-						image: ENVOY_IMAGE,
-						pod: instanceId,
-						command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "--log-level", "warn"],
-						privileged: false,
-						cap_drop: ["ALL"],
-						no_new_privileges: true,
-						mounts: [{
-							destination: "/etc/envoy/envoy.yaml",
-							type: "bind",
-							source: configPath,
-							options: ["ro"],
-						}],
-					});
-				} catch (err) {
-					span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-					throw err;
-				} finally {
-					span.end();
-				}
-			});
-		}
-
-		// Restore the container into the pod. Port mappings are on the pod
-		// (not the container), so we don't pass publishPorts.
-		await tracer.startActiveSpan("restore.criu", async (span) => {
-			span.setAttribute("snapshot.id", ref.id);
-			span.setAttribute("snapshot.encrypted", ref.encrypted ?? false);
-			try {
-				await this.backend.restore(
-					ref.paths.vmstate,
-					instanceId,
-					undefined,
-					instanceId,
-					ref.encrypted,
-				);
-			} catch (err) {
-				span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-				throw err;
-			} finally {
-				span.end();
-			}
-		});
-
-		// CRIU restore only starts the workload container — the sidecar
-		// must be started explicitly since it wasn't part of the checkpoint.
-		if (proxyConfig) {
-			await tracer.startActiveSpan("restore.start_envoy", async (span) => {
-				try {
-					await this.backend.startContainer(`${instanceId}-proxy`);
-				} catch (err) {
-					span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
-					throw err;
-				} finally {
-					span.end();
-				}
-			});
-		}
-
-		this.instances.set(instanceId, {
-			instanceId,
-			running: true,
-			ports: hostPorts,
-			hasEnvoyProxySidecar,
-		});
-
-		return { instanceId, running: true };
-	}
-
 	async exec(handle: InstanceHandle, command: string[]): Promise<ExecResult> {
 		return this.backend.exec(handle.instanceId, command);
 	}
@@ -425,85 +263,6 @@ export class PodmanRuntime implements Runtime {
 	}
 
 	// ── Private helpers ──────────────────────────────────────────────────────
-
-	/**
-	 * Wait for all established TCP connections inside the container to close.
-	 *
-	 * CRIU cannot checkpoint established TCP connections without
-	 * `--tcp-established`. Rather than adding that flag and dealing with
-	 * stale connections on restore, we drain them before checkpoint.
-	 *
-	 * Reads `/proc/net/tcp` via `cat` and parses the output in TypeScript.
-	 * State `01` = TCP_ESTABLISHED.
-	 *
-	 * If the exec fails (e.g. no network namespace, or `/proc/net/tcp`
-	 * doesn't exist), we treat it as "no connections" and return immediately.
-	 *
-	 * @param maxWaitMs - Maximum time to wait for connections to drain.
-	 *   @default 30000
-	 * @param pollIntervalMs - Time between polls.
-	 *   @default 1000
-	 */
-	private async waitForTcpDrain(
-		instanceId: string,
-		maxWaitMs = 30_000,
-		pollIntervalMs = 1_000,
-	): Promise<void> {
-		const deadline = Date.now() + maxWaitMs;
-
-		while (Date.now() < deadline) {
-			let result: { exitCode: number; stdout: string };
-			try {
-				result = await this.backend.exec(instanceId, [
-					"cat", "/proc/net/tcp",
-				]);
-			} catch {
-				// Exec failed entirely (container stopped, no network namespace, etc.)
-				return;
-			}
-
-			if (result.exitCode !== 0) {
-				// cat failed — /proc/net/tcp doesn't exist (no network namespace)
-				return;
-			}
-
-			if (!hasEstablishedConnections(result.stdout)) {
-				return;
-			}
-
-			await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-		}
-
-		throw new PodmanRuntimeError(
-			`TCP connections in container ${instanceId} did not drain within ${maxWaitMs}ms`,
-		);
-	}
-
-	/**
-	 * Get the exposed container ports (guest ports) from the pod's infra container.
-	 * These are needed when creating a new pod for restore.
-	 */
-	private async resolveExposedContainerPorts(instanceId: string): Promise<number[]> {
-		try {
-			const pod = await this.backend.inspectPod(instanceId);
-			if (!pod.infraContainerId) return [];
-
-			const inspect = await this.backend.inspectContainer(pod.infraContainerId);
-			const portsMap = inspect.NetworkSettings?.Ports;
-			if (!portsMap) return [];
-
-			// Keys are like "8080/tcp" — extract the container port number
-			const ports: number[] = [];
-			for (const key of Object.keys(portsMap)) {
-				const port = parseInt(key.split("/")[0]!, 10);
-				if (port > 0) ports.push(port);
-			}
-			return ports;
-		} catch {
-			return [];
-		}
-	}
-
 	private requireInstance(instanceId: InstanceId): ManagedInstance {
 		const instance = this.instances.get(instanceId);
 		if (!instance) {

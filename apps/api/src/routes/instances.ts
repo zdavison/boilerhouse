@@ -89,37 +89,8 @@ export function instanceRoutes(deps: RouteDeps) {
 				endpoint,
 			};
 		})
-		.post("/instances/:id/hibernate", async ({ params, set }) => {
-			const instanceId = params.id as InstanceId;
-			const row = db
-				.select()
-				.from(instances)
-				.where(eq(instances.instanceId, instanceId))
-				.get();
-
-			if (!row) {
-				set.status = 404;
-				return { error: `Instance '${params.id}' not found` };
-			}
-
-			let ref;
-			try {
-				ref = await instanceManager.hibernate(instanceId);
-			} catch (err) {
-				if (err instanceof InvalidTransitionError) {
-					set.status = 409;
-					return { error: err.message };
-				}
-				throw err;
-			}
-
-			return {
-				instanceId,
-				status: "hibernated",
-				snapshotId: ref.id,
-			};
-		})
-		.post("/instances/:id/exec", async ({ params, body, set }) => {
+	
+			.post("/instances/:id/exec", async ({ params, body, set }) => {
 			const instanceId = params.id as InstanceId;
 			const row = db
 				.select()
