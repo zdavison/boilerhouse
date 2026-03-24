@@ -205,8 +205,8 @@ function InstanceRow({
 				{shortId(instance.instanceId)}
 			</span>
 			{instance.tenantId && (
-				<span className="text-xs text-muted ml-2">
-					tenant:<span className="text-muted-light">{instance.tenantId}</span>
+				<span className="text-xs font-mono ml-2 text-muted">
+					for <span className="text-foreground">{instance.tenantId}</span>
 				</span>
 			)}
 
