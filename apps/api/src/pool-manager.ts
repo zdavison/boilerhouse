@@ -50,6 +50,7 @@ export class PoolManager {
 		}
 		this.db.update(instances).set({ poolStatus: "ready" }).where(eq(instances.instanceId, handle.instanceId)).run();
 		applyWorkloadTransition(this.db, workloadId, "creating", "created");
+		await this.replenish(workloadId);
 	}
 
 	/**
