@@ -23,7 +23,10 @@ interface InstanceNode {
 
 interface WorkloadTreeNode {
 	workload: WorkloadSummary;
-	instances: InstanceNode[];
+	/** Unclaimed pool instances (tenantId === null). */
+	poolInstances: InstanceNode[];
+	/** Instances claimed by a tenant (tenantId !== null). */
+	claimedInstances: InstanceNode[];
 }
 
 // --- Tree builder ---
@@ -40,10 +43,14 @@ function buildWorkloadTree(
 		instancesByWorkload.set(inst.workloadId, list);
 	}
 
-	return workloads.map((workload) => ({
-		workload,
-		instances: (instancesByWorkload.get(workload.workloadId) ?? []).map((inst) => ({ instance: inst })),
-	}));
+	return workloads.map((workload) => {
+		const all = instancesByWorkload.get(workload.workloadId) ?? [];
+		return {
+			workload,
+			poolInstances: all.filter((i) => i.tenantId === null).map((inst) => ({ instance: inst })),
+			claimedInstances: all.filter((i) => i.tenantId !== null).map((inst) => ({ instance: inst })),
+		};
+	});
 }
 
 // --- Formatting ---
@@ -227,6 +234,44 @@ function InstanceRow({
 
 // --- Workload Group ---
 
+function InstanceSection({
+	label,
+	instances,
+	onAction,
+	onConnect,
+	workloadName,
+	busyInstances,
+}: {
+	label: string;
+	instances: InstanceNode[];
+	onAction: (id: string, action: "destroy") => void;
+	onConnect: (id: string, workloadName: string) => void;
+	workloadName: string;
+	busyInstances: Set<string>;
+}) {
+	return (
+		<>
+			<div
+				className="flex items-center h-6 px-2 border-b border-border/10"
+				style={{ paddingLeft: GUTTER_W + STATUS_W + 8 }}
+			>
+				<span className="text-xs text-muted font-mono uppercase tracking-wider">{label}</span>
+				<span className="text-xs text-muted font-mono ml-1.5">({instances.length})</span>
+			</div>
+			{instances.map((inst) => (
+				<InstanceRow
+					key={inst.instance.instanceId}
+					instance={inst.instance}
+					onAction={onAction}
+					onConnect={onConnect}
+					workloadName={workloadName}
+					busy={busyInstances.has(inst.instance.instanceId)}
+				/>
+			))}
+		</>
+	);
+}
+
 function WorkloadGroup({
 	node,
 	expanded,
@@ -244,8 +289,9 @@ function WorkloadGroup({
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
 }) {
-	const { workload, instances } = node;
+	const { workload, poolInstances, claimedInstances } = node;
 	const Chevron = expanded ? ChevronDown : ChevronRight;
+	const hasInstances = poolInstances.length > 0 || claimedInstances.length > 0;
 
 	return (
 		<div className="mb-3">
@@ -285,18 +331,28 @@ function WorkloadGroup({
 			</div>
 
 			{/* Expanded children */}
-			{expanded && (
+			{expanded && hasInstances && (
 				<div className="mt-1">
-					{instances.map((inst) => (
-						<InstanceRow
-							key={inst.instance.instanceId}
-							instance={inst.instance}
+					{poolInstances.length > 0 && (
+						<InstanceSection
+							label="pool"
+							instances={poolInstances}
 							onAction={onAction}
 							onConnect={onConnect}
 							workloadName={workload.name}
-							busy={busyInstances.has(inst.instance.instanceId)}
+							busyInstances={busyInstances}
 						/>
-					))}
+					)}
+					{claimedInstances.length > 0 && (
+						<InstanceSection
+							label="claimed"
+							instances={claimedInstances}
+							onAction={onAction}
+							onConnect={onConnect}
+							workloadName={workload.name}
+							busyInstances={busyInstances}
+						/>
+					)}
 				</div>
 			)}
 		</div>
