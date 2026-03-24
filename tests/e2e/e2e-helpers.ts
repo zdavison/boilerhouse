@@ -164,13 +164,13 @@ export async function startE2EServer(
 	if (idleMonitor) {
 		idleMonitor.onIdle(async (instanceId, _action) => {
 			const claimRow = db
-				.select({ tenantId: claims.tenantId })
+				.select({ tenantId: claims.tenantId, workloadId: claims.workloadId })
 				.from(claims)
 				.where(eq(claims.instanceId, instanceId))
 				.get();
 
 			if (!claimRow) return;
-			await tenantManager.release(claimRow.tenantId);
+			await tenantManager.release(claimRow.tenantId, claimRow.workloadId);
 		});
 	}
 

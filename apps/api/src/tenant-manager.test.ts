@@ -309,7 +309,7 @@ describe("TenantManager", () => {
 
 			const tenantId = generateTenantId();
 			const claimed = await destroyTenantManager.claim(tenantId, destroyWorkloadId);
-			await destroyTenantManager.release(tenantId);
+			await destroyTenantManager.release(tenantId, destroyWorkloadId);
 
 			const row = db
 				.select()
@@ -324,7 +324,7 @@ describe("TenantManager", () => {
 			const tenantId = generateTenantId();
 
 			const claimed = await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId);
+			await tenantManager.release(tenantId, workloadId);
 
 			const row = db
 				.select()
@@ -339,7 +339,7 @@ describe("TenantManager", () => {
 			const tenantId = generateTenantId();
 
 			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId);
+			await tenantManager.release(tenantId, workloadId);
 
 			const claimRow = db
 				.select()
@@ -366,14 +366,14 @@ describe("TenantManager", () => {
 				.run();
 
 			// Should not throw
-			await expect(tenantManager.release(tenantId)).resolves.toBeUndefined();
+			await expect(tenantManager.release(tenantId, workloadId)).resolves.toBeUndefined();
 		});
 
 		test("logs 'tenant.released' activity", async () => {
 			const tenantId = generateTenantId();
 
 			await tenantManager.claim(tenantId, workloadId);
-			await tenantManager.release(tenantId);
+			await tenantManager.release(tenantId, workloadId);
 
 			const events = log.queryByTenant(tenantId);
 			const releaseEvent = events.find(

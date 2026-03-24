@@ -85,6 +85,13 @@
       "when": 1774300000000,
       "tag": "0011_pool_status",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1774400000000,
+      "tag": "0012_claims_workload_scope",
+      "breakpoints": true
     }
   ]
 }

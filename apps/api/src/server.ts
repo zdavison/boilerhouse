@@ -176,7 +176,7 @@ eventBus.on((event) => {
 
 idleMonitor.onIdle(async (instanceId, action) => {
 	const claimRow = db
-		.select({ tenantId: claims.tenantId })
+		.select({ tenantId: claims.tenantId, workloadId: claims.workloadId })
 		.from(claims)
 		.where(eq(claims.instanceId, instanceId))
 		.get();
@@ -187,7 +187,7 @@ idleMonitor.onIdle(async (instanceId, action) => {
 	}
 
 	log.info({ instanceId, tenantId: claimRow.tenantId, action }, "Idle timeout: releasing tenant");
-	await tenantManager.release(claimRow.tenantId);
+	await tenantManager.release(claimRow.tenantId, claimRow.workloadId);
 });
 
 // Recover state before accepting requests

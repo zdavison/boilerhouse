@@ -10,7 +10,7 @@ interface ClaimableTenantManager {
 		source: string;
 		latencyMs: number;
 	}>;
-	release(tenantId: string): Promise<void>;
+	release(tenantId: string, workloadId: string): Promise<void>;
 }
 
 /**
@@ -49,11 +49,11 @@ export function wrapTenantManager<T extends ClaimableTenantManager>(
 			}
 
 			if (prop === "release") {
-				return async (tenantId: string) => {
+				return async (tenantId: string, workloadId: string) => {
 					return tracer.startActiveSpan("tenant.release", async (span) => {
-						span.setAttribute("tenant.id", tenantId);
+						span.setAttributes({ "tenant.id": tenantId, "workload.id": workloadId });
 						try {
-							await target.release(tenantId);
+							await target.release(tenantId, workloadId);
 						} catch (err) {
 							span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
 							span.recordException(err as Error);

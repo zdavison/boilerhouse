@@ -117,10 +117,10 @@ export function tenantRoutes(deps: RouteDeps) {
 			const instanceId = db
 				.select({ instanceId: claims.instanceId })
 				.from(claims)
-				.where(eq(claims.tenantId, tenantId))
+				.where(and(eq(claims.tenantId, tenantId), eq(claims.workloadId, workloadRow.workloadId)))
 				.get()?.instanceId;
 
-			await tenantManager.release(tenantId);
+			await tenantManager.release(tenantId, workloadRow.workloadId);
 
 			if (instanceId) {
 				eventBus.emit({
@@ -151,11 +151,13 @@ export function tenantRoutes(deps: RouteDeps) {
 				return { error: `Tenant '${params.id}' not found` };
 			}
 
-			// Build a map of tenantId → instanceId from claims
-			const tenantClaims = db.select({ instanceId: claims.instanceId }).from(claims).where(eq(claims.tenantId, tenantId)).all();
-			const claimedInstanceId = tenantClaims[0]?.instanceId ?? null;
+			// Build a per-workload map of workloadId → instanceId from claims
+			const tenantClaims = db.select({ workloadId: claims.workloadId, instanceId: claims.instanceId }).from(claims).where(eq(claims.tenantId, tenantId)).all();
+			const claimByWorkload = new Map(tenantClaims.map((c) => [c.workloadId, c.instanceId]));
 
 			return tenantRows.map((tenantRow) => {
+				const claimedInstanceId = claimByWorkload.get(tenantRow.workloadId) ?? null;
+
 				// Get current instance if assigned
 				let instance = null;
 				if (claimedInstanceId) {
@@ -202,14 +204,14 @@ export function tenantRoutes(deps: RouteDeps) {
 		.get("/tenants", () => {
 			const rows = db.select().from(tenants).all();
 
-			// Build a map of tenantId → instanceId from claims
-			const allClaims = db.select({ tenantId: claims.tenantId, instanceId: claims.instanceId }).from(claims).all();
-			const claimMap = new Map(allClaims.map((c) => [c.tenantId, c.instanceId]));
+			// Build a per-workload map of tenantId:workloadId → instanceId from claims
+			const allClaims = db.select({ tenantId: claims.tenantId, workloadId: claims.workloadId, instanceId: claims.instanceId }).from(claims).all();
+			const claimMap = new Map(allClaims.map((c) => [`${c.tenantId}:${c.workloadId}`, c.instanceId]));
 
 			return rows.map((r) => ({
 				tenantId: r.tenantId,
 				workloadId: r.workloadId,
-				instanceId: claimMap.get(r.tenantId) ?? null,
+				instanceId: claimMap.get(`${r.tenantId}:${r.workloadId}`) ?? null,
 				lastActivity: r.lastActivity?.toISOString() ?? null,
 				createdAt: r.createdAt.toISOString(),
 			}));

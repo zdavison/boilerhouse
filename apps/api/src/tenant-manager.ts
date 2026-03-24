@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type {
 	InstanceId,
 	InstanceHandle,
@@ -79,7 +79,7 @@ export class TenantManager {
 
 		// 1. Check for existing claim
 		const existingClaim = this.db.select().from(claims)
-			.where(eq(claims.tenantId, tenantId)).get();
+			.where(and(eq(claims.tenantId, tenantId), eq(claims.workloadId, workloadId))).get();
 
 		if (existingClaim?.status === "active" && existingClaim.instanceId) {
 			// Verify the instance is actually running (it may have been destroyed directly)
@@ -110,9 +110,9 @@ export class TenantManager {
 		// 2. Upsert tenant identity row first (FK target for claims)
 		this.upsertTenantIdentity(tenantId, workloadId);
 
-		// 3. Reserve claim slot (UNIQUE on tenantId prevents races)
+		// 3. Reserve claim slot (UNIQUE on tenantId+workloadId prevents races)
 		const claimId = generateClaimId();
-		this.db.insert(claims).values({ claimId, tenantId, status: "creating", createdAt: new Date() }).run();
+		this.db.insert(claims).values({ claimId, tenantId, workloadId, status: "creating", createdAt: new Date() }).run();
 
 		try {
 			// 4. Pool path (if configured) — acquire a pre-warmed instance
@@ -166,9 +166,9 @@ export class TenantManager {
 	 *
 	 * No-op if the tenant has no active claim.
 	 */
-	async release(tenantId: TenantId): Promise<void> {
+	async release(tenantId: TenantId, workloadId: WorkloadId): Promise<void> {
 		const claim = this.db.select().from(claims)
-			.where(eq(claims.tenantId, tenantId)).get();
+			.where(and(eq(claims.tenantId, tenantId), eq(claims.workloadId, workloadId))).get();
 
 		if (!claim?.instanceId) return;
 
@@ -184,18 +184,12 @@ export class TenantManager {
 			this.watchDirsPoller.stopPolling(instanceId);
 		}
 
-		// Get tenant row for workloadId
-		const tenantRow = this.db.select().from(tenants)
-			.where(eq(tenants.tenantId, tenantId)).get();
-
-		if (!tenantRow) return;
-
 		// Extract overlay data from the running container, then destroy and replenish pool
 		const handle: InstanceHandle = { instanceId, running: true };
-		await this.tenantDataStore.extractOverlay(handle, tenantId, tenantRow.workloadId);
+		await this.tenantDataStore.extractOverlay(handle, tenantId, workloadId);
 		await this.instanceManager.destroy(instanceId);
 		if (this.poolManager) {
-			this.poolManager.replenish(tenantRow.workloadId).catch(() => {});
+			this.poolManager.replenish(workloadId).catch(() => {});
 		}
 
 		// Delete the claim — tenant identity (with lastSnapshotId) persists
@@ -205,7 +199,7 @@ export class TenantManager {
 			event: "tenant.released",
 			tenantId,
 			instanceId,
-			workloadId: tenantRow.workloadId,
+			workloadId,
 			nodeId: this.nodeId,
 		});
 	}
@@ -271,7 +265,7 @@ export class TenantManager {
 		const existing = this.db
 			.select()
 			.from(tenants)
-			.where(eq(tenants.tenantId, tenantId))
+			.where(and(eq(tenants.tenantId, tenantId), eq(tenants.workloadId, workloadId)))
 			.get();
 
 		if (!existing) {

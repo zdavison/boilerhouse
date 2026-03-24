@@ -156,17 +156,20 @@ export const claims = sqliteTable(
 		claimId: text("claim_id").primaryKey().$type<ClaimId>(),
 		tenantId: text("tenant_id")
 			.notNull()
-			.unique()
 			.$type<TenantId>(),
+		workloadId: text("workload_id")
+			.notNull()
+			.$type<WorkloadId>()
+			.references(() => workloads.workloadId),
 		instanceId: text("instance_id").$type<InstanceId>(),
 		status: text("status").notNull().$type<ClaimStatus>(),
 		createdAt: timestamp("created_at").notNull(),
 	},
 	(table) => [
+		unique("claims_tenant_workload_uniq").on(table.tenantId, table.workloadId),
 		index("claims_instance_id_idx").on(table.instanceId),
 		index("claims_status_idx").on(table.status),
 	],
-
 );
 
 export type ClaimRow = typeof claims.$inferSelect;
