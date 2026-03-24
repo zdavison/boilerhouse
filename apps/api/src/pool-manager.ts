@@ -8,12 +8,15 @@ import { pollHealth, createExecCheck, createHttpCheck } from "./health-check";
 import type { HealthConfig, HealthCheckFn, HealthChecker } from "./health-check";
 import type { BootstrapLogStore } from "./bootstrap-log-store";
 import type { EventBus } from "./event-bus";
+import { createLogger } from "@boilerhouse/o11y";
 
 export interface PoolManagerOptions {
 	healthChecker?: HealthChecker;
 	bootstrapLogStore?: BootstrapLogStore;
 	eventBus?: EventBus;
 }
+
+const log = createLogger("PoolManager");
 
 export class PoolManager {
 	private readonly healthChecker: HealthChecker;
@@ -146,8 +149,8 @@ export class PoolManager {
 				const handle: InstanceHandle = { instanceId: row.instanceId, running: row.status === "active" || row.status === "starting" };
 				await this.runtime.destroy(handle);
 				this.db.update(instances).set({ status: "destroyed", poolStatus: null }).where(eq(instances.instanceId, row.instanceId)).run();
-			} catch {
-				// Best-effort
+			} catch (err) {
+				log.warn({ instanceId: row.instanceId, err }, "Failed to destroy pool instance during drain");
 			}
 		}));
 	}
