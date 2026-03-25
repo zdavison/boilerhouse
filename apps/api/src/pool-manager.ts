@@ -21,6 +21,8 @@ const log = createLogger("PoolManager");
 export class PoolManager {
 	private readonly healthChecker: HealthChecker;
 	private readonly warmingPromises = new Map<InstanceId, Promise<void>>();
+	private readonly bootstrapLogStore?: BootstrapLogStore;
+	private readonly eventBus?: EventBus;
 
 	constructor(
 		private readonly runtime: Runtime,
@@ -29,6 +31,8 @@ export class PoolManager {
 		options?: PoolManagerOptions,
 	) {
 		this.healthChecker = options?.healthChecker ?? pollHealth;
+		this.bootstrapLogStore = options?.bootstrapLogStore;
+		this.eventBus = options?.eventBus;
 	}
 
 	/**
@@ -42,7 +46,7 @@ export class PoolManager {
 		const workload = workloadRow.config as Workload;
 		const handle = await this.startPoolInstance(workloadId, workload);
 		try {
-			await this.runHealthChecks(handle, workload);
+			await this.runHealthChecks(handle, workload, workloadId);
 		} catch (err) {
 			await this.runtime.destroy(handle).catch(() => {});
 			this.db.delete(instances).where(eq(instances.instanceId, handle.instanceId)).run();
@@ -86,7 +90,7 @@ export class PoolManager {
 		if (!workloadRow) throw new Error(`Workload not found: ${workloadId}`);
 		const workload = workloadRow.config as Workload;
 		const handle = await this.startPoolInstance(workloadId, workload);
-		await this.runHealthChecks(handle, workload);
+		await this.runHealthChecks(handle, workload, workloadId);
 		this.db.update(instances).set({ poolStatus: "acquired" }).where(eq(instances.instanceId, handle.instanceId)).run();
 		return { instanceId: handle.instanceId, running: true };
 	}
@@ -163,7 +167,7 @@ export class PoolManager {
 		const promise = new Promise<void>((res, rej) => { resolve = res; reject = rej; });
 		this.warmingPromises.set(handle.instanceId, promise);
 		try {
-			await this.runHealthChecks(handle, workload);
+			await this.runHealthChecks(handle, workload, workloadId);
 			this.db.update(instances).set({ poolStatus: "ready" }).where(eq(instances.instanceId, handle.instanceId)).run();
 			resolve();
 		} catch (err) {
@@ -173,6 +177,14 @@ export class PoolManager {
 		} finally {
 			this.warmingPromises.delete(handle.instanceId);
 		}
+	}
+
+	private makeOnLog(workloadId: WorkloadId): (line: string) => void {
+		return (line: string) => {
+			if (!this.bootstrapLogStore) return;
+			const entry = this.bootstrapLogStore.append(workloadId, line);
+			this.eventBus?.emit({ type: "bootstrap.log", workloadId, line, timestamp: entry.timestamp });
+		};
 	}
 
 	private async startPoolInstance(workloadId: WorkloadId, workload: Workload): Promise<InstanceHandle> {
@@ -186,7 +198,7 @@ export class PoolManager {
 			createdAt: new Date(),
 		}).run();
 		try {
-			const handle = await this.runtime.create(workload, instanceId);
+			const handle = await this.runtime.create(workload, instanceId, { onLog: this.makeOnLog(workloadId) });
 			await this.runtime.start(handle);
 			applyInstanceTransition(this.db, instanceId, "starting", "started");
 			return { instanceId, running: true };
@@ -196,17 +208,18 @@ export class PoolManager {
 		}
 	}
 
-	private async runHealthChecks(handle: InstanceHandle, workload: Workload): Promise<void> {
+	private async runHealthChecks(handle: InstanceHandle, workload: Workload, workloadId?: WorkloadId): Promise<void> {
 		if (!workload.health) return;
 		const intervalMs = workload.health.interval_seconds * 1000;
+		const onLog = workloadId ? this.makeOnLog(workloadId) : undefined;
 		let check: HealthCheckFn;
 		if (workload.health.exec) {
-			check = createExecCheck(this.runtime, handle, workload.health.exec.command);
+			check = createExecCheck(this.runtime, handle, workload.health.exec.command, onLog);
 		} else if (workload.health.http_get) {
 			const endpoint = await this.runtime.getEndpoint(handle);
 			const port = endpoint.ports[0]!;
 			const url = `http://${endpoint.host}:${port}${workload.health.http_get.path}`;
-			check = createHttpCheck(url);
+			check = createHttpCheck(url, onLog);
 		} else {
 			throw new Error("Workload health config has no exec or http_get probe");
 		}
@@ -215,6 +228,6 @@ export class PoolManager {
 			unhealthyThreshold: workload.health.unhealthy_threshold,
 			timeoutMs: Math.max(intervalMs * workload.health.unhealthy_threshold * 2, 120_000),
 		};
-		await this.healthChecker(check, config);
+		await this.healthChecker(check, config, onLog);
 	}
 }
