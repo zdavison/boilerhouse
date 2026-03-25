@@ -19,19 +19,14 @@ trap cleanup EXIT INT TERM
 
 # ── Runtime selection ────────────────────────────────────────────────────────
 
-IS_MACOS=false
-if [ "$(uname -s)" = "Darwin" ]; then
-  IS_MACOS=true
-fi
-
 echo "Select runtime:"
-echo "  1) podman   — Container runtime via boilerhouse-podmand"
+echo "  1) docker     — Container runtime via Docker daemon"
 echo "  2) kubernetes — Pods on minikube (boilerhouse-test profile)"
 echo ""
 read -rp "Runtime [1]: " RUNTIME_CHOICE
 
 case "${RUNTIME_CHOICE:-1}" in
-  1|podman)   RUNTIME_TYPE="podman" ;;
+  1|docker)     RUNTIME_TYPE="docker" ;;
   2|kubernetes) RUNTIME_TYPE="kubernetes" ;;
   *)
     echo "Invalid choice: $RUNTIME_CHOICE" >&2
@@ -44,7 +39,7 @@ echo "Using runtime: $RUNTIME_TYPE"
 echo ""
 
 # ── Detect observability stack ───────────────────────────────────────────────
-# Must run before daemon start so the daemon inherits OTEL_EXPORTER_OTLP_ENDPOINT.
+# Must run before API start so OTEL_EXPORTER_OTLP_ENDPOINT is set.
 
 TEMPO_HTTP_CODE=$(curl --max-time 1 -s -o /dev/null -w '%{http_code}' http://localhost:4318/v1/traces 2>/dev/null || echo "000")
 if [ "$TEMPO_HTTP_CODE" != "000" ]; then
@@ -53,39 +48,19 @@ if [ "$TEMPO_HTTP_CODE" != "000" ]; then
   echo "  OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_EXPORTER_OTLP_ENDPOINT"
   echo ""
 else
-  echo "ℹ Observability stack not running (start with: podman compose up -d)"
+  echo "ℹ Observability stack not running (start with: docker compose up -d)"
   echo ""
 fi
 
 # ── Ensure runtime infrastructure ───────────────────────────────────────────
 
-if [ "$RUNTIME_TYPE" = "podman" ]; then
-  # Resolve socket path
-  if [ "$IS_MACOS" = true ]; then
-    RUNTIME_SOCKET="${LISTEN_SOCKET:-$HOME/.local/share/boilerhouse/runtime.sock}"
-  else
-    RUNTIME_SOCKET="${LISTEN_SOCKET:-/var/run/boilerhouse/runtime.sock}"
+if [ "$RUNTIME_TYPE" = "docker" ]; then
+  if ! docker info &>/dev/null; then
+    echo "Error: Docker daemon is not running or not accessible." >&2
+    echo "Hint: Start Docker Desktop or run: sudo systemctl start docker" >&2
+    exit 1
   fi
-
-  # Check if daemon is already running
-  if [ -S "$RUNTIME_SOCKET" ]; then
-    # Verify it's responsive
-    PING_OK=false
-    if curl --unix-socket "$RUNTIME_SOCKET" --max-time 2 -sf http://localhost/_ping &>/dev/null; then
-      PING_OK=true
-    fi
-
-    if [ "$PING_OK" = true ]; then
-      echo "✓ Podman daemon already running ($RUNTIME_SOCKET)"
-    else
-      echo "Stale daemon socket found — restarting..."
-      bash "$SCRIPT_DIR/.kadai/actions/daemon.sh"
-    fi
-  else
-    echo "Podman daemon not running — starting..."
-    bash "$SCRIPT_DIR/.kadai/actions/daemon.sh"
-  fi
-
+  echo "✓ Docker daemon is running"
   echo ""
 
 elif [ "$RUNTIME_TYPE" = "kubernetes" ]; then

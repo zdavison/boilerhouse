@@ -19,10 +19,10 @@ dirs so that `tests/` (integration, e2e, security) is excluded.
 
 Live in `tests/integration/`. Require live infrastructure.
 
-**Podman** — requires podmand socket (default `/var/run/boilerhouse/podman.sock`):
+**Docker** — requires Docker daemon running:
 
 ```sh
-BOILERHOUSE_CRIU_AVAILABLE=true bun test tests/integration/podman.integration.test.ts --timeout 60000
+bun test tests/integration/docker.integration.test.ts --timeout 60000
 ```
 
 **Kubernetes** — requires minikube with profile `boilerhouse-test`
@@ -37,12 +37,12 @@ bun test tests/integration/kubernetes.integration.test.ts --timeout 60000
 Live in `tests/e2e/`. Run via kadai (`bunx kadai run e2e`) or directly:
 
 ```sh
-# All detected runtimes (fake + podman + kubernetes)
-BOILERHOUSE_CRIU_AVAILABLE=true bun test tests/e2e/ --timeout 120000
+# All detected runtimes (fake + docker + kubernetes)
+bun test tests/e2e/ --timeout 120000
 
 # Filter to specific runtimes
 BOILERHOUSE_E2E_RUNTIMES=fake bun test tests/e2e/ --timeout 120000
-BOILERHOUSE_E2E_RUNTIMES=podman bun test tests/e2e/ --timeout 120000
+BOILERHOUSE_E2E_RUNTIMES=docker bun test tests/e2e/ --timeout 120000
 ```
 
 ### Security tests

@@ -1,7 +1,7 @@
 # Local observability stack: Prometheus (metrics) + Tempo (traces) + Grafana (UI).
 #
 # Boilerhouse itself runs on the host, not in this compose file.
-# Start with: podman compose up -d
+# Start with: docker compose up -d
 # Then run the API with: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces bun run dev
 #
 # Grafana UI:  http://localhost:3003  (no login required)

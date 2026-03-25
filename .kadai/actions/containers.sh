@@ -5,14 +5,8 @@
 
 set -euo pipefail
 
-# On macOS, discover the podman machine socket automatically.
-# On Linux, use the boilerhouse-podmand-managed socket.
-if [ "$(uname -s)" = "Darwin" ]; then
-  SOCKET_PATH="${PODMAN_SOCKET:-$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' 2>/dev/null)}"
-else
-  SOCKET_PATH="${PODMAN_SOCKET:-/var/run/boilerhouse/podman.sock}"
-fi
-PODMAN_API="http://d/v5.0.0/libpod"
+DOCKER_SOCKET="${DOCKER_SOCKET:-/var/run/docker.sock}"
+DOCKER_API="http://localhost/v1.43"
 BH_API="http://127.0.0.1:${PORT:-3000}/api/v1"
 KILL_ALL=false
 DRY_RUN=false
@@ -27,23 +21,23 @@ done
 
 # --- Preflight checks ---
 
-for cmd in jq curl podman; do
+for cmd in jq curl docker; do
   if ! command -v "$cmd" &>/dev/null; then
     echo "Error: $cmd is required but not installed." >&2
     exit 1
   fi
 done
 
-if ! [ -S "$SOCKET_PATH" ]; then
-  echo "Error: Podman socket not found at $SOCKET_PATH" >&2
-  echo "Hint: kadai run daemon" >&2
+if ! docker info &>/dev/null; then
+  echo "Error: Docker daemon is not running or not accessible." >&2
+  echo "Hint: Start Docker Desktop or run: sudo systemctl start docker" >&2
   exit 1
 fi
 
-# --- Fetch running containers from podman ---
+# --- Fetch running containers from docker ---
 
-CONTAINERS=$(curl -sf --unix-socket "$SOCKET_PATH" "$PODMAN_API/containers/json?all=false") || {
-  echo "Error: Failed to query podman API." >&2
+CONTAINERS=$(curl -sf --unix-socket "$DOCKER_SOCKET" "$DOCKER_API/containers/json?all=false") || {
+  echo "Error: Failed to query Docker API." >&2
   exit 1
 }
 
@@ -60,7 +54,6 @@ kill_all_containers() {
   ids=$(echo "$CONTAINERS" | jq -r '.[].Id')
 
   echo "Stopping $COUNT container(s)..."
-  export CONTAINER_HOST="unix://$SOCKET_PATH"
 
   local failed=0
   while IFS= read -r cid; do
@@ -68,8 +61,8 @@ kill_all_containers() {
     if [ "$DRY_RUN" = true ]; then
       echo "  [dry-run] Would stop and remove $short"
     else
-      if podman stop -t 10 "$cid" &>/dev/null; then
-        podman rm "$cid" &>/dev/null 2>&1 || true
+      if docker stop -t 10 "$cid" &>/dev/null; then
+        docker rm "$cid" &>/dev/null 2>&1 || true
         echo "  Stopped $short"
       else
         echo "  Failed to stop $short" >&2
@@ -105,7 +98,7 @@ if [ -n "$INSTANCES_JSON" ]; then
   ')
 fi
 
-# Build tab-separated display lines from podman container data + labels.
+# Build tab-separated display lines from docker container data + labels.
 # Fields: FULL_ID \t WORKLOAD \t TENANT \t IMAGE \t PORTS
 LINES=$(echo "$CONTAINERS" | jq -r --argjson tenants "$TENANT_MAP" '
   .[] |
@@ -113,9 +106,9 @@ LINES=$(echo "$CONTAINERS" | jq -r --argjson tenants "$TENANT_MAP" '
   [
     .Id,
     ((.Labels // {})["boilerhouse.workload"] // "-"),
-    ($tenants[$name] // "-"),
+    ($tenants[($name | ltrimstr("/"))] // "-"),
     ((.Image // "<none>") | split("/") | .[-1]),
-    ((.Ports // []) | map(select(.hostPort > 0) | "\(.hostPort)->\(.containerPort)") | join(", ") | if . == "" then "-" else . end)
+    ((.Ports // []) | map(select(.PublicPort > 0) | "\(.PublicPort)->\(.PrivatePort)") | join(", ") | if . == "" then "-" else . end)
   ] | @tsv
 ')
 
@@ -240,21 +233,19 @@ pick_action() {
 
 ACTION=$(pick_action) || { echo "No action selected."; exit 0; }
 
-export CONTAINER_HOST="unix://$SOCKET_PATH"
-
 case "$ACTION" in
   "Tail logs"*)
     echo "Tailing logs for $CONTAINER_LABEL... (Ctrl+C to stop)"
     echo ""
-    exec podman logs -f "$CONTAINER_ID"
+    exec docker logs -f "$CONTAINER_ID"
     ;;
   "Shell"*)
     echo "Opening shell in $CONTAINER_LABEL..."
-    exec podman exec -it "$CONTAINER_ID" /bin/sh
+    exec docker exec -it "$CONTAINER_ID" /bin/sh
     ;;
   "Approve device claims"*)
     echo "Approving device claims for $CONTAINER_LABEL..."
-    exec podman exec -it "$CONTAINER_ID" node openclaw.mjs devices approve
+    exec docker exec -it "$CONTAINER_ID" node openclaw.mjs devices approve
     ;;
   *)
     echo "No action selected."

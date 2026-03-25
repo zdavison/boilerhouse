@@ -7,16 +7,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 
-IS_MACOS=false
-if [ "$(uname -s)" = "Darwin" ]; then
-  IS_MACOS=true
-fi
-
 # ── Runtime selection ────────────────────────────────────────────────────────
 
 echo "Select runtime for E2E tests:"
 echo "  1) fake        — In-memory fake runtime (no infra needed)"
-echo "  2) podman      — Container runtime via boilerhouse-podmand"
+echo "  2) docker      — Container runtime via Docker daemon"
 echo "  3) kubernetes  — Pods on minikube (boilerhouse-test profile)"
 echo "  4) all         — All available runtimes"
 echo ""
@@ -24,7 +19,7 @@ read -rp "Runtime [1]: " RUNTIME_CHOICE
 
 case "${RUNTIME_CHOICE:-1}" in
   1|fake)       RUNTIMES="fake" ;;
-  2|podman)     RUNTIMES="podman" ;;
+  2|docker)     RUNTIMES="docker" ;;
   3|kubernetes) RUNTIMES="kubernetes" ;;
   4|all)        RUNTIMES="all" ;;
   *)
@@ -37,25 +32,13 @@ echo ""
 
 # ── Ensure runtime infrastructure ───────────────────────────────────────────
 
-ensure_podman() {
-  if [ "$IS_MACOS" = true ]; then
-    RUNTIME_SOCKET="${LISTEN_SOCKET:-$HOME/.local/share/boilerhouse/runtime.sock}"
-  else
-    RUNTIME_SOCKET="${LISTEN_SOCKET:-/var/run/boilerhouse/runtime.sock}"
+ensure_docker() {
+  if ! docker info &>/dev/null; then
+    echo "Error: Docker daemon is not running or not accessible." >&2
+    echo "Hint: Start Docker Desktop or run: sudo systemctl start docker" >&2
+    exit 1
   fi
-
-  if [ -S "$RUNTIME_SOCKET" ]; then
-    if curl --unix-socket "$RUNTIME_SOCKET" --max-time 2 -sf http://localhost/healthz &>/dev/null; then
-      echo "✓ Podman daemon already running"
-      return 0
-    else
-      echo "Stale daemon socket — restarting..."
-      bash "$SCRIPT_DIR/.kadai/actions/daemon.sh"
-    fi
-  else
-    echo "Podman daemon not running — starting..."
-    bash "$SCRIPT_DIR/.kadai/actions/daemon.sh"
-  fi
+  echo "✓ Docker daemon is running"
 }
 
 ensure_kubernetes() {
@@ -74,9 +57,8 @@ ensure_kubernetes() {
   fi
 }
 
-if [ "$RUNTIMES" = "podman" ] || [ "$RUNTIMES" = "all" ]; then
-  ensure_podman
-  export BOILERHOUSE_CRIU_AVAILABLE=true
+if [ "$RUNTIMES" = "docker" ] || [ "$RUNTIMES" = "all" ]; then
+  ensure_docker
 fi
 
 if [ "$RUNTIMES" = "kubernetes" ] || [ "$RUNTIMES" = "all" ]; then

@@ -1,7 +1,7 @@
 #!/bin/bash
 # kadai:name Nuke Local Data
 # kadai:emoji 💣
-# kadai:description Delete local database, data, and boilerhouse podman images
+# kadai:description Delete local database, data, and boilerhouse docker containers
 # kadai:confirm true
 
 set -euo pipefail
@@ -39,62 +39,19 @@ nuke "$DB_PATH-shm"
 # Data directory (snapshots + tenant overlays)
 nuke "$STORAGE_PATH"
 
-# Daemon data directories (snapshots + proxy configs)
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  nuke "$HOME/.local/share/boilerhouse/snapshots"
-  nuke "$HOME/.local/share/boilerhouse/proxy-configs"
-else
-  nuke "/var/lib/boilerhouse/snapshots"
-fi
-
-# Kill the boilerhouse-podmand daemon if running
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  RUNTIME_SOCKET="${RUNTIME_SOCKET:-$HOME/.local/share/boilerhouse/runtime.sock}"
-else
-  RUNTIME_SOCKET="${RUNTIME_SOCKET:-/var/run/boilerhouse/runtime.sock}"
-fi
-
-if [[ -S "$RUNTIME_SOCKET" ]]; then
-  DAEMON_PID=$(lsof -t "$RUNTIME_SOCKET" 2>/dev/null || true)
-  if [[ -n "$DAEMON_PID" ]]; then
+# Remove all boilerhouse-labelled docker containers
+if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+  CONTAINER_IDS=$(docker ps -aq --filter "label=boilerhouse" 2>/dev/null || true)
+  if [[ -n "$CONTAINER_IDS" ]]; then
     echo ""
     if $DRY_RUN; then
-      echo "  Would kill boilerhouse-podmand (PID $DAEMON_PID)"
+      CONTAINER_COUNT=$(echo "$CONTAINER_IDS" | wc -l | tr -d ' ')
+      echo "  Would remove $CONTAINER_COUNT boilerhouse container(s)"
     else
-      echo "Stopping boilerhouse-podmand (PID $DAEMON_PID)..."
-      kill "$DAEMON_PID" 2>/dev/null || true
-      sleep 0.5
+      echo "Removing boilerhouse docker containers..."
+      echo "$CONTAINER_IDS" | xargs docker rm -f 2>/dev/null || true
+      echo "All boilerhouse containers removed."
     fi
-  fi
-  if ! $DRY_RUN; then
-    rm -f "$RUNTIME_SOCKET"
-  fi
-fi
-
-# Remove all podman pods and containers, but keep the machine and cached images
-if command -v podman &>/dev/null && [[ "$(uname -s)" == "Darwin" ]]; then
-  echo ""
-  echo "Removing podman pods and containers..."
-  if $DRY_RUN; then
-    POD_COUNT=$(podman pod ls -q 2>/dev/null | wc -l | tr -d ' ')
-    CONTAINER_COUNT=$(podman ps -aq 2>/dev/null | wc -l | tr -d ' ')
-    echo "  Would remove $POD_COUNT pod(s) and $CONTAINER_COUNT container(s)"
-  else
-    podman pod rm --all --force 2>/dev/null || true
-    podman rm --all --force 2>/dev/null || true
-    echo "All pods and containers removed (images preserved)."
-  fi
-elif command -v podman &>/dev/null; then
-  # Linux: no VM layer, just remove pods directly
-  echo ""
-  echo "Removing podman pods..."
-  if $DRY_RUN; then
-    POD_COUNT=$(podman pod ls -q 2>/dev/null | wc -l | tr -d ' ')
-    echo "  Would remove $POD_COUNT pod(s)"
-  else
-    podman pod rm --all --force 2>/dev/null || true
-    podman system prune --all --force 2>/dev/null || true
-    echo "All pods and images removed."
   fi
 fi
 
