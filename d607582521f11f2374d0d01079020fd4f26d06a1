@@ -1,0 +1,122 @@
+packages/driver-openclaw/tsconfig.json
+  ff2ac4230eb0ae06 1-11
+apps/dashboard/src/api.ts
+  ff2ac4230eb0ae06 171-174,189-192
+packages/triggers/src/adapters/telegram.ts
+  ff2ac4230eb0ae06 1-2,50,120-137,142-146
+packages/triggers/src/dispatcher.ts
+  ff2ac4230eb0ae06 1,74-77,182-190
+packages/triggers/src/driver.ts
+  ff2ac4230eb0ae06 1-90
+packages/triggers/src/adapters/webhook.ts
+  ff2ac4230eb0ae06 1-2,28,77-86,91-95
+packages/triggers/src/drivers/default.test.ts
+  48d05ca9c75884b9 1-45
+apps/api/src/routes/triggers.ts
+  ff2ac4230eb0ae06 27-28,71-72,104-105
+packages/db/src/trigger-loader.test.ts
+  48d05ca9c75884b9 1-306
+packages/triggers/src/adapters/slack.test.ts
+  48d05ca9c75884b9 6,195-286
+packages/triggers/src/config.ts
+  ff2ac4230eb0ae06 3-22,61-73,145-160
+packages/triggers/src/adapters/slack.ts
+  ff2ac4230eb0ae06 1-2,50,131-140,145-149
+packages/triggers/src/driver-socket.ts
+  ff2ac4230eb0ae06 1-95
+workloads/tg-openclaw.trigger.ts
+  ff2ac4230eb0ae06 1-17
+packages/triggers/src/adapters/webhook.test.ts
+  48d05ca9c75884b9 6,209-333
+packages/driver-openclaw/package.json
+  ff2ac4230eb0ae06 1-15
+packages/triggers/src/driver-socket.test.ts
+  48d05ca9c75884b9 1-280
+packages/triggers/src/dispatcher.test.ts
+  48d05ca9c75884b9 334-491
+packages/triggers/src/index.ts
+  ff2ac4230eb0ae06 12-19,27,29
+packages/triggers/src/adapters/telegram.test.ts
+  48d05ca9c75884b9 6,183-332
+packages/driver-openclaw/src/openclaw.test.ts
+  48d05ca9c75884b9 1-458
+packages/triggers/src/session-manager.test.ts
+  ff2ac4230eb0ae06 3,173,178-186,188-190,193
+  48d05ca9c75884b9 213-401
+packages/triggers/src/adapters/cron.ts
+  ff2ac4230eb0ae06 2-3,12,17,19-25,31-35
+apps/api/src/routes/trigger-adapters.ts
+  ff2ac4230eb0ae06 13,18,103-104,115-147,170-176,179-201,224-231,234-237,249-253
+packages/driver-openclaw/src/openclaw.ts
+  ff2ac4230eb0ae06 1-142
+packages/driver-openclaw/src/index.ts
+  ff2ac4230eb0ae06 1
+packages/triggers/src/resolve-driver.test.ts
+  48d05ca9c75884b9 1-55
+packages/triggers/src/adapters/cron.test.ts
+  48d05ca9c75884b9 7,107-174
+packages/triggers/src/resolve-driver.ts
+  ff2ac4230eb0ae06 1-90
+packages/db/src/schema.ts
+  ff2ac4230eb0ae06 257-260
+packages/triggers/src/session-manager.ts
+  ff2ac4230eb0ae06 5-7,12-15,18,25-27,50-54,56-63,83,93,117-118,122,126-128,154,160-161,163-168,170,182,194,196,217-220,222,224-231,255
+packages/db/src/index.ts
+  ff2ac4230eb0ae06 53-57
+packages/triggers/src/drivers/default.ts
+  ff2ac4230eb0ae06 1-13
+packages/db/src/trigger-loader.ts
+  ff2ac4230eb0ae06 1-137
+apps/api/src/server.ts
+  ff2ac4230eb0ae06 6,128-137
+workloads/openclaw.workload.ts
+  ff2ac4230eb0ae06 16
+apps/dashboard/src/pages/TriggerList.tsx
+  ff2ac4230eb0ae06 89-92,96-125,185-190,435-548,774,785-789
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "d607582521f11f2374d0d01079020fd4f26d06a1",
+  "prompts": {
+    "48d05ca9c75884b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00bfd5e1-dead-46ae-84aa-654a280d5f51",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1944,
+      "total_deletions": 28,
+      "accepted_lines": 1930,
+      "overriden_lines": 0
+    },
+    "e7878b4d330dedfc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06603255-051d-4ee1-bb4b-14ddb57076f3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 16,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    },
+    "ff2ac4230eb0ae06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa5eb0fb-b32f-4ebb-9d9d-30ee3ce46abf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1392,
+      "total_deletions": 236,
+      "accepted_lines": 1266,
+      "overriden_lines": 0
+    }
+  }
+}
