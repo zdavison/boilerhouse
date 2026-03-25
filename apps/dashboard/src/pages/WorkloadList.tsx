@@ -102,7 +102,7 @@ function IconButton({
 
 // --- Claim Cell ---
 
-function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?: boolean }) {
+function ClaimCell({ workloadName, disabled, onClaim }: { workloadName: string; disabled?: boolean; onClaim?: () => void }) {
 	const [expanded, setExpanded] = useState(false);
 	const [tenantId, setTenantId] = useState("");
 	const [claiming, setClaiming] = useState(false);
@@ -117,6 +117,7 @@ function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?
 		try {
 			const res = await api.claimWorkload(tenantId.trim(), workloadName);
 			setResult(res);
+			onClaim?.();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Claim failed");
 		} finally {
@@ -280,6 +281,7 @@ function WorkloadGroup({
 	onConnect,
 	navigate,
 	busyInstances,
+	onClaim,
 }: {
 	node: WorkloadTreeNode;
 	expanded: boolean;
@@ -288,6 +290,7 @@ function WorkloadGroup({
 	onConnect: (id: string, workloadName: string) => void;
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
+	onClaim?: () => void;
 }) {
 	const { workload, poolInstances, claimedInstances } = node;
 	const Chevron = expanded ? ChevronDown : ChevronRight;
@@ -326,7 +329,7 @@ function WorkloadGroup({
 				<span className="flex-1" />
 
 				<div onClick={(e) => e.stopPropagation()}>
-					<ClaimCell workloadName={workload.name} disabled={workload.status !== "ready"} />
+					<ClaimCell workloadName={workload.name} disabled={workload.status !== "ready"} onClaim={onClaim} />
 				</div>
 			</div>
 
@@ -435,6 +438,7 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 							onConnect={(id, name) => setConnectTarget({ instanceId: id, workloadName: name })}
 							navigate={navigate}
 							busyInstances={busyInstances}
+							onClaim={refetchAll}
 						/>
 					))}
 				</div>
