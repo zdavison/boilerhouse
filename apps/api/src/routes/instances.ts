@@ -82,6 +82,11 @@ export function instanceRoutes(deps: RouteDeps) {
 				return { error: `Instance '${params.id}' is ${row.status}` };
 			}
 
+			if (row.poolStatus !== null) {
+				set.status = 409;
+				return { error: `Instance '${params.id}' is a pool instance and does not expose ports until claimed` };
+			}
+
 			const handle = instanceHandleFrom(instanceId, row.status);
 			const endpoint = await deps.runtime.getEndpoint(handle);
 
