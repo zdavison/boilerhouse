@@ -274,6 +274,11 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 
 			// ── Pod routes ──────────────────────────────────────────────
 
+			// GET /pods (list)
+			if (method === "GET" && pathname === "/pods") {
+				return await handleListPods();
+			}
+
 			// POST /pods (create)
 			if (method === "POST" && pathname === "/pods") {
 				return await handleCreatePod(req);
@@ -606,6 +611,17 @@ export async function createDaemon(config: DaemonConfig): Promise<{ stop: () => 
 	}
 
 	// ── Pod handlers ────────────────────────────────────────────────────────
+
+	async function handleListPods(): Promise<Response> {
+		const res = await client.get(
+			'/libpod/pods/json?filters={"label":["managed-by=boilerhouse-podmand"]}',
+		);
+		if (res.status !== 200 && res.status !== 404) {
+			return jsonResponse(res.status, { error: `Failed to list pods: HTTP ${res.status}` });
+		}
+		const pods = (res.body as Array<{ Name: string }>) ?? [];
+		return jsonResponse(200, { names: pods.map((p) => p.Name) });
+	}
 
 	async function handleInspectPod(name: string): Promise<Response> {
 		const res = await client.get(`/libpod/pods/${encodeURIComponent(name)}/json`);

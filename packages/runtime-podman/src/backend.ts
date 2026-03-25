@@ -93,6 +93,12 @@ export interface ContainerBackend {
 	listContainers(): Promise<string[]>;
 
 	/**
+	 * List pod names managed by this backend (label: managed-by=boilerhouse-podmand).
+	 * Pod names correspond 1:1 with instance IDs.
+	 */
+	listPods(): Promise<string[]>;
+
+	/**
 	 * Fetch recent stdout/stderr logs from a container.
 	 *
 	 * @param tail - Number of most recent lines to return.
