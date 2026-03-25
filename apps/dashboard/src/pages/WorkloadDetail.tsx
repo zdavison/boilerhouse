@@ -22,10 +22,14 @@ export function WorkloadDetail({
 	const [logCopied, setLogCopied] = useState(false);
 	const logContainerRef = useRef<HTMLDivElement>(null);
 
-	// Fetch logs for any workload that has been through the bootstrap pipeline
+	// Fetch logs for any workload that has been through the bootstrap pipeline.
+	// Merge fetched logs into existing state so that WS-streamed logs are not
+	// overwritten when the workload status transitions to "ready".
 	useEffect(() => {
 		if (!data) return;
-		api.fetchBootstrapLogs(name).then(setBootstrapLogs).catch(() => {});
+		api.fetchBootstrapLogs(name).then((fetched) => {
+			setBootstrapLogs((prev) => fetched.length > 0 ? fetched : prev);
+		}).catch(() => {});
 	}, [data?.status, name]);
 
 	// Listen for bootstrap.log WS events for this workload

@@ -184,6 +184,31 @@ export function computePercentile(
 	return sorted[sorted.length - 1]!.le;
 }
 
+/**
+ * Computes the mean of a histogram from its _sum and _count samples.
+ * Returns null if there are no observations.
+ */
+export function getHistogramAvg(
+	metrics: PrometheusMetrics,
+	name: string,
+	filterLabels?: Record<string, string>,
+): number | null {
+	const family = metrics.byName.get(name);
+	if (!family) return null;
+
+	const matches = (s: PrometheusSample) =>
+		!filterLabels || Object.entries(filterLabels).every(([k, v]) => s.labels[k] === v);
+
+	const sumSamples = family.samples.filter((s) => s.name === `${name}_sum` && matches(s));
+	const countSamples = family.samples.filter((s) => s.name === `${name}_count` && matches(s));
+
+	const total = sumSamples.reduce((acc, s) => acc + s.value, 0);
+	const count = countSamples.reduce((acc, s) => acc + s.value, 0);
+
+	if (count === 0) return null;
+	return total / count;
+}
+
 /** Groups samples by a label value. */
 export function groupByLabel(
 	samples: PrometheusSample[],

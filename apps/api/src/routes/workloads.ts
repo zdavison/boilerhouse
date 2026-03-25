@@ -91,6 +91,7 @@ export function workloadRoutes(deps: RouteDeps) {
 				version: r.version,
 				status: r.status,
 				statusDetail: r.statusDetail,
+				idleTimeoutSeconds: (r.config as { idle?: { timeout_seconds?: number } } | null)?.idle?.timeout_seconds ?? null,
 				createdAt: r.createdAt.toISOString(),
 				updatedAt: r.updatedAt.toISOString(),
 			}));

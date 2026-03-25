@@ -6,6 +6,7 @@ import {
 	getGaugeValues,
 	getCounterValues,
 	computePercentile,
+	getHistogramAvg,
 	type PrometheusMetrics,
 	type PrometheusSample,
 } from "../prometheus";
@@ -81,9 +82,10 @@ function OverviewSection({ metrics }: { metrics: PrometheusMetrics }) {
 	const claimP50 = computePercentile(metrics, "boilerhouse_tenant_claim_duration_seconds", 0.5);
 	const claimP95 = computePercentile(metrics, "boilerhouse_tenant_claim_duration_seconds", 0.95);
 	const poolDepth = sumValues(getGaugeValues(metrics, "boilerhouse_pool_depth"));
+	const coldStartAvg = getHistogramAvg(metrics, "boilerhouse_pool_cold_start_duration_seconds");
 
 	return (
-		<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+		<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
 			<MetricStatCard label="Active Tenants" value={String(activeTenants)} />
 			<MetricStatCard label="Active Instances" value={String(activeInstances)} />
 			<MetricStatCard
@@ -100,6 +102,10 @@ function OverviewSection({ metrics }: { metrics: PrometheusMetrics }) {
 				value={claimP95 !== null ? formatDuration(claimP95) : "--"}
 			/>
 			<MetricStatCard label="Pool Depth" value={String(poolDepth)} />
+			<MetricStatCard
+				label="Cold Start avg"
+				value={coldStartAvg !== null ? formatDuration(coldStartAvg) : "--"}
+			/>
 		</div>
 	);
 }
@@ -111,13 +117,18 @@ function PoolSection({ metrics }: { metrics: PrometheusMetrics }) {
 	if (depthGauges.length === 0) return <NoData />;
 
 	return (
-		<DataTable headers={["Workload", "Pool Depth"]}>
-			{depthGauges.map((s) => (
-				<DataRow key={s.labels.workload ?? ""}>
-					<td className="px-4 py-2 text-accent">{s.labels.workload ?? "(none)"}</td>
-					<td className="px-4 py-2">{s.value}</td>
-				</DataRow>
-			))}
+		<DataTable headers={["Workload", "Pool Depth", "Cold Start avg"]}>
+			{depthGauges.map((s) => {
+				const workload = s.labels.workload ?? "";
+				const avg = getHistogramAvg(metrics, "boilerhouse_pool_cold_start_duration_seconds", { workload });
+				return (
+					<DataRow key={workload}>
+						<td className="px-4 py-2 text-accent">{workload || "(none)"}</td>
+						<td className="px-4 py-2">{s.value}</td>
+						<td className="px-4 py-2">{avg !== null ? formatDuration(avg) : "--"}</td>
+					</DataRow>
+				);
+			})}
 		</DataTable>
 	);
 }

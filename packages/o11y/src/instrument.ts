@@ -225,6 +225,13 @@ export function instrumentFromEventBus(meter: Meter, deps: InstrumentDeps): AllM
 			});
 		}
 
+		if (event.type === "pool.instance.ready") {
+			const e = event as { workloadId?: string; durationSeconds?: number };
+			poolMetrics.coldStartDuration.record(Number(e.durationSeconds ?? 0), {
+				workload: workloadName(String(e.workloadId ?? "")),
+			});
+		}
+
 		if (event.type === "instance.state") {
 			const e = event as { instanceId?: string; status?: string; workloadId?: string };
 			const instanceId = String(e.instanceId ?? "");

@@ -31,6 +31,8 @@ export function instanceRoutes(deps: RouteDeps) {
 				tenantId: r.tenantId,
 				status: r.status,
 				statusDetail: r.statusDetail,
+				lastActivity: r.lastActivity?.toISOString() ?? null,
+				claimedAt: r.claimedAt?.toISOString() ?? null,
 				createdAt: r.createdAt.toISOString(),
 			}));
 		}, {
@@ -78,6 +80,11 @@ export function instanceRoutes(deps: RouteDeps) {
 			if (row.status === "destroyed" || row.status === "hibernated" || row.status === "hibernating") {
 				set.status = 409;
 				return { error: `Instance '${params.id}' is ${row.status}` };
+			}
+
+			if (row.poolStatus !== null) {
+				set.status = 409;
+				return { error: `Instance '${params.id}' is a pool instance and does not expose ports until claimed` };
 			}
 
 			const handle = instanceHandleFrom(instanceId, row.status);

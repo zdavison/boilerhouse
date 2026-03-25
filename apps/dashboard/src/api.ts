@@ -56,6 +56,8 @@ export interface WorkloadSummary {
 	status: string;
 	/** Error message or other status context, shown on hover. */
 	statusDetail: string | null;
+	/** Idle timeout in seconds, or null if not configured. */
+	idleTimeoutSeconds: number | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -72,6 +74,8 @@ export interface InstanceSummary {
 	tenantId: string | null;
 	status: string;
 	statusDetail: string | null;
+	lastActivity: string | null;
+	claimedAt: string | null;
 	createdAt: string;
 }
 

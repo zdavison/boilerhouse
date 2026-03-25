@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ChevronDown, ChevronRight, Plug, Trash2, UserPlus, Loader2 } from "lucide-react";
 import { useApi } from "../hooks";
 import {
@@ -102,7 +102,7 @@ function IconButton({
 
 // --- Claim Cell ---
 
-function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?: boolean }) {
+function ClaimCell({ workloadName, disabled, onClaim }: { workloadName: string; disabled?: boolean; onClaim?: () => void }) {
 	const [expanded, setExpanded] = useState(false);
 	const [tenantId, setTenantId] = useState("");
 	const [claiming, setClaiming] = useState(false);
@@ -117,6 +117,7 @@ function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?
 		try {
 			const res = await api.claimWorkload(tenantId.trim(), workloadName);
 			setResult(res);
+			onClaim?.();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Claim failed");
 		} finally {
@@ -171,6 +172,35 @@ function ClaimCell({ workloadName, disabled }: { workloadName: string; disabled?
 	);
 }
 
+// --- Idle timer hook ---
+
+function useIdleTimerPct(
+	lastActivity: string | null,
+	claimedAt: string | null,
+	timeoutSeconds: number | null,
+): number | null {
+	const [pct, setPct] = useState<number | null>(null);
+
+	useEffect(() => {
+		if (!timeoutSeconds) return;
+		const startStr = lastActivity ?? claimedAt;
+		if (!startStr) return;
+
+		function compute() {
+			const start = new Date(startStr!).getTime();
+			const elapsed = (Date.now() - start) / 1000;
+			const remaining = Math.max(0, timeoutSeconds! - elapsed);
+			setPct(remaining / timeoutSeconds!);
+		}
+
+		compute();
+		const id = setInterval(compute, 1000);
+		return () => clearInterval(id);
+	}, [lastActivity, claimedAt, timeoutSeconds]);
+
+	return pct;
+}
+
 // --- Layout constants ---
 
 /** Width of the chevron gutter (holds chevron in workload header, empty in other rows). */
@@ -188,6 +218,7 @@ function InstanceRow({
 	onConnect,
 	workloadName,
 	busy,
+	idleTimeoutSeconds,
 }: {
 	instance: InstanceSummary;
 	onAction: (id: string, action: "destroy") => void;
@@ -195,9 +226,22 @@ function InstanceRow({
 	workloadName: string;
 	/** When true, action buttons are replaced with a spinner. */
 	busy?: boolean;
+	idleTimeoutSeconds?: number | null;
 }) {
+	const idlePct = useIdleTimerPct(
+		instance.lastActivity ?? null,
+		instance.claimedAt ?? null,
+		instance.tenantId ? (idleTimeoutSeconds ?? null) : null,
+	);
+
 	return (
-		<div className="flex items-center h-7 px-2 text-sm font-mono border-b border-border/10">
+		<div className="relative flex items-center h-7 px-2 text-sm font-mono border-b border-border/10 overflow-hidden">
+			{idlePct !== null && (
+				<div
+					className="absolute inset-y-0 left-0 pointer-events-none transition-[width] duration-1000 ease-linear"
+					style={{ width: `${idlePct * 100}%`, backgroundColor: "rgba(255,255,255,0.06)" }}
+				/>
+			)}
 			<span style={{ width: GUTTER_W + STATUS_W }} className="shrink-0 flex items-center justify-end pr-2">
 				<StatusIndicator status={instance.status} detail={instance.statusDetail ?? undefined} />
 			</span>
@@ -217,7 +261,7 @@ function InstanceRow({
 					<Loader2 size={13} className="text-muted animate-spin mr-1" />
 				) : (
 					<div className="flex items-center gap-0.5">
-						{instance.status === "active" && (
+						{instance.status === "active" && instance.tenantId !== null && (
 							<IconButton icon={Plug} title="Connect" variant="info" onClick={() => onConnect(instance.instanceId, workloadName)} />
 						)}
 						<IconButton icon={Trash2} title="Destroy" variant="danger" onClick={() => onAction(instance.instanceId, "destroy")} />
@@ -241,6 +285,7 @@ function InstanceSection({
 	onConnect,
 	workloadName,
 	busyInstances,
+	idleTimeoutSeconds,
 }: {
 	label: string;
 	instances: InstanceNode[];
@@ -248,6 +293,7 @@ function InstanceSection({
 	onConnect: (id: string, workloadName: string) => void;
 	workloadName: string;
 	busyInstances: Set<string>;
+	idleTimeoutSeconds?: number | null;
 }) {
 	return (
 		<>
@@ -266,6 +312,7 @@ function InstanceSection({
 					onConnect={onConnect}
 					workloadName={workloadName}
 					busy={busyInstances.has(inst.instance.instanceId)}
+					idleTimeoutSeconds={idleTimeoutSeconds}
 				/>
 			))}
 		</>
@@ -280,6 +327,7 @@ function WorkloadGroup({
 	onConnect,
 	navigate,
 	busyInstances,
+	onClaim,
 }: {
 	node: WorkloadTreeNode;
 	expanded: boolean;
@@ -288,6 +336,7 @@ function WorkloadGroup({
 	onConnect: (id: string, workloadName: string) => void;
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
+	onClaim?: () => void;
 }) {
 	const { workload, poolInstances, claimedInstances } = node;
 	const Chevron = expanded ? ChevronDown : ChevronRight;
@@ -326,7 +375,7 @@ function WorkloadGroup({
 				<span className="flex-1" />
 
 				<div onClick={(e) => e.stopPropagation()}>
-					<ClaimCell workloadName={workload.name} disabled={workload.status !== "ready"} />
+					<ClaimCell workloadName={workload.name} disabled={workload.status !== "ready"} onClaim={onClaim} />
 				</div>
 			</div>
 
@@ -351,6 +400,7 @@ function WorkloadGroup({
 							onConnect={onConnect}
 							workloadName={workload.name}
 							busyInstances={busyInstances}
+							idleTimeoutSeconds={workload.idleTimeoutSeconds}
 						/>
 					)}
 				</div>
@@ -435,6 +485,7 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 							onConnect={(id, name) => setConnectTarget({ instanceId: id, workloadName: name })}
 							navigate={navigate}
 							busyInstances={busyInstances}
+							onClaim={refetchAll}
 						/>
 					))}
 				</div>

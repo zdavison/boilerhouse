@@ -51,13 +51,21 @@ export interface BootstrapLogEvent {
 	timestamp: string;
 }
 
+export interface PoolInstanceReadyEvent {
+	type: "pool.instance.ready";
+	instanceId: InstanceId;
+	workloadId: WorkloadId;
+	durationSeconds: number;
+}
+
 export type DomainEvent =
 	| InstanceStateEvent
 	| TenantClaimEvent
 	| TenantClaimingEvent
 	| TenantReleaseEvent
 	| WorkloadStateEvent
-	| BootstrapLogEvent;
+	| BootstrapLogEvent
+	| PoolInstanceReadyEvent;
 
 export class EventBus {
 	private readonly emitter = new EventEmitter();

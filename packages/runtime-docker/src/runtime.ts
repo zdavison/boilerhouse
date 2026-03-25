@@ -230,7 +230,8 @@ export class DockerRuntime implements Runtime {
 	}
 
 	async list(): Promise<InstanceId[]> {
-		return Array.from(this.instances.keys()) as InstanceId[];
+		const names = await this.client.listContainers();
+		return names as InstanceId[];
 	}
 
 	async logs(handle: InstanceHandle, tail = 100): Promise<string | null> {

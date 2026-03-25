@@ -217,6 +217,19 @@ export class DockerClient {
 		}
 	}
 
+	/**
+	 * List container names managed by Boilerhouse (label: boilerhouse.managed=true, boilerhouse.role=workload).
+	 */
+	async listContainers(): Promise<string[]> {
+		const filters = JSON.stringify({
+			label: ["boilerhouse.managed=true", "boilerhouse.role=workload"],
+		});
+		const res = await this.get(`/containers/json?all=true&filters=${encodeURIComponent(filters)}`);
+		if (res.status !== 200) return [];
+		const containers = (res.body as Array<{ Names: string[] }>) ?? [];
+		return containers.map((c) => c.Names[0]?.replace(/^\//, "") ?? "").filter(Boolean);
+	}
+
 	/** Inspect a container. Returns container metadata. */
 	async inspectContainer(id: string): Promise<ContainerInspect> {
 		const res = await this.get(
