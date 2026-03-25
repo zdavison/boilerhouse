@@ -102,6 +102,11 @@ export class DaemonBackend implements ContainerBackend {
 		return (res as { ids: string[] }).ids;
 	}
 
+	async listPods(): Promise<string[]> {
+		const res = await this.request("GET", "/pods");
+		return (res as { names: string[] }).names;
+	}
+
 	async logs(id: string, tail = 100): Promise<string> {
 		const res = await this.request(
 			"GET",
