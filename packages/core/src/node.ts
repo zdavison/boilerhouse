@@ -11,11 +11,11 @@ export type NodeStatus = Static<typeof NodeStatusSchema>;
 export const NODE_STATUSES = ["online", "draining", "offline"] as const;
 
 export const RuntimeTypeSchema = Type.Union([
-	Type.Literal("podman"),
+	Type.Literal("docker"),
 	Type.Literal("kubernetes"),
 ]);
 export type RuntimeType = Static<typeof RuntimeTypeSchema>;
-export const RUNTIME_TYPES = ["podman", "kubernetes"] as const;
+export const RUNTIME_TYPES = ["docker", "kubernetes"] as const;
 
 export const NodeCapacitySchema = Type.Object({
 	vcpus: Type.Integer({ exclusiveMinimum: 0 }),

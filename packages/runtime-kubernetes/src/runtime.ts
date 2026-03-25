@@ -17,13 +17,9 @@ import { MinikubeImageProvider } from "./minikube";
 import type { EnsureImageResult } from "./minikube";
 import { resolveInClusterConfig } from "./in-cluster";
 
-/**
- * Tracks a managed pod and its associated workload (needed for restore).
- */
 interface ManagedPod {
 	instanceId: InstanceId;
 	running: boolean;
-	workload: Workload;
 	/** Active port-forward processes, keyed by container port. */
 	portForwards: Map<number, { proc: ReturnType<typeof Bun.spawn>; localPort: number }>;
 }
@@ -132,7 +128,7 @@ export class KubernetesRuntime implements Runtime {
 			await this.client.createNetworkPolicy(this.namespace, networkPolicy).catch(() => {});
 		}
 
-		this.pods.set(instanceId, { instanceId, running: false, workload, portForwards: new Map() });
+		this.pods.set(instanceId, { instanceId, running: false, portForwards: new Map() });
 
 		log(`Pod ${instanceId} created`);
 		return { instanceId, running: false };

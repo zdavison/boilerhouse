@@ -119,49 +119,6 @@ const dockerEntry: RuntimeEntry = {
 	},
 };
 
-const podmanEntry: RuntimeEntry = {
-	name: "podman",
-	capabilities: {
-		goldenSnapshot: true,
-		tenantSnapshot: true,
-		exec: true,
-		networking: true,
-		concurrentRestore: true,
-	},
-	workloadFixtures: {
-		minimal: fixturePath("workload-podman-minimal.workload.ts"),
-		httpserver: fixturePath("workload-podman-httpserver.workload.ts"),
-		openclaw: fixturePath("workload-podman-openclaw.workload.ts"),
-		wsecho: fixturePath("workload-podman-wsecho.workload.ts"),
-	},
-	brokenWorkloadFixture: fixturePath("workload-podman-broken.workload.ts"),
-	verifyCleanup: async () => {
-		const result = Bun.spawnSync([
-			"podman",
-			"ps",
-			"-q",
-			"--filter",
-			"label=boilerhouse",
-		]);
-		const output = result.stdout.toString().trim();
-		if (output.length > 0) {
-			throw new Error(
-				`Orphaned Podman containers found: ${output}`,
-			);
-		}
-	},
-	isInstanceRunning: async (instanceId: string) => {
-		const result = Bun.spawnSync([
-			"podman",
-			"inspect",
-			"--format",
-			"{{.State.Running}}",
-			instanceId,
-		]);
-		return result.stdout.toString().trim() === "true";
-	},
-};
-
 const kubernetesEntry: RuntimeEntry = {
 	name: "kubernetes",
 	capabilities: {
@@ -205,14 +162,13 @@ const kubernetesEntry: RuntimeEntry = {
 const ALL_ENTRIES: Record<string, RuntimeEntry> = {
 	fake: fakeEntry,
 	docker: dockerEntry,
-	podman: podmanEntry,
 	kubernetes: kubernetesEntry,
 };
 
 /**
  * Runtimes that have a working Runtime implementation wired into startE2EServer.
  */
-const IMPLEMENTED_RUNTIMES = new Set(["fake", "podman", "kubernetes"]);
+const IMPLEMENTED_RUNTIMES = new Set(["fake", "docker", "kubernetes"]);
 
 /**
  * Returns runtime entries filtered to only those available on this system.
@@ -251,6 +207,5 @@ export function availableRuntimes(): RuntimeEntry[] {
 export const E2E_TIMEOUTS = {
 	fake: { operation: 2_000, connect: 1_000 },
 	docker: { operation: 30_000, connect: 10_000 },
-	podman: { operation: 120_000, connect: 10_000 },
 	kubernetes: { operation: 120_000, connect: 10_000 },
 } as const;

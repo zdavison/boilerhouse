@@ -16,7 +16,7 @@ import {
 } from "@boilerhouse/db";
 import { eq } from "drizzle-orm";
 import { PoolManager } from "./pool-manager";
-import type { HealthChecker } from "./snapshot-manager";
+import type { HealthChecker } from "./health-check";
 
 const alwaysHealthy: HealthChecker = async () => {};
 

@@ -1,8 +1,8 @@
-import { mkdirSync, chmodSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { eq } from "drizzle-orm";
-import { FakeRuntime, generateNodeId, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
+import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import type { Runtime, RuntimeType, Workload } from "@boilerhouse/core";
-import { PodmanRuntime } from "@boilerhouse/runtime-podman";
+import { DockerRuntime } from "@boilerhouse/runtime-docker";
 import { initDatabase, ActivityLog, loadWorkloadsFromDir } from "@boilerhouse/db";
 import { claims } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
@@ -33,15 +33,10 @@ const log = createLogger("server");
 const port = Number(process.env.PORT ?? 3000);
 const dbPath = process.env.DB_PATH ?? "boilerhouse.db";
 const storagePath = process.env.STORAGE_PATH ?? "./data";
-const snapshotDir = process.env.SNAPSHOT_DIR ?? "./data/snapshots";
-const runtimeType = (process.env.RUNTIME_TYPE ?? "podman") as RuntimeType;
+const runtimeType = (process.env.RUNTIME_TYPE ?? "docker") as RuntimeType;
 const maxInstances = Number(process.env.MAX_INSTANCES ?? 100);
 const workloadsDir = process.env.WORKLOADS_DIR;
-const socketPath = process.env.RUNTIME_SOCKET ?? DEFAULT_RUNTIME_SOCKET;
 
-// Ensure data directories exist with restrictive permissions
-mkdirSync(snapshotDir, { recursive: true, mode: 0o700 });
-chmodSync(snapshotDir, 0o700); // enforce on pre-existing dir
 mkdirSync(storagePath, { recursive: true });
 
 const db = initDatabase(dbPath);
@@ -85,20 +80,18 @@ if (secretStore) {
 }
 
 let runtime: Runtime;
-if (runtimeType === "podman") {
-	log.info({ socketPath }, "Using boilerhouse-podmand daemon backend");
-	runtime = new PodmanRuntime({
-		snapshotDir,
-		socketPath,
-	});
+if (runtimeType === "docker") {
+	const dockerSocket = process.env.DOCKER_SOCKET;
+	const seccompProfilePath = process.env.SECCOMP_PROFILE_PATH;
+	log.info({ socketPath: dockerSocket ?? "/var/run/docker.sock" }, "Using Docker runtime");
+	runtime = new DockerRuntime({ socketPath: dockerSocket, seccompProfilePath });
 } else if (runtimeType === "kubernetes") {
 	const { KubernetesRuntime, isInCluster } = await import("@boilerhouse/runtime-kubernetes");
 
 	const k8sNamespace = process.env.K8S_NAMESPACE;
 	const k8sContext = process.env.K8S_CONTEXT;
 	const k8sMinikubeProfile = process.env.K8S_MINIKUBE_PROFILE;
-	const encryptionKey = process.env.BOILERHOUSE_ENCRYPTION_KEY;
-	const common = { namespace: k8sNamespace, snapshotDir, context: k8sContext, minikubeProfile: k8sMinikubeProfile, workloadsDir, encryptionKey };
+	const common = { namespace: k8sNamespace, context: k8sContext, minikubeProfile: k8sMinikubeProfile, workloadsDir };
 
 	if (process.env.K8S_API_URL && process.env.K8S_TOKEN) {
 		log.info({ apiUrl: process.env.K8S_API_URL, namespace: k8sNamespace }, "Using Kubernetes runtime (external auth)");

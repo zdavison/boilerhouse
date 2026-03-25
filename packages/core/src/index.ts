@@ -132,9 +132,8 @@ export {
 } from "./snapshot-state";
 
 export {
-	DEFAULT_RUNTIME_SOCKET,
-	DEFAULT_PODMAN_SOCKET,
-	DEFAULT_SNAPSHOT_DIR,
+	DEFAULT_DOCKER_SOCKET,
+	DEFAULT_STORAGE_DIR,
 } from "./paths";
 
 export {
