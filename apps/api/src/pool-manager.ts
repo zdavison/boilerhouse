@@ -99,7 +99,7 @@ export class PoolManager {
 		const workloadRow = this.db.select().from(workloads).where(eq(workloads.workloadId, workloadId)).get();
 		if (!workloadRow) return;
 		const workload = workloadRow.config as Workload;
-		const targetSize = workload.pool?.size ?? 3;
+		const targetSize = workload.pool?.size ?? 1;
 		const maxConcurrency = workload.pool?.max_fill_concurrency ?? 2;
 
 		// Count current pool instances (warming + ready)
