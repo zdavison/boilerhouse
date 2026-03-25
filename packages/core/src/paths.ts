@@ -8,22 +8,12 @@
 const IS_MACOS = process.platform === "darwin";
 const HOME = process.env.HOME ?? "/tmp";
 
-/** Default path for the boilerhouse-podmand runtime socket. */
-export const DEFAULT_RUNTIME_SOCKET = IS_MACOS
-	? `${HOME}/.local/share/boilerhouse/runtime.sock`
-	: "/var/run/boilerhouse/runtime.sock";
+/** Default Docker daemon socket path. */
+export const DEFAULT_DOCKER_SOCKET = IS_MACOS
+	? "/var/run/docker.sock"
+	: "/var/run/docker.sock";
 
-/**
- * Default path for the podman API socket.
- *
- * On macOS the socket is discovered at runtime via `podman machine inspect`,
- * so there is no static default.
- */
-export const DEFAULT_PODMAN_SOCKET: string | undefined = IS_MACOS
-	? undefined
-	: "/var/run/boilerhouse/podman.sock";
-
-/** Default path for CRIU checkpoint/snapshot archives. */
-export const DEFAULT_SNAPSHOT_DIR = IS_MACOS
-	? `${HOME}/.local/share/boilerhouse/snapshots`
-	: "/var/lib/boilerhouse/snapshots";
+/** Default storage directory for Boilerhouse data. */
+export const DEFAULT_STORAGE_DIR = IS_MACOS
+	? `${HOME}/.local/share/boilerhouse`
+	: "/var/lib/boilerhouse";

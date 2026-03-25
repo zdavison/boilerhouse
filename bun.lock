@@ -18,22 +18,12 @@
         "@boilerhouse/db": "workspace:*",
         "@boilerhouse/envoy-config": "workspace:*",
         "@boilerhouse/o11y": "workspace:*",
+        "@boilerhouse/runtime-docker": "workspace:*",
         "@boilerhouse/runtime-kubernetes": "workspace:*",
-        "@boilerhouse/runtime-podman": "workspace:*",
         "@boilerhouse/triggers": "workspace:*",
         "@elysiajs/cors": "^1.4.1",
         "drizzle-orm": "0.44.7",
         "elysia": "^1.4.25",
-      },
-    },
-    "apps/boilerhouse-podmand": {
-      "name": "@boilerhouse/boilerhouse-podmand",
-      "version": "0.0.1",
-      "dependencies": {
-        "@boilerhouse/core": "workspace:*",
-        "@boilerhouse/o11y": "workspace:*",
-        "@boilerhouse/runtime-podman": "workspace:*",
-        "@opentelemetry/api": "^1.9.0",
       },
     },
     "apps/cli": {
@@ -41,7 +31,6 @@
       "version": "0.0.0",
       "dependencies": {
         "@boilerhouse/api": "workspace:*",
-        "@boilerhouse/boilerhouse-podmand": "workspace:*",
         "@boilerhouse/core": "workspace:*",
         "commander": "^13.1.0",
       },
@@ -120,19 +109,19 @@
         "pino-pretty": "^13.0.0",
       },
     },
+    "packages/runtime-docker": {
+      "name": "@boilerhouse/runtime-docker",
+      "version": "0.0.1",
+      "dependencies": {
+        "@boilerhouse/core": "workspace:*",
+        "@opentelemetry/api": "^1.9.0",
+      },
+    },
     "packages/runtime-kubernetes": {
       "name": "@boilerhouse/runtime-kubernetes",
       "version": "0.0.1",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
-      },
-    },
-    "packages/runtime-podman": {
-      "name": "@boilerhouse/runtime-podman",
-      "version": "0.0.1",
-      "dependencies": {
-        "@boilerhouse/core": "workspace:*",
-        "@opentelemetry/api": "^1.9.0",
       },
     },
     "packages/triggers": {
@@ -150,8 +139,8 @@
         "@boilerhouse/db": "workspace:*",
         "@boilerhouse/envoy-config": "workspace:*",
         "@boilerhouse/o11y": "workspace:*",
+        "@boilerhouse/runtime-docker": "workspace:*",
         "@boilerhouse/runtime-kubernetes": "workspace:*",
-        "@boilerhouse/runtime-podman": "workspace:*",
         "@boilerhouse/triggers": "workspace:*",
         "@elysiajs/cors": "^1.4.1",
         "drizzle-orm": "0.44.7",
@@ -171,8 +160,6 @@
 
     "@boilerhouse/api": ["@boilerhouse/api@workspace:apps/api"],
 
-    "@boilerhouse/boilerhouse-podmand": ["@boilerhouse/boilerhouse-podmand@workspace:apps/boilerhouse-podmand"],
-
     "@boilerhouse/cli": ["@boilerhouse/cli@workspace:apps/cli"],
 
     "@boilerhouse/core": ["@boilerhouse/core@workspace:packages/core"],
@@ -185,9 +172,9 @@
 
     "@boilerhouse/o11y": ["@boilerhouse/o11y@workspace:packages/o11y"],
 
-    "@boilerhouse/runtime-kubernetes": ["@boilerhouse/runtime-kubernetes@workspace:packages/runtime-kubernetes"],
+    "@boilerhouse/runtime-docker": ["@boilerhouse/runtime-docker@workspace:packages/runtime-docker"],
 
-    "@boilerhouse/runtime-podman": ["@boilerhouse/runtime-podman@workspace:packages/runtime-podman"],
+    "@boilerhouse/runtime-kubernetes": ["@boilerhouse/runtime-kubernetes@workspace:packages/runtime-kubernetes"],
 
     "@boilerhouse/tests": ["@boilerhouse/tests@workspace:tests"],
 

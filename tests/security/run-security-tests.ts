@@ -15,12 +15,11 @@ import { createTestDatabase, ActivityLog, nodes, triggers } from "../../packages
 import type { DrizzleDb } from "../../packages/db/src/index";
 import { createLogger } from "../../packages/o11y/src/index";
 import { InstanceManager } from "../../apps/api/src/instance-manager";
-import { SnapshotManager } from "../../apps/api/src/snapshot-manager";
 import { TenantManager } from "../../apps/api/src/tenant-manager";
 import { TenantDataStore } from "../../apps/api/src/tenant-data";
 import { EventBus } from "../../apps/api/src/event-bus";
-import { GoldenCreator } from "../../apps/api/src/golden-creator";
 import { BootstrapLogStore } from "../../apps/api/src/bootstrap-log-store";
+import { PoolManager } from "../../apps/api/src/pool-manager";
 import { ResourceLimiter } from "../../apps/api/src/resource-limits";
 import { SecretStore } from "../../apps/api/src/secret-store";
 import { createApp } from "../../apps/api/src/app";
@@ -65,7 +64,7 @@ async function startSecurityServer() {
 	db.insert(nodes)
 		.values({
 			nodeId,
-			runtimeType: "podman",
+			runtimeType: "docker",
 			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 			status: "online",
 			lastHeartbeat: new Date(),
@@ -91,14 +90,11 @@ async function startSecurityServer() {
 		log,
 		secretStore,
 	);
-	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-		healthChecker: async () => {},
-		secretStore,
-	});
 	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-sec", db, runtime);
+	const bootstrapLogStore = new BootstrapLogStore(db);
+	const poolManager = new PoolManager(runtime, db, nodeId, { bootstrapLogStore, eventBus });
 	const tenantManager = new TenantManager(
 		instanceManager,
-		snapshotManager,
 		db,
 		activityLog,
 		nodeId,
@@ -106,11 +102,11 @@ async function startSecurityServer() {
 		undefined,
 		log,
 		eventBus,
+		undefined,
+		poolManager,
 	);
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
-	const bootstrapLogStore = new BootstrapLogStore(db);
-	const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
 
 	const app = createApp({
 		db,
@@ -119,10 +115,9 @@ async function startSecurityServer() {
 		activityLog,
 		instanceManager,
 		tenantManager,
-		snapshotManager,
 		eventBus,
-		goldenCreator,
 		bootstrapLogStore,
+		poolManager,
 		resourceLimiter,
 		secretStore,
 		log,

@@ -1,21 +1,17 @@
 import { randomBytes } from "node:crypto";
-import { FakeRuntime, generateNodeId, resolveWorkloadConfig, DEFAULT_RUNTIME_SOCKET } from "@boilerhouse/core";
+import { FakeRuntime, generateNodeId, resolveWorkloadConfig } from "@boilerhouse/core";
 import type { Runtime, Workload, WorkloadConfig } from "@boilerhouse/core";
-import { PodmanRuntime } from "@boilerhouse/runtime-podman";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { DockerRuntime } from "@boilerhouse/runtime-docker";
 import { eq } from "drizzle-orm";
 import { createTestDatabase, ActivityLog, nodes, claims } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
 import { InstanceManager } from "../../apps/api/src/instance-manager";
-import { SnapshotManager } from "../../apps/api/src/snapshot-manager";
 import { TenantManager } from "../../apps/api/src/tenant-manager";
 import { TenantDataStore } from "../../apps/api/src/tenant-data";
 import { EventBus } from "../../apps/api/src/event-bus";
-import { GoldenCreator } from "../../apps/api/src/golden-creator";
 import { BootstrapLogStore } from "../../apps/api/src/bootstrap-log-store";
+import { PoolManager } from "../../apps/api/src/pool-manager";
 import { ResourceLimiter } from "../../apps/api/src/resource-limits";
 import { SecretStore } from "../../apps/api/src/secret-store";
 import { IdleMonitor } from "../../apps/api/src/idle-monitor";
@@ -27,8 +23,6 @@ type RuntimeOperation =
 	| "create"
 	| "start"
 	| "destroy"
-	| "snapshot"
-	| "restore"
 	| "exec"
 	| "getEndpoint"
 	| "list";
@@ -43,7 +37,6 @@ export interface E2EServer {
 	/**
 	 * Mutable set controlling FakeRuntime failure injection.
 	 * Only present when runtimeName is "fake".
-	 * Add operation names to make the runtime throw.
 	 */
 	fakeFailOn?: Set<RuntimeOperation>;
 	/** Secret store for managing tenant secrets. Present when secret gateway is enabled. */
@@ -53,10 +46,6 @@ export interface E2EServer {
 /**
  * Boots the API server with the given runtime wired in.
  * Starts on a random port and returns a handle for tests.
- *
- * Pass `idlePollIntervalMs` to enable idle timeout monitoring. When set, an
- * IdleMonitor and WatchDirsPoller are wired in and instances are automatically
- * released when their workload's idle timeout elapses.
  */
 export async function startE2EServer(
 	runtimeName: string,
@@ -67,11 +56,10 @@ export async function startE2EServer(
 	const activityLog = new ActivityLog(db);
 	const eventBus = new EventBus();
 
-	// Insert a node so FK constraints pass
 	db.insert(nodes)
 		.values({
 			nodeId,
-			runtimeType: "podman",
+			runtimeType: "docker",
 			capacity: { vcpus: 8, memoryMb: 16384, diskGb: 100 },
 			status: "online",
 			lastHeartbeat: new Date(),
@@ -79,27 +67,21 @@ export async function startE2EServer(
 		})
 		.run();
 
-	// Secret store setup
 	const secretKey = randomBytes(32).toString("hex");
 	const secretStore = new SecretStore(db, secretKey);
 
 	let runtime: Runtime;
 	let fakeFailOn: Set<RuntimeOperation> | undefined;
-	let snapshotDir: string | undefined;
 
 	if (runtimeName === "fake") {
 		fakeFailOn = new Set<RuntimeOperation>();
 		runtime = new FakeRuntime({ failOn: fakeFailOn });
-	} else if (runtimeName === "podman") {
-		snapshotDir = mkdtempSync(join(tmpdir(), "bh-e2e-snap-"));
-		const socketPath = process.env.RUNTIME_SOCKET ?? DEFAULT_RUNTIME_SOCKET;
-		runtime = new PodmanRuntime({ snapshotDir, socketPath });
+	} else if (runtimeName === "docker") {
+		const socketPath = process.env.DOCKER_SOCKET;
+		runtime = new DockerRuntime({ socketPath });
 	} else if (runtimeName === "kubernetes") {
 		const { KubernetesRuntime } = await import("@boilerhouse/runtime-kubernetes");
 
-		snapshotDir = mkdtempSync(join(tmpdir(), "bh-e2e-k8s-snap-"));
-		// Use kubeconfig to get the API URL — minikube ip is not routable
-		// from the host with the docker driver on macOS.
 		const apiUrl = Bun.spawnSync(
 			["kubectl", "--context", "boilerhouse-test", "config", "view",
 			 "--minify", "-o", "jsonpath={.clusters[0].cluster.server}"],
@@ -118,7 +100,6 @@ export async function startE2EServer(
 			namespace: "boilerhouse",
 			context: "boilerhouse-test",
 			minikubeProfile: "boilerhouse-test",
-			snapshotDir,
 		});
 	} else {
 		throw new Error(`Runtime '${runtimeName}' not implemented for E2E`);
@@ -134,11 +115,10 @@ export async function startE2EServer(
 		log,
 		secretStore,
 	);
-	const snapshotManager = new SnapshotManager(runtime, db, nodeId, {
-		...(runtimeName === "fake" ? { healthChecker: async () => {} } : {}),
-		secretStore,
-	});
+
 	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-e2e", db, runtime);
+	const bootstrapLogStore = new BootstrapLogStore(db);
+	const poolManager = new PoolManager(runtime, db, nodeId, { bootstrapLogStore, eventBus });
 
 	let idleMonitor: IdleMonitor | undefined;
 	let watchDirsPoller: WatchDirsPoller | undefined;
@@ -150,7 +130,6 @@ export async function startE2EServer(
 
 	const tenantManager = new TenantManager(
 		instanceManager,
-		snapshotManager,
 		db,
 		activityLog,
 		nodeId,
@@ -159,6 +138,7 @@ export async function startE2EServer(
 		log,
 		eventBus,
 		watchDirsPoller,
+		poolManager,
 	);
 
 	if (idleMonitor) {
@@ -175,8 +155,6 @@ export async function startE2EServer(
 	}
 
 	const resourceLimiter = new ResourceLimiter(db, { maxInstances: 100 });
-	const bootstrapLogStore = new BootstrapLogStore(db);
-	const goldenCreator = new GoldenCreator(db, snapshotManager, eventBus, bootstrapLogStore);
 
 	const app = createApp({
 		db,
@@ -185,12 +163,11 @@ export async function startE2EServer(
 		activityLog,
 		instanceManager,
 		tenantManager,
-		snapshotManager,
 		eventBus,
-		goldenCreator,
 		bootstrapLogStore,
 		resourceLimiter,
 		secretStore,
+		poolManager,
 		log,
 	});
 
@@ -207,7 +184,6 @@ export async function startE2EServer(
 			server.stop();
 			resourceLimiter.dispose();
 			idleMonitor?.stop();
-			// Destroy any remaining containers for real runtimes
 			if (runtimeName !== "fake") {
 				const remaining = await runtime.list();
 				for (const id of remaining) {
@@ -220,7 +196,6 @@ export async function startE2EServer(
 
 /**
  * Waits for a workload to reach "ready" status by polling.
- * Throws if the workload doesn't become ready within the timeout.
  */
 export async function waitForWorkloadReady(
 	server: E2EServer,
@@ -236,7 +211,7 @@ export async function waitForWorkloadReady(
 			const body = (await res.json()) as { status: string };
 			if (body.status === "ready") return;
 			if (body.status === "error") {
-				throw new Error(`Workload '${workloadName}' failed to create golden snapshot`);
+				throw new Error(`Workload '${workloadName}' entered error state`);
 			}
 		}
 		await new Promise((r) => setTimeout(r, 50));
@@ -246,7 +221,6 @@ export async function waitForWorkloadReady(
 
 /**
  * Typed fetch wrapper against the E2E server.
- * Handles JSON serialization of request bodies.
  */
 export async function api(
 	server: E2EServer,
@@ -268,11 +242,7 @@ export async function api(
 		}
 	}
 
-	return fetch(url, {
-		method,
-		headers,
-		body: reqBody,
-	});
+	return fetch(url, { method, headers, body: reqBody });
 }
 
 /**

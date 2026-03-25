@@ -19,7 +19,7 @@ describe("node types", () => {
 	});
 
 	test("runtime types are exhaustive", () => {
-		expect(RUNTIME_TYPES).toContain("podman");
+		expect(RUNTIME_TYPES).toContain("docker");
 		expect(RUNTIME_TYPES).toContain("kubernetes");
 		expect(RUNTIME_TYPES).toHaveLength(2);
 	});
