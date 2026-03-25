@@ -31,6 +31,8 @@ export function instanceRoutes(deps: RouteDeps) {
 				tenantId: r.tenantId,
 				status: r.status,
 				statusDetail: r.statusDetail,
+				lastActivity: r.lastActivity?.toISOString() ?? null,
+				claimedAt: r.claimedAt?.toISOString() ?? null,
 				createdAt: r.createdAt.toISOString(),
 			}));
 		}, {
