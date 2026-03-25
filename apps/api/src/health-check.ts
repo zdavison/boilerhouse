@@ -43,6 +43,7 @@ export async function pollHealth(
 		try {
 			const healthy = await check();
 			if (healthy) {
+				onLog?.(`Health check passed on attempt ${attempt}`);
 				return;
 			}
 			consecutiveFailures++;
