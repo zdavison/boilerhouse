@@ -92,6 +92,8 @@ export class TenantManager {
 				// Instance is active or still starting — return it
 				const handle = instanceHandleFrom(existingClaim.instanceId, instanceRow.status);
 				const endpoint = await this.safeGetEndpoint(handle);
+				// Reset idle timeout so repeated claims don’t cause premature eviction
+				this.startIdleWatch(existingClaim.instanceId, workloadId);
 				return {
 					tenantId,
 					instanceId: existingClaim.instanceId,

@@ -185,6 +185,50 @@ describe("IdleMonitor + TenantManager integration", () => {
 		expect(afterRow!.status).toBe("destroyed");
 	});
 
+	test("re-claiming an existing instance resets the idle timeout", async () => {
+		// Use a workload with 100ms idle timeout
+		const workload: Workload = {
+			workload: { name: "idle-reclaim", version: "1.0.0" },
+			image: { ref: "test:latest" },
+			resources: { vcpus: 1, memory_mb: 256, disk_gb: 2 },
+			network: { access: "none" },
+			idle: { action: "destroy", timeout_seconds: 0.1 },
+		};
+
+		const workloadId = generateWorkloadId();
+		seedWorkload(workloadId, workload);
+
+		const tenantId = generateTenantId();
+		const first = await tenantManager.claim(tenantId, workloadId);
+
+		// Wait 70ms (past halfway but before the 100ms timeout)
+		await sleep(70);
+
+		// Re-claim the same tenant+workload — should reset the idle timer
+		const second = await tenantManager.claim(tenantId, workloadId);
+		expect(second.source).toBe("existing");
+		expect(second.instanceId).toBe(first.instanceId);
+
+		// At 70ms after re-claim, instance should still be active
+		// (original timer would have fired at ~30ms from now without the reset)
+		await sleep(70);
+		const midRow = db
+			.select()
+			.from(instances)
+			.where(eq(instances.instanceId, first.instanceId))
+			.get();
+		expect(midRow!.status).toBe("active");
+
+		// After the full 100ms timeout from the re-claim, it should be destroyed
+		await sleep(60);
+		const afterRow = db
+			.select()
+			.from(instances)
+			.where(eq(instances.instanceId, first.instanceId))
+			.get();
+		expect(afterRow!.status).toBe("destroyed");
+	});
+
 	test("workload's idle config (timeout_seconds, action) is used by the monitor", async () => {
 		// Use a workload with a longer timeout to verify it's read from config
 		const longTimeoutWorkload: Workload = {
