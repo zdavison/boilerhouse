@@ -1,10 +1,12 @@
 {
   "name": "@boilerhouse/trigger-gateway",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "license": "BUSL-1.1",
   "type": "module",
-  "exports": { ".": "./src/server.ts" },
+  "exports": {
+    ".": "./src/server.ts"
+  },
   "scripts": {
     "dev": "bun --hot src/server.ts",
     "start": "bun src/server.ts"
