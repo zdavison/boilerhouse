@@ -1,0 +1,37 @@
+Dockerfile
+  bb1bbd30e6b50014 3-4,7-8,13,17-18
+packages/db/src/database.ts
+  bb1bbd30e6b50014 19-21,30
+Dockerfile.dashboard
+  bb1bbd30e6b50014 3-4,7-8,16
+.dockerignore
+  bb1bbd30e6b50014 4,6-8
+packages/envoy-config/src/config.ts
+  bb1bbd30e6b50014 4
+Dockerfile.trigger-gateway
+  bb1bbd30e6b50014 3-4,7-8,16
+tests/docker/docker-smoke.test.ts
+  bb1bbd30e6b50014 1,4-6,11-13,30,33-35,45-66,68-96,98-136,146-148,152-154
+packages/envoy-config/src/text.d.ts
+  bb1bbd30e6b50014 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "db9099d505379c0bcf6204afd9a1484cdd3eed6c",
+  "prompts": {
+    "bb1bbd30e6b50014": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ed3ffb2-d180-47ee-9884-0607d845114e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 153,
+      "total_deletions": 100,
+      "accepted_lines": 137,
+      "overriden_lines": 0
+    }
+  }
+}
