@@ -1,0 +1,9 @@
+import { defineWorkload } from "@boilerhouse/core";
+
+export default defineWorkload({
+	name: "e2e-fake-broken",
+	version: "1.0.0",
+	image: { ref: "fake-broken:latest" },
+	resources: { vcpus: 1, memory_mb: 256 },
+	idle: { action: "destroy" },
+});

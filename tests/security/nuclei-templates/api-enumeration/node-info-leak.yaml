@@ -1,0 +1,21 @@
+id: node-info-leak
+
+info:
+  name: Node endpoint leaks host details
+  author: boilerhouse-security
+  severity: medium
+  tags: info-disclosure
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/v1/nodes"
+    matchers:
+      - type: regex
+        regex:
+          - '"hostname"\s*:\s*"[^"]+"'
+          - '"ip"\s*:\s*"\d+\.\d+\.\d+\.\d+"'
+          - '"os"\s*:\s*"[^"]+"'
+          - '"kernel"\s*:\s*"[^"]+"'
+        condition: or
+    # FINDING if: host-level details exposed

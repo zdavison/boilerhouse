@@ -1,0 +1,22 @@
+{
+  "name": "boilerhouse",
+  "private": true,
+  "license": "BUSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zdavison/boilerhouse.git"
+  },
+  "workspaces": ["packages/*", "apps/*", "workloads", "tests"],
+  "scripts": {
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun test packages/ apps/ workloads/",
+    "dev": "bun run --filter '@boilerhouse/api' dev & bun run --filter '@boilerhouse/dashboard' dev"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.9",
+    "oxlint": "^1.49.0",
+    "typescript": "^5.9.3"
+  }
+}

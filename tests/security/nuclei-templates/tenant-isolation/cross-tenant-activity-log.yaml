@@ -1,0 +1,70 @@
+id: cross-tenant-activity-log
+
+info:
+  name: Activity log leaks cross-tenant entries
+  author: boilerhouse-security
+  severity: high
+  tags: tenant-isolation,info-disclosure
+
+flow: |
+  http("setup-workload") && http("setup-ready") && http("claim-a") && http("claim-b") && http("query-log")
+
+http:
+  - id: setup-workload
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: '{"workload":{"name":"{{workload_name}}","version":"1.0.0"},"image":{"ref":"fake:latest"},"resources":{"vcpus":1,"memory_mb":128},"network":{"access":"none"},"idle":{"action":"hibernate"}}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 201 || status_code == 409"
+        internal: true
+
+  - id: setup-ready
+    method: GET
+    path:
+      - "{{BaseURL}}/api/v1/workloads/{{workload_name}}"
+    matchers:
+      - type: word
+        words:
+          - '"ready"'
+        internal: true
+
+  - id: claim-a
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/tenants/{{tenant_a_id}}/claim"
+    headers:
+      Content-Type: application/json
+    body: '{"workload": "{{workload_name}}"}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+        internal: true
+
+  - id: claim-b
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/tenants/{{tenant_b_id}}/claim"
+    headers:
+      Content-Type: application/json
+    body: '{"workload": "{{workload_name}}"}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+        internal: true
+
+  - id: query-log
+    method: GET
+    path:
+      - "{{BaseURL}}/api/v1/activity"
+    matchers:
+      - type: word
+        words:
+          - "{{tenant_b_id}}"
+    # FINDING if: tenant-B's ID appears in unfiltered activity log

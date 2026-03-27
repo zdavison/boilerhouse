@@ -1,0 +1,32 @@
+id: slack-forged-signature
+
+info:
+  name: Slack endpoint accepts forged signature
+  author: boilerhouse-security
+  severity: critical
+  tags: auth-bypass,slack
+
+http:
+  - method: POST
+    path:
+      - "{{trigger_base_url}}/slack/events"
+    headers:
+      Content-Type: application/json
+      X-Slack-Request-Timestamp: "1234567890"
+      X-Slack-Signature: "v0=0000000000000000000000000000000000000000000000000000000000000000"
+    body: |
+      {
+        "type": "event_callback",
+        "team_id": "T12345",
+        "event": {
+          "type": "app_mention",
+          "user": "U12345",
+          "channel": "C12345",
+          "text": "test"
+        }
+      }
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+    # FINDING if: forged Slack signature accepted

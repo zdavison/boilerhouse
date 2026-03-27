@@ -1,0 +1,44 @@
+id: workload-duplicate-name
+
+info:
+  name: Duplicate workload name silently overwrites
+  author: boilerhouse-security
+  severity: medium
+  tags: input-validation
+
+flow: |
+  http("create-first") && http("create-duplicate")
+
+http:
+  - id: create-first
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "workload": {"name": "dup-test", "version": "1.0.0"},
+        "image": {"ref": "alpine:latest"},
+        "resources": {"vcpus": 1, "memory_mb": 256},
+        "entrypoint": {"cmd": "/bin/sh"}
+      }
+
+  - id: create-duplicate
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "workload": {"name": "dup-test", "version": "1.0.0"},
+        "image": {"ref": "ubuntu:latest"},
+        "resources": {"vcpus": 2, "memory_mb": 512},
+        "entrypoint": {"cmd": "/bin/bash"}
+      }
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200 || status_code == 201"
+    # FINDING if: second create succeeds (silent overwrite)

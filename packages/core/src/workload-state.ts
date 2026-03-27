@@ -1,0 +1,67 @@
+import { Type, type Static } from "@sinclair/typebox";
+import { createMachine, type TransitionMap } from "./state-machine";
+
+// ── Schemas ─────────────────────────────────────────────────────────────────
+
+export const WorkloadStatusSchema = Type.Union([
+	Type.Literal("creating"),
+	Type.Literal("ready"),
+	Type.Literal("error"),
+]);
+
+export const WorkloadEventSchema = Type.Union([
+	Type.Literal("created"),
+	Type.Literal("failed"),
+	Type.Literal("retry"),
+	Type.Literal("recover"),
+]);
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export type WorkloadStatus = Static<typeof WorkloadStatusSchema>;
+export type WorkloadEvent = Static<typeof WorkloadEventSchema>;
+
+export const WORKLOAD_STATUSES = [
+	"creating",
+	"ready",
+	"error",
+] as const satisfies readonly WorkloadStatus[];
+
+export const WORKLOAD_EVENTS = [
+	"created",
+	"failed",
+	"retry",
+	"recover",
+] as const satisfies readonly WorkloadEvent[];
+
+// ── Machine ─────────────────────────────────────────────────────────────────
+
+const transitions: TransitionMap<WorkloadStatus, WorkloadEvent> = {
+	creating: { created: "ready", failed: "error" },
+	ready: { recover: "creating" },
+	error: { retry: "creating" },
+};
+
+const workloadMachine = createMachine<WorkloadStatus, WorkloadEvent>(
+	"workload",
+	{ transitions },
+);
+
+/**
+ * Applies an event to the current workload status, returning the new status.
+ * Throws {@link InvalidTransitionError} if the transition is not allowed.
+ */
+export function workloadTransition(
+	current: WorkloadStatus,
+	event: WorkloadEvent,
+): WorkloadStatus {
+	return workloadMachine.transition(current, event);
+}
+
+/** Checks whether the given event is valid for the current workload status. */
+export function canWorkloadTransition(
+	current: WorkloadStatus,
+	event: WorkloadEvent,
+): boolean {
+	return workloadMachine.can(current, event);
+}

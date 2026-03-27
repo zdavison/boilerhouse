@@ -1,0 +1,14 @@
+{
+	"name": "@boilerhouse/runtime-kubernetes",
+	"version": "0.0.1",
+	"private": true,
+	"license": "BUSL-1.1",
+	"type": "module",
+	"exports": { ".": "./src/index.ts" },
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@boilerhouse/core": "workspace:*"
+	}
+}

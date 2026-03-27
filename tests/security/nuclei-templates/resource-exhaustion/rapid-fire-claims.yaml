@@ -1,0 +1,50 @@
+id: rapid-fire-claims
+
+info:
+  name: Server crashes under rapid-fire tenant claims
+  author: boilerhouse-security
+  severity: high
+  tags: dos
+
+flow: |
+  http("setup-workload") && http("setup-ready") && http("flood")
+
+http:
+  - id: setup-workload
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: '{"workload":{"name":"{{workload_name}}","version":"1.0.0"},"image":{"ref":"fake:latest"},"resources":{"vcpus":1,"memory_mb":128},"network":{"access":"none"},"idle":{"action":"hibernate"}}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 201 || status_code == 409"
+        internal: true
+
+  - id: setup-ready
+    method: GET
+    path:
+      - "{{BaseURL}}/api/v1/workloads/{{workload_name}}"
+    matchers:
+      - type: word
+        words:
+          - '"ready"'
+        internal: true
+
+  - id: flood
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/tenants/flood-{{rand_int(1,1000)}}/claim"
+    headers:
+      Content-Type: application/json
+    body: '{"workload": "{{workload_name}}"}'
+    threads: 50
+    race: true
+    race_count: 50
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 500 || status_code == 0"
+    # FINDING if: server returns 500 or connection drops

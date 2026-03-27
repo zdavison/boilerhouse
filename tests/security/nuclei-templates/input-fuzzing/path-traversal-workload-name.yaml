@@ -1,0 +1,31 @@
+id: path-traversal-workload-name
+
+info:
+  name: Path traversal in workload name accepted
+  author: boilerhouse-security
+  severity: high
+  tags: input-validation,path-traversal
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "workload": {"name": "../../etc/passwd", "version": "1.0.0"},
+        "image": {"ref": "alpine:latest"},
+        "resources": {"vcpus": 1, "memory_mb": 256},
+        "entrypoint": {"cmd": "/bin/sh"}
+      }
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+          - 201
+      - type: word
+        words:
+          - "../../etc/passwd"
+    # FINDING if: path traversal name accepted and stored

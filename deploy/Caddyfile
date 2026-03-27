@@ -1,0 +1,81 @@
+# Boilerhouse reverse proxy — TLS, auth, security headers, rate limiting.
+# Caddy automatically provisions and renews TLS certificates via ACME.
+#
+# Usage:
+#   Standalone: BOILERHOUSE_DOMAIN=api.example.com BOILERHOUSE_AUTH_TOKEN=<secret> caddy run --config deploy/Caddyfile
+#   Docker:     Set BOILERHOUSE_API_UPSTREAM=api:3000 (defaults to 127.0.0.1:3000 for host installs)
+#
+{$BOILERHOUSE_DOMAIN:localhost} {
+	# TLS — automatic via Let's Encrypt / ZeroSSL
+	tls {$BOILERHOUSE_TLS_EMAIL:admin@example.com}
+
+	# Require auth token on all API requests
+	@api {
+		path /api/*
+	}
+	route @api {
+		@missing_token not header Authorization "Bearer {$BOILERHOUSE_AUTH_TOKEN}"
+		respond @missing_token 401
+
+		reverse_proxy {$BOILERHOUSE_API_UPSTREAM:127.0.0.1:3000}
+	}
+
+	# WebSocket — proxied to API (auth required)
+	@ws {
+		path /ws
+	}
+	route @ws {
+		@missing_token not header Authorization "Bearer {$BOILERHOUSE_AUTH_TOKEN}"
+		respond @missing_token 401
+
+		reverse_proxy {$BOILERHOUSE_API_UPSTREAM:127.0.0.1:3000}
+	}
+
+	# Dashboard — auth required
+	@dashboard {
+		path /dashboard /dashboard/*
+	}
+	route @dashboard {
+		@missing_token not header Authorization "Bearer {$BOILERHOUSE_AUTH_TOKEN}"
+		respond @missing_token 401
+
+		reverse_proxy {$BOILERHOUSE_DASHBOARD_UPSTREAM:127.0.0.1:3001}
+	}
+
+	# Webhook endpoints — public but rate-limited (trigger gateway)
+	@hooks {
+		path /hooks/* /slack/* /telegram/*
+	}
+	route @hooks {
+		rate_limit {
+			zone webhooks {
+				key {remote_host}
+				events 60
+				window 1m
+			}
+		}
+
+		reverse_proxy {$BOILERHOUSE_TRIGGER_UPSTREAM:127.0.0.1:3002}
+	}
+
+	# Health check for trigger gateway
+	@trigger_health {
+		path /healthz
+	}
+	route @trigger_health {
+		reverse_proxy {$BOILERHOUSE_TRIGGER_UPSTREAM:127.0.0.1:3002}
+	}
+
+	# Security headers
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		-Server
+	}
+
+	# Block everything else
+	respond 404
+}

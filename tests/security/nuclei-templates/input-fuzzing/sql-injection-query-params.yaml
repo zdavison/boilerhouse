@@ -1,0 +1,26 @@
+id: sql-injection-query-params
+
+info:
+  name: SQL injection via query parameters
+  author: boilerhouse-security
+  severity: critical
+  tags: sqli
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/v1/instances?status=running'%20OR%20'1'%3D'1"
+      - "{{BaseURL}}/api/v1/instances?status=running%22%20OR%20%221%22%3D%221"
+      - "{{BaseURL}}/api/v1/instances?status=running;DROP%20TABLE%20instances;--"
+    stop-at-first-match: true
+    matchers-condition: or
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 500"
+      - type: word
+        words:
+          - "SQLITE_ERROR"
+          - "syntax error"
+          - "SQL"
+        condition: or

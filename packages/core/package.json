@@ -1,0 +1,17 @@
+{
+	"name": "@boilerhouse/core",
+	"version": "0.0.1",
+	"private": true,
+	"license": "BUSL-1.1",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@sinclair/typebox": "^0.34.48",
+		"age-encryption": "^0.3.0"
+	}
+}

@@ -1,0 +1,76 @@
+id: cross-tenant-release-impact
+
+info:
+  name: Releasing tenant-A destroys tenant-B instance
+  author: boilerhouse-security
+  severity: critical
+  tags: tenant-isolation
+
+flow: |
+  http("setup-workload") && http("setup-ready") && http("claim-a") && http("claim-b") && http("release-a") && http("check-b")
+
+http:
+  - id: setup-workload
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: '{"workload":{"name":"{{workload_name}}","version":"1.0.0"},"image":{"ref":"fake:latest"},"resources":{"vcpus":1,"memory_mb":128},"network":{"access":"none"},"idle":{"action":"hibernate"}}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 201 || status_code == 409"
+        internal: true
+
+  - id: setup-ready
+    method: GET
+    path:
+      - "{{BaseURL}}/api/v1/workloads/{{workload_name}}"
+    matchers:
+      - type: word
+        words:
+          - '"ready"'
+        internal: true
+
+  - id: claim-a
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/tenants/{{tenant_a_id}}/claim"
+    headers:
+      Content-Type: application/json
+    body: '{"workload": "{{workload_name}}"}'
+
+  - id: claim-b
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/tenants/{{tenant_b_id}}/claim"
+    headers:
+      Content-Type: application/json
+    body: '{"workload": "{{workload_name}}"}'
+    extractors:
+      - type: json
+        name: instance_b_id
+        json:
+          - ".instanceId"
+        internal: true
+
+  - id: release-a
+    method: POST
+    path:
+      - "{{BaseURL}}/api/v1/tenants/{{tenant_a_id}}/release"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+        internal: true
+
+  - id: check-b
+    method: GET
+    path:
+      - "{{BaseURL}}/api/v1/instances/{{instance_b_id}}"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code != 200"
+    # FINDING if: tenant-B's instance is gone after tenant-A's release

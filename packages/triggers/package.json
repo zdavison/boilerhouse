@@ -1,0 +1,20 @@
+{
+	"name": "@boilerhouse/triggers",
+	"version": "0.0.1",
+	"private": true,
+	"license": "BUSL-1.1",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@boilerhouse/core": "workspace:*",
+		"@boilerhouse/o11y": "workspace:*",
+		"bullmq": "^5.71.1",
+		"croner": "^10.0.1",
+		"ioredis": "^5.10.1"
+	}
+}

@@ -1,0 +1,29 @@
+{
+	"name": "@boilerhouse/api",
+	"version": "0.0.1",
+	"private": true,
+	"license": "BUSL-1.1",
+	"type": "module",
+	"exports": {
+		".": "./src/server.ts"
+	},
+	"scripts": {
+		"dev": "bun --hot src/server.ts",
+		"start": "bun src/server.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@boilerhouse/core": "workspace:*",
+		"@boilerhouse/db": "workspace:*",
+		"@boilerhouse/envoy-config": "workspace:*",
+		"@boilerhouse/o11y": "workspace:*",
+		"@boilerhouse/runtime-docker": "workspace:*",
+		"@boilerhouse/runtime-kubernetes": "workspace:*",
+		"@boilerhouse/storage": "workspace:*",
+		"@boilerhouse/triggers": "workspace:*",
+		"@elysiajs/cors": "^1.4.1",
+		"drizzle-orm": "0.44.7",
+		"elysia": "^1.4.25",
+		"ioredis": "^5.10.1"
+	}
+}

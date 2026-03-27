@@ -1,0 +1,26 @@
+id: negative-resources
+
+info:
+  name: Negative resource values accepted in workload
+  author: boilerhouse-security
+  severity: medium
+  tags: input-validation
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "workload": {"name": "negative-cpu-test", "version": "1.0.0"},
+        "image": {"ref": "alpine:latest"},
+        "resources": {"vcpus": -1, "memory_mb": -512},
+        "entrypoint": {"cmd": "/bin/sh"}
+      }
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200 || status_code == 201"
+    # FINDING if: negative resources accepted

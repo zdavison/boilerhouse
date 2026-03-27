@@ -1,0 +1,21 @@
+id: cors-wildcard
+
+info:
+  name: CORS allows wildcard origin
+  author: boilerhouse-security
+  severity: medium
+  tags: cors
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Origin: "https://evil-attacker.com"
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: header
+        words:
+          - "Access-Control-Allow-Origin: *"
+    # FINDING if: wildcard CORS header present

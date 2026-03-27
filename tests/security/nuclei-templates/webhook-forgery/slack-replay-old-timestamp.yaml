@@ -1,0 +1,27 @@
+id: slack-replay-old-timestamp
+
+info:
+  name: Slack endpoint accepts replayed request with old timestamp
+  author: boilerhouse-security
+  severity: medium
+  tags: auth-bypass,slack,replay
+  description: |
+    Known vulnerability: no timestamp freshness check.
+    A valid signature with a stale timestamp should be rejected
+    (Slack recommends a 5-minute window).
+
+http:
+  - method: POST
+    path:
+      - "{{trigger_base_url}}/slack/events"
+    headers:
+      Content-Type: application/json
+      X-Slack-Request-Timestamp: "1000000000"
+      X-Slack-Signature: "{{slack_replay_signature}}"
+    body: "{{slack_replay_body}}"
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200"
+    # FINDING if: replayed request with old timestamp accepted
+    # (known vulnerability — no timestamp freshness check)

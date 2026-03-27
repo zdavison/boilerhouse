@@ -1,0 +1,160 @@
+admin:
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: {{adminPort}}
+
+static_resources:
+  listeners:
+  - name: egress_http
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: {{port}}
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: egress_http
+          http_protocol_options:
+            allow_absolute_url: true
+          route_config:
+            name: local_route
+            virtual_hosts:
+{{#each domains}}
+            - name: {{safeName domain}}
+              domains:
+              - "{{domain}}"
+              routes:
+              - match:
+                  prefix: /
+{{#if isWildcard}}
+                direct_response:
+                  status: 502
+                  body:
+                    inline_string: "Wildcard domain matched but dynamic forward proxy is not yet configured"
+{{else}}
+                route:
+                  cluster: upstream_{{safeName domain}}
+{{#if headers}}
+                request_headers_to_add:
+{{#each headers}}
+                - header:
+                    key: "{{key}}"
+                    value: "{{value}}"
+                  append_action: OVERWRITE_IF_EXISTS_OR_ADD
+{{/each}}
+{{/if}}
+{{/if}}
+{{/each}}
+            - name: deny_all
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: /
+                direct_response:
+                  status: 403
+                  body:
+                    inline_string: "Forbidden: domain not in allowlist"
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+{{#if hasTls}}
+  - name: egress_tls
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: {{tlsPort}}
+    listener_filters:
+    - name: envoy.filters.listener.tls_inspector
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+    filter_chains:
+{{#each tlsDomains}}
+    - filter_chain_match:
+        server_names:
+        - "{{domain}}"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            - certificate_chain:
+                filename: /etc/envoy/certs/{{safe}}.crt
+              private_key:
+                filename: /etc/envoy/certs/{{safe}}.key
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: egress_tls_{{safe}}
+          route_config:
+            name: tls_route_{{safe}}
+            virtual_hosts:
+            - name: {{safe}}
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: /
+                route:
+                  cluster: upstream_{{safe}}
+{{#if headers}}
+                request_headers_to_add:
+{{#each headers}}
+                - header:
+                    key: "{{key}}"
+                    value: "{{value}}"
+                  append_action: OVERWRITE_IF_EXISTS_OR_ADD
+{{/each}}
+{{/if}}
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+{{/each}}
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tls_deny
+          cluster: deny_cluster
+{{/if}}
+
+  clusters:
+{{#each clusters}}
+  - name: upstream_{{safeName domain}}
+    type: STRICT_DNS
+    dns_lookup_family: V4_ONLY
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: {{domain}}
+    load_assignment:
+      cluster_name: upstream_{{safeName domain}}
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: {{domain}}
+                port_value: 443
+{{/each}}
+{{#if hasTls}}
+  - name: deny_cluster
+    type: STATIC
+    load_assignment:
+      cluster_name: deny_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 1
+{{/if}}

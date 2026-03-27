@@ -1,0 +1,23 @@
+id: oversized-body
+
+info:
+  name: Server accepts oversized request body
+  author: boilerhouse-security
+  severity: medium
+  tags: dos,input-validation
+
+variables:
+  padding: "{{repeat('A', 5242880)}}"
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/api/v1/workloads"
+    headers:
+      Content-Type: application/json
+    body: '{"name": "{{padding}}"}'
+    matchers:
+      - type: dsl
+        dsl:
+          - "status_code == 200 || status_code == 201"
+    # FINDING if: 5MB body accepted without rejection
