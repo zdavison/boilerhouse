@@ -11,6 +11,7 @@
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
     "typecheck": "bun run --filter '*' typecheck",
+    "build": "bun build --compile apps/cli/src/main.ts --outfile boilerhouse",
     "test": "bun test packages/ apps/ workloads/",
     "dev": "bun run --filter '@boilerhouse/api' dev & bun run --filter '@boilerhouse/dashboard' dev"
   },
