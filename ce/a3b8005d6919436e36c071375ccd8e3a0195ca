@@ -1,0 +1,96 @@
+.github/workflows/docker.yml
+  bb1bbd30e6b50014 14-22,33,35-36
+apps/docs/reference/env.md
+  e707fc44f6c6d29c 1-31
+apps/docs/guide/observability.md
+  e707fc44f6c6d29c 1-21
+apps/docs/guide/architecture.md
+  e707fc44f6c6d29c 1-21
+apps/docs/reference/workload-schema.md
+  e707fc44f6c6d29c 1-38
+apps/docs/.gitignore
+  e707fc44f6c6d29c 1-2
+apps/docs/.vitepress/config.ts
+  e707fc44f6c6d29c 1-73
+apps/docs/guide/quick-start.md
+  e707fc44f6c6d29c 1-25
+apps/docs/index.md
+  e707fc44f6c6d29c 1-23
+apps/docs/guide/configuration.md
+  e707fc44f6c6d29c 1-17
+README.md
+  e707fc44f6c6d29c 3,5,7,9-13,17-39,41
+Dockerfile.trigger-gateway
+  bb1bbd30e6b50014 1-17
+Dockerfile.dashboard
+  bb1bbd30e6b50014 1-17
+apps/docs/guide/what-is-boilerhouse.md
+  e707fc44f6c6d29c 1-15
+apps/dashboard/package.json
+  bb1bbd30e6b50014 13-16
+apps/docs/guide/networking.md
+  e707fc44f6c6d29c 1-21
+package.json
+  bb1bbd30e6b50014 14
+apps/trigger-gateway/package.json
+  bb1bbd30e6b50014 12-15
+apps/docs/guide/deployment.md
+  e707fc44f6c6d29c 1-17
+apps/docs/guide/triggers.md
+  e707fc44f6c6d29c 1-21
+apps/docs/guide/workloads.md
+  e707fc44f6c6d29c 1-37
+apps/docs/guide/runtime-kubernetes.md
+  e707fc44f6c6d29c 1-17
+apps/docs/guide/tenants.md
+  e707fc44f6c6d29c 1-21
+apps/docs/guide/instances.md
+  e707fc44f6c6d29c 1-21
+apps/docs/guide/storage.md
+  e707fc44f6c6d29c 1-17
+apps/docs/guide/pooling.md
+  e707fc44f6c6d29c 1-17
+apps/docs/package.json
+  e707fc44f6c6d29c 1-15
+apps/docs/guide/snapshots.md
+  e707fc44f6c6d29c 1-17
+apps/docs/guide/runtime-docker.md
+  e707fc44f6c6d29c 1-17
+apps/docs/reference/api.md
+  e707fc44f6c6d29c 1-47
+apps/docs/reference/cli.md
+  e707fc44f6c6d29c 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "cea3b8005d6919436e36c071375ccd8e3a0195ca",
+  "prompts": {
+    "bb1bbd30e6b50014": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ed3ffb2-d180-47ee-9884-0607d845114e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 55,
+      "total_deletions": 5,
+      "accepted_lines": 55,
+      "overriden_lines": 0
+    },
+    "e707fc44f6c6d29c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f527a30-56d8-4f9b-9f3b-66e26cf6bbf1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 608,
+      "total_deletions": 4,
+      "accepted_lines": 608,
+      "overriden_lines": 0
+    }
+  }
+}
