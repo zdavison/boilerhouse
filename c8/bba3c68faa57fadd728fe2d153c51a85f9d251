@@ -1,0 +1,37 @@
+apps/api/src/routes/trigger-adapters.ts
+  f6269b598276a041 192-206
+packages/triggers/src/index.ts
+  f6269b598276a041 32
+apps/dashboard/src/pages/MetricsPage.tsx
+  f6269b598276a041 586-687,767-769
+packages/triggers/src/trigger-queue-manager.ts
+  f6269b598276a041 18-24,29-30,36-62,65,167-171
+packages/o11y/src/metrics/triggers.ts
+  f6269b598276a041 13-15
+packages/triggers/src/trigger-queue-manager.test.ts
+  f6269b598276a041 49-56,59,471-481
+deploy/grafana/dashboards/boilerhouse.json
+  f6269b598276a041 583-754
+apps/api/src/routes/trigger-adapters.test.ts
+  f6269b598276a041 29,31,120-122,124,127,148,150,182-183,185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "c8bba3c68faa57fadd728fe2d153c51a85f9d251",
+  "prompts": {
+    "f6269b598276a041": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae8f4bff-8298-4b07-b00b-d562e3e2fb84",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 402,
+      "total_deletions": 52,
+      "accepted_lines": 376,
+      "overriden_lines": 0
+    }
+  }
+}
