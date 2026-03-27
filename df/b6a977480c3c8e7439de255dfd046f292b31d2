@@ -1,0 +1,33 @@
+packages/triggers/package.json
+  bb1bbd30e6b50014 15-18
+tests/docker/docker-smoke.test.ts
+  bb1bbd30e6b50014 118-119,152-160
+packages/triggers/src/builtin-registry.ts
+  bb1bbd30e6b50014 1-23
+packages/triggers/src/resolve-driver.ts
+  bb1bbd30e6b50014 9,47-52
+packages/triggers/src/resolve-guard.ts
+  bb1bbd30e6b50014 8,32-37
+tests/docker/test-triggers.json
+  bb1bbd30e6b50014 1-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "dfb6a977480c3c8e7439de255dfd046f292b31d2",
+  "prompts": {
+    "bb1bbd30e6b50014": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ed3ffb2-d180-47ee-9884-0607d845114e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 70,
+      "total_deletions": 4,
+      "accepted_lines": 68,
+      "overriden_lines": 0
+    }
+  }
+}
