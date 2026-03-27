@@ -63,6 +63,22 @@ describe("DockerSidecar", () => {
 	});
 
 	describe("create()", () => {
+		test("proxy container has ReadonlyRootfs enabled", async () => {
+			await sidecar.create(instanceId, { proxyConfig: "static_resources: {}" });
+
+			const [, proxyBody] = mock.calls.createContainer[0]!.args;
+			expect(proxyBody.HostConfig.ReadonlyRootfs).toBe(true);
+		});
+
+		test("iptables init blocks link-local range (covers metadata server)", async () => {
+			await sidecar.create(instanceId, { proxyConfig: "config" });
+
+			const [, initBody] = mock.calls.createContainer[1]!.args;
+			const script = (initBody.Cmd as string[]).join(" ");
+			expect(script).toContain("169.254.0.0/16");
+			expect(script).toContain("DROP");
+		});
+
 		test("creates proxy and iptables-init containers with correct network mode", async () => {
 			await sidecar.create(instanceId, { proxyConfig: "static_resources: {}" });
 
@@ -209,6 +225,43 @@ describe("DockerSidecar", () => {
 
 			expect(existsSync(state.configPath)).toBe(false);
 			expect(existsSync(state.certsDir!)).toBe(false);
+		});
+	});
+
+	describe("blockMetadataServer()", () => {
+		test("creates, starts, waits, and removes an init container", async () => {
+			await sidecar.blockMetadataServer(instanceId);
+
+			const name = `${instanceId}-metadata-block`;
+			expect(mock.calls.createContainer[0]?.args[0]).toBe(name);
+			expect(mock.calls.startContainer[0]?.args[0]).toBe(name);
+			expect(mock.calls.waitContainer[0]?.args[0]).toBe(name);
+			expect(mock.calls.removeContainer[0]?.args[0]).toBe(name);
+		});
+
+		test("init container shares workload network namespace and has NET_ADMIN cap", async () => {
+			await sidecar.blockMetadataServer(instanceId);
+
+			const [, body] = mock.calls.createContainer[0]!.args;
+			expect(body.HostConfig.NetworkMode).toBe(`container:${instanceId}`);
+			expect(body.HostConfig.CapAdd).toContain("NET_ADMIN");
+			expect(body.HostConfig.CapDrop).toContain("ALL");
+		});
+
+		test("init command drops link-local range", async () => {
+			await sidecar.blockMetadataServer(instanceId);
+
+			const [, body] = mock.calls.createContainer[0]!.args;
+			const script = (body.Cmd as string[]).join(" ");
+			expect(script).toContain("169.254.0.0/16");
+			expect(script).toContain("DROP");
+		});
+
+		test("throws DockerRuntimeError when init exits non-zero", async () => {
+			mock.setWaitResult({ StatusCode: 1 });
+			mock.setLogsResult("iptables error");
+
+			await expect(sidecar.blockMetadataServer(instanceId)).rejects.toThrow(DockerRuntimeError);
 		});
 	});
 

@@ -12,7 +12,7 @@ export const ENVOY_PROXY_PORT = 18080;
 export interface TranslationResult {
 	pod: K8sPod;
 	service?: K8sService;
-	networkPolicy?: K8sNetworkPolicy;
+	networkPolicy: K8sNetworkPolicy;
 }
 
 /**
@@ -54,10 +54,10 @@ export function workloadToPod(
 		name: "main",
 		image: imageRef,
 		securityContext: {
-			capabilities: {
-				drop: ["NET_RAW", "MKNOD", "AUDIT_WRITE"],
-			},
+			capabilities: { drop: ["ALL"] },
 			allowPrivilegeEscalation: false,
+			runAsNonRoot: true,
+			readOnlyRootFilesystem: false,
 		},
 	};
 
@@ -164,6 +164,12 @@ export function workloadToPod(
 				limits: { cpu: "100m", memory: "64Mi" },
 				requests: { cpu: "50m", memory: "32Mi" },
 			},
+			securityContext: {
+				capabilities: { drop: ["ALL"] },
+				allowPrivilegeEscalation: false,
+				runAsNonRoot: true,
+				readOnlyRootFilesystem: true,
+			},
 		});
 	}
 
@@ -176,6 +182,14 @@ export function workloadToPod(
 			labels,
 		},
 		spec: {
+			automountServiceAccountToken: false,
+			hostNetwork: false,
+			hostPID: false,
+			hostIPC: false,
+			securityContext: {
+				runAsNonRoot: true,
+				seccompProfile: { type: "RuntimeDefault" },
+			},
 			containers,
 			restartPolicy: "Never",
 			...(volumes.length > 0 ? { volumes } : {}),
@@ -208,32 +222,67 @@ export function workloadToPod(
 		};
 	}
 
-	// NetworkPolicy: restrict egress to DNS + HTTPS when sidecar is active
-	let networkPolicy: K8sNetworkPolicy | undefined;
-	if (proxyConfig) {
+	// NetworkPolicy: always enforce egress controls based on workload network access level.
+	// The link-local range (169.254.0.0/16) is blocked in all permissive tiers to prevent
+	// access to cloud metadata servers (e.g. AWS IMDSv2 at 169.254.169.254).
+	const LINK_LOCAL_CIDR = "169.254.0.0/16";
+	const access = workload.network?.access ?? "none";
+
+	const networkPolicyBase = {
+		apiVersion: "networking.k8s.io/v1" as const,
+		kind: "NetworkPolicy" as const,
+		metadata: {
+			name: `${instanceId}-restrict`,
+			namespace,
+			labels,
+		},
+		spec: {
+			podSelector: { matchLabels: { [INSTANCE_ID_LABEL]: instanceId } },
+			policyTypes: ["Egress"],
+		},
+	};
+
+	let networkPolicy: K8sNetworkPolicy;
+	if (access === "outbound") {
 		networkPolicy = {
-			apiVersion: "networking.k8s.io/v1",
-			kind: "NetworkPolicy",
-			metadata: {
-				name: `${instanceId}-restrict`,
-				namespace,
-				labels,
-			},
+			...networkPolicyBase,
 			spec: {
-				podSelector: { matchLabels: { [INSTANCE_ID_LABEL]: instanceId } },
-				policyTypes: ["Egress"],
+				...networkPolicyBase.spec,
 				egress: [
 					{
-						ports: [
-							{ protocol: "UDP", port: 53 },
-							{ protocol: "TCP", port: 53 },
-						],
+						ports: [{ protocol: "UDP", port: 53 }, { protocol: "TCP", port: 53 }],
+						to: [{ namespaceSelector: {} }],
+					},
+					{
+						to: [{ ipBlock: { cidr: "0.0.0.0/0", except: [LINK_LOCAL_CIDR] } }],
+					},
+				],
+			},
+		};
+	} else if (access === "restricted") {
+		networkPolicy = {
+			...networkPolicyBase,
+			spec: {
+				...networkPolicyBase.spec,
+				egress: [
+					{
+						ports: [{ protocol: "UDP", port: 53 }, { protocol: "TCP", port: 53 }],
 						to: [{ namespaceSelector: {} }],
 					},
 					{
 						ports: [{ protocol: "TCP", port: 443 }],
+						to: [{ ipBlock: { cidr: "0.0.0.0/0", except: [LINK_LOCAL_CIDR] } }],
 					},
 				],
+			},
+		};
+	} else {
+		// access === "none": deny all egress
+		networkPolicy = {
+			...networkPolicyBase,
+			spec: {
+				...networkPolicyBase.spec,
+				egress: [],
 			},
 		};
 	}

@@ -21,6 +21,8 @@ interface ManagedInstance {
 	ports: number[];
 	/** Whether this instance has an Envoy proxy sidecar. */
 	hasSidecar: boolean;
+	/** Whether to run a metadata server block init on start (non-none access, no sidecar). */
+	metadataBlock: boolean;
 	/** Sidecar state for cleanup. Only present when hasSidecar is true. */
 	sidecarState?: SidecarState;
 	/** Mapping from container overlay dir → host dir backing the bind mount. */
@@ -173,6 +175,7 @@ export class DockerRuntime implements Runtime {
 			running: false,
 			ports: [],
 			hasSidecar,
+			metadataBlock: !hasSidecar && workload.network.access !== "none",
 			sidecarState,
 			overlayDirMap,
 		});
@@ -187,6 +190,8 @@ export class DockerRuntime implements Runtime {
 
 		if (instance.hasSidecar) {
 			await this.sidecar.start(handle.instanceId);
+		} else if (instance.metadataBlock) {
+			await this.sidecar.blockMetadataServer(handle.instanceId);
 		}
 
 		instance.running = true;

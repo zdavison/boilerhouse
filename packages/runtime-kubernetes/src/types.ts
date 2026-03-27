@@ -109,12 +109,24 @@ export interface K8sSecurityContext {
 		add?: string[];
 	};
 	allowPrivilegeEscalation?: boolean;
+	runAsNonRoot?: boolean;
+	readOnlyRootFilesystem?: boolean;
+}
+
+export interface K8sPodSecurityContext {
+	runAsNonRoot?: boolean;
+	seccompProfile?: { type: string };
 }
 
 export interface K8sPodSpec {
 	containers: K8sContainer[];
 	restartPolicy?: "Always" | "OnFailure" | "Never";
 	volumes?: K8sVolume[];
+	automountServiceAccountToken?: boolean;
+	hostNetwork?: boolean;
+	hostPID?: boolean;
+	hostIPC?: boolean;
+	securityContext?: K8sPodSecurityContext;
 }
 
 export interface K8sPod {
@@ -193,7 +205,10 @@ export interface K8sNetworkPolicy {
 		policyTypes: string[];
 		egress?: Array<{
 			ports?: Array<{ protocol: string; port: number }>;
-			to?: Array<{ namespaceSelector: Record<string, never> }>;
+			to?: Array<{
+				namespaceSelector?: Record<string, never>;
+				ipBlock?: { cidr: string; except?: string[] };
+			}>;
 		}>;
 	};
 }

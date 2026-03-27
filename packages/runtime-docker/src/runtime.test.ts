@@ -134,6 +134,7 @@ function createMockSidecar() {
 		create: [] as MockCall<unknown[]>[],
 		start: [] as MockCall<[string]>[],
 		destroy: [] as MockCall<[string, SidecarState]>[],
+		blockMetadataServer: [] as MockCall<[string]>[],
 	};
 
 	const sidecar = {
@@ -145,6 +146,7 @@ function createMockSidecar() {
 		destroy: async (id: string, state: SidecarState) => {
 			calls.destroy.push({ args: [id, state] });
 		},
+		blockMetadataServer: async (id: string) => { calls.blockMetadataServer.push({ args: [id] }); },
 		prepareCaCert: () => ({ caCertPath: "/tmp/ca.crt", binds: [], env: {} }),
 	} as unknown as DockerSidecar;
 
@@ -173,6 +175,7 @@ function registerFakeInstance(
 		running?: boolean;
 		ports?: number[];
 		hasSidecar?: boolean;
+		metadataBlock?: boolean;
 		sidecarState?: SidecarState;
 		overlayDirMap?: Map<string, string>;
 	} = {},
@@ -183,6 +186,7 @@ function registerFakeInstance(
 		running: opts.running ?? false,
 		ports: opts.ports ?? [],
 		hasSidecar: opts.hasSidecar ?? false,
+		metadataBlock: opts.metadataBlock ?? false,
 		sidecarState: opts.sidecarState,
 		overlayDirMap: opts.overlayDirMap,
 	});
@@ -511,6 +515,26 @@ describe("DockerRuntime", () => {
 			await runtime.create(bridgeWorkload(), instanceId);
 			expect(sidecarMock.calls.create).toHaveLength(0);
 		});
+
+		test("sets metadataBlock=true for non-none access without sidecar", async () => {
+			const instanceId = generateInstanceId();
+			const workload: Workload = {
+				...minimalWorkload(),
+				network: { access: "outbound" },
+			};
+			await runtime.create(workload, instanceId);
+
+			const instances = (runtime as unknown as Record<string, unknown>).instances as Map<string, { metadataBlock: boolean }>;
+			expect(instances.get(instanceId)?.metadataBlock).toBe(true);
+		});
+
+		test("sets metadataBlock=false for access=none", async () => {
+			const instanceId = generateInstanceId();
+			await runtime.create(minimalWorkload(), instanceId);
+
+			const instances = (runtime as unknown as Record<string, unknown>).instances as Map<string, { metadataBlock: boolean }>;
+			expect(instances.get(instanceId)?.metadataBlock).toBe(false);
+		});
 	});
 
 	// ── start() ──────────────────────────────────────────────────────────────
@@ -538,6 +562,23 @@ describe("DockerRuntime", () => {
 
 			await runtime.start({ instanceId, running: false });
 			expect(sidecarMock.calls.start).toHaveLength(0);
+		});
+
+		test("calls blockMetadataServer when metadataBlock=true", async () => {
+			const instanceId = generateInstanceId();
+			registerFakeInstance(runtime, instanceId, { metadataBlock: true });
+
+			await runtime.start({ instanceId, running: false });
+			expect(sidecarMock.calls.blockMetadataServer).toHaveLength(1);
+			expect(sidecarMock.calls.blockMetadataServer[0]?.args[0]).toBe(instanceId);
+		});
+
+		test("does not call blockMetadataServer when metadataBlock=false", async () => {
+			const instanceId = generateInstanceId();
+			registerFakeInstance(runtime, instanceId, { metadataBlock: false });
+
+			await runtime.start({ instanceId, running: false });
+			expect(sidecarMock.calls.blockMetadataServer).toHaveLength(0);
 		});
 
 		test("marks instance as running", async () => {

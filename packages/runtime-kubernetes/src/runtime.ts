@@ -123,9 +123,7 @@ export class KubernetesRuntime implements Runtime {
 			}
 		}
 
-		if (networkPolicy) {
-			await this.client.createNetworkPolicy(this.namespace, networkPolicy).catch(() => {});
-		}
+		await this.client.createNetworkPolicy(this.namespace, networkPolicy).catch(() => {});
 
 		this.pods.set(instanceId, { instanceId, running: false, portForwards: new Map() });
 

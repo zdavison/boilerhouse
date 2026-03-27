@@ -62,6 +62,7 @@ export interface ContainerCreateBody {
 		PortBindings?: Record<string, Array<{ HostPort: string }>>;
 		Binds?: string[];
 		Tmpfs?: Record<string, string>;
+		ReadonlyRootfs?: boolean;
 		Resources?: {
 			CpuQuota?: number;
 			CpuPeriod?: number;

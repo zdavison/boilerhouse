@@ -214,6 +214,62 @@ describe("workloadToPod", () => {
 		expect(pod.spec.restartPolicy).toBe("Never");
 	});
 
+	// ── Security hardening ─────────────────────────────────────────────
+
+	test("main container drops ALL capabilities", () => {
+		const workload = makeWorkload();
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+		const sc = pod.spec.containers[0]!.securityContext!;
+
+		expect(sc.capabilities?.drop).toEqual(["ALL"]);
+	});
+
+	test("main container has runAsNonRoot and allowPrivilegeEscalation disabled", () => {
+		const workload = makeWorkload();
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+		const sc = pod.spec.containers[0]!.securityContext!;
+
+		expect(sc.runAsNonRoot).toBe(true);
+		expect(sc.allowPrivilegeEscalation).toBe(false);
+	});
+
+	test("pod spec disables service account token automount", () => {
+		const workload = makeWorkload();
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		expect(pod.spec.automountServiceAccountToken).toBe(false);
+	});
+
+	test("pod spec blocks host namespace sharing", () => {
+		const workload = makeWorkload();
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		expect(pod.spec.hostNetwork).toBe(false);
+		expect(pod.spec.hostPID).toBe(false);
+		expect(pod.spec.hostIPC).toBe(false);
+	});
+
+	test("pod spec has RuntimeDefault seccomp profile and runAsNonRoot", () => {
+		const workload = makeWorkload();
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		expect(pod.spec.securityContext?.runAsNonRoot).toBe(true);
+		expect(pod.spec.securityContext?.seccompProfile?.type).toBe("RuntimeDefault");
+	});
+
+	test("sidecar container has hardened securityContext when proxyConfig provided", () => {
+		const workload = makeWorkload({
+			network: { access: "restricted" },
+		});
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, "config: {}");
+		const sc = pod.spec.containers[1]!.securityContext!;
+
+		expect(sc.capabilities?.drop).toEqual(["ALL"]);
+		expect(sc.allowPrivilegeEscalation).toBe(false);
+		expect(sc.runAsNonRoot).toBe(true);
+		expect(sc.readOnlyRootFilesystem).toBe(true);
+	});
+
 	test("no volumes when no overlay_dirs", () => {
 		const workload = makeWorkload();
 		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
@@ -336,11 +392,11 @@ describe("workloadToPod", () => {
 		});
 	});
 
-	test("creates NetworkPolicy when proxyConfig provided", () => {
+	test("creates NetworkPolicy for restricted access (always, not just with proxyConfig)", () => {
 		const workload = makeWorkload({
 			network: { access: "restricted" },
 		});
-		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE, undefined, "config: {}");
+		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
 
 		expect(networkPolicy).toBeDefined();
 		expect(networkPolicy!.apiVersion).toBe("networking.k8s.io/v1");
@@ -353,17 +409,63 @@ describe("workloadToPod", () => {
 		// DNS egress
 		expect(networkPolicy!.spec.egress![0]!.ports).toContainEqual({ protocol: "UDP", port: 53 });
 		expect(networkPolicy!.spec.egress![0]!.ports).toContainEqual({ protocol: "TCP", port: 53 });
-		// HTTPS egress
+		// HTTPS egress only
 		expect(networkPolicy!.spec.egress![1]!.ports).toContainEqual({ protocol: "TCP", port: 443 });
 	});
 
-	test("no sidecar, no NetworkPolicy when proxyConfig not provided", () => {
+	test("no sidecar when proxyConfig not provided", () => {
 		const workload = makeWorkload({
 			network: { access: "restricted" },
 		});
-		const { pod, networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+		const { pod } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
 
 		expect(pod.spec.containers).toHaveLength(1);
-		expect(networkPolicy).toBeUndefined();
+	});
+
+	// ── NetworkPolicy tiers ────────────────────────────────────────────
+
+	test("NetworkPolicy always created for access: none (deny all egress)", () => {
+		const workload = makeWorkload({ network: { access: "none" } });
+		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		expect(networkPolicy).toBeDefined();
+		expect(networkPolicy!.spec.policyTypes).toEqual(["Egress"]);
+		expect(networkPolicy!.spec.egress).toEqual([]);
+	});
+
+	test("NetworkPolicy for access: outbound allows DNS + all TCP egress", () => {
+		const workload = makeWorkload({ network: { access: "outbound" } });
+		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		expect(networkPolicy).toBeDefined();
+		const egress = networkPolicy!.spec.egress!;
+		// DNS rule
+		expect(egress[0]!.ports).toContainEqual({ protocol: "UDP", port: 53 });
+		expect(egress[0]!.ports).toContainEqual({ protocol: "TCP", port: 53 });
+		// All-traffic rule (no port restriction)
+		expect(egress[1]!.ports).toBeUndefined();
+		expect(egress[1]!.to).toBeDefined();
+	});
+
+	test("NetworkPolicy blocks link-local range (covers metadata server) for outbound access", () => {
+		const workload = makeWorkload({ network: { access: "outbound" } });
+		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		const allTrafficRule = networkPolicy!.spec.egress![1]!;
+		const ipBlock = allTrafficRule.to!.find((t) => t.ipBlock)?.ipBlock;
+		expect(ipBlock).toBeDefined();
+		const exceptions = ipBlock!.except ?? [];
+		expect(exceptions.some((e) => e === "169.254.0.0/16" || e === "169.254.169.254/32")).toBe(true);
+	});
+
+	test("NetworkPolicy blocks link-local range (covers metadata server) for restricted access", () => {
+		const workload = makeWorkload({ network: { access: "restricted" } });
+		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
+
+		const httpsRule = networkPolicy!.spec.egress![1]!;
+		const ipBlock = httpsRule.to!.find((t) => t.ipBlock)?.ipBlock;
+		expect(ipBlock).toBeDefined();
+		const exceptions = ipBlock!.except ?? [];
+		expect(exceptions.some((e) => e === "169.254.0.0/16" || e === "169.254.169.254/32")).toBe(true);
 	});
 });

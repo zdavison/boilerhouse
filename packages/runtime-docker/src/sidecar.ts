@@ -87,16 +87,18 @@ export class DockerSidecar {
 			HostConfig: {
 				CapDrop: ["ALL"],
 				SecurityOpt: ["no-new-privileges:true"],
+				ReadonlyRootfs: true,
 				NetworkMode: `container:${instanceId}`,
 				Binds: envoyBinds,
 			},
 		});
 
-		// iptables init container — sets up transparent redirect then exits.
+		// iptables init container — blocks metadata server, sets up transparent redirect, then exits.
 		await this.client.createContainer(`${instanceId}-iptables-init`, {
 			Image: IPTABLES_IMAGE,
 			Cmd: ["sh", "-c", [
 				"apk add --no-cache -q iptables",
+				"iptables -A OUTPUT -d 169.254.0.0/16 -j DROP",
 				"iptables -t nat -A OUTPUT -m owner --uid-owner 101 -j RETURN",
 				`iptables -t nat -A OUTPUT -p tcp --dport 80 -j REDIRECT --to-port ${ENVOY_HTTP_PORT}`,
 				`iptables -t nat -A OUTPUT -p tcp --dport 443 -j REDIRECT --to-port ${ENVOY_TLS_PORT}`,
@@ -132,6 +134,40 @@ export class DockerSidecar {
 			);
 		}
 		await this.client.removeContainer(`${instanceId}-iptables-init`);
+	}
+
+	/**
+	 * Runs a minimal iptables init container in the workload's network namespace
+	 * to block the cloud metadata server (169.254.0.0/16).
+	 * Used for outbound containers that have no Envoy sidecar.
+	 */
+	async blockMetadataServer(instanceId: string): Promise<void> {
+		const name = `${instanceId}-metadata-block`;
+		await this.client.createContainer(name, {
+			Image: IPTABLES_IMAGE,
+			Cmd: ["sh", "-c", [
+				"apk add --no-cache -q iptables",
+				"iptables -A OUTPUT -d 169.254.0.0/16 -j DROP",
+			].join(" && ")],
+			Labels: {
+				"boilerhouse.managed": "true",
+				"boilerhouse.role": "init",
+			},
+			HostConfig: {
+				CapDrop: ["ALL"],
+				CapAdd: ["NET_ADMIN"],
+				SecurityOpt: ["no-new-privileges:true"],
+				NetworkMode: `container:${instanceId}`,
+			},
+		});
+		await this.client.startContainer(name);
+		const { StatusCode } = await this.client.waitContainer(name);
+		await this.client.removeContainer(name);
+		if (StatusCode !== 0) {
+			throw new DockerRuntimeError(
+				`Metadata server block init failed (exit ${StatusCode}) for ${instanceId}`,
+			);
+		}
 	}
 
 	/**
