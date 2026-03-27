@@ -1,0 +1,33 @@
+README.md
+  ba85c08d7ed4ed51 74-75
+docs/deploy-checklist.md
+  ba85c08d7ed4ed51 9,53
+apps/cli/src/main.ts
+  ba85c08d7ed4ed51 30-31,35-41,60-68,74,78,86
+docs/deploy-vm.md
+  ba85c08d7ed4ed51 54-55,89,91-92,94,96-98,100,234,236,238
+apps/cli/src/commands/host-install.ts
+  ba85c08d7ed4ed51 124,126,134-135,144,150,198-206
+apps/cli/src/commands/api-install.ts
+  ba85c08d7ed4ed51 1,5-6,9-17,27-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "3325115d19e082a03de59600a6c965b642a8b688",
+  "prompts": {
+    "ba85c08d7ed4ed51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f901175-e56c-43b0-9ed4-7a402154bdbf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 69,
+      "accepted_lines": 90,
+      "overriden_lines": 0
+    }
+  }
+}

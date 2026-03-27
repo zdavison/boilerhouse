@@ -1,0 +1,29 @@
+apps/api/src/recovery.test.ts
+  5ee71ce2cded39a8 96
+apps/api/src/transitions.test.ts
+  5ee71ce2cded39a8 78
+packages/envoy-config/src/config.test.ts
+  5ee71ce2cded39a8 4,8-9,38-39,94-95,188,190
+packages/driver-openclaw/src/openclaw.test.ts
+  5ee71ce2cded39a8 3,5-6,8-9,12,14,16-17,20,24,28,31-32,53,61-63,67,70,73,79-80,83,86,91,93-95,98-99,104-111,113-116,120,122-127,129,133,137,140,144,150,154,157,161,167-168,170-175,177,181,183-185,188-193,195-196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "85ee25850817e29991dba6bbdaac48d0fada37bc",
+  "prompts": {
+    "5ee71ce2cded39a8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6267500a-8409-4da4-8cea-7b9c77656a88",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 95,
+      "total_deletions": 354,
+      "accepted_lines": 95,
+      "overriden_lines": 0
+    }
+  }
+}

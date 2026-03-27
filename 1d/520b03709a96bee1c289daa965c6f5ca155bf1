@@ -1,0 +1,35 @@
+packages/storage/src/index.ts
+  09c0e5a98c7b3d78 7-8
+packages/storage/src/encrypted-store.test.ts
+  09c0e5a98c7b3d78 1-141
+packages/storage/src/encrypted-store.ts
+  09c0e5a98c7b3d78 1-109
+apps/api/src/tenant-data.ts
+  09c0e5a98c7b3d78 10-16,18-20,25-37,50,52-53,72,74-75,92,94,96,118,120-121
+packages/core/src/workload.ts
+  09c0e5a98c7b3d78 118-119,310-311
+apps/api/src/bootstrap.ts
+  09c0e5a98c7b3d78 174-175,186-190,221-224
+packages/storage/src/factory.ts
+  09c0e5a98c7b3d78 4-5,29-35,44-45,50,53-69,72-73,76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "1d520b03709a96bee1c289daa965c6f5ca155bf1",
+  "prompts": {
+    "09c0e5a98c7b3d78": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "404b5bff-79ab-455c-a96b-defd13f69855",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 393,
+      "total_deletions": 86,
+      "accepted_lines": 336,
+      "overriden_lines": 0
+    }
+  }
+}

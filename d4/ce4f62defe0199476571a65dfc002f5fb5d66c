@@ -1,0 +1,51 @@
+.kadai/actions/tests/e2e.sh
+  b91984ee343656aa 8
+.kadai/actions/tests/security-breakout.sh
+  b91984ee343656aa 8,89
+packages/runtime-kubernetes/src/translator.ts
+  7c07b89afdcb99e2 56-61
+tests/security/container-breakout/tools.ts
+  b91984ee343656aa 1-54
+tests/security/container-breakout/breakout.test.ts
+  7c07b89afdcb99e2 26-28,31,36-63,65-66,120-122
+  b91984ee343656aa 1-25,29-30,32-35,64,67-119,123-158
+.kadai/actions/tests/security.sh
+  b91984ee343656aa 8
+.gitignore
+  b91984ee343656aa 13
+packages/runtime-kubernetes/src/types.ts
+  7c07b89afdcb99e2 95,112-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "d4ce4f62defe0199476571a65dfc002f5fb5d66c",
+  "prompts": {
+    "7c07b89afdcb99e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65882158-678c-404a-b92e-a050d58a4b7b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 52,
+      "accepted_lines": 52,
+      "overriden_lines": 0
+    },
+    "b91984ee343656aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7491857c-4e89-4fbe-a306-2bb1c3a1f845",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 440,
+      "total_deletions": 144,
+      "accepted_lines": 269,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,41 @@
+packages/o11y/src/instrument.ts
+  09c0e5a98c7b3d78 3,50-51,115-121,123
+apps/dashboard/src/prometheus.ts
+  09c0e5a98c7b3d78 230-304
+packages/triggers/src/adapters/slack.ts
+  09c0e5a98c7b3d78 151-152
+apps/api/src/bootstrap.test.ts
+  09c0e5a98c7b3d78 8
+apps/dashboard/src/pages/MetricsPage.tsx
+  09c0e5a98c7b3d78 11,18,118-121,126,130,132,134-138,144,157-169,206-213,220-221,284,293-295,402,411
+apps/api/src/bootstrap.ts
+  09c0e5a98c7b3d78 36-52,68-70,74,91-99,104-111,174,178-183,185,188,298,351-353,357-358,361-363,369
+packages/triggers/src/adapters/telegram.ts
+  09c0e5a98c7b3d78 118-119
+packages/triggers/src/dispatcher.test.ts
+  09c0e5a98c7b3d78 90,97-98,104,108-109,530,532,537-538,542-543
+apps/dashboard/src/server.ts
+  09c0e5a98c7b3d78 5,41-58
+packages/triggers/src/adapters/telegram-poll.ts
+  09c0e5a98c7b3d78 173-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "ce03f9042836f35113c8b7c60c40ec58de870add",
+  "prompts": {
+    "09c0e5a98c7b3d78": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "404b5bff-79ab-455c-a96b-defd13f69855",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 265,
+      "total_deletions": 152,
+      "accepted_lines": 229,
+      "overriden_lines": 0
+    }
+  }
+}

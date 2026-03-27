@@ -1,0 +1,164 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "09fc7a5cd4998b1dc0f99074711b95d9e84699f9",
+  "prompts": {
+    "0afbbab91a95db05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c48408d-571f-4a51-bd9f-a088a4866bb7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 2271,
+      "total_deletions": 209,
+      "accepted_lines": 2137,
+      "overriden_lines": 0
+    },
+    "39236d7def7b34ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f1dd6d8-4dab-413f-806b-cde49168cb81",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 0,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    },
+    "472c586191ea3e28": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3d5aa7b1-7dea-4daa-a1bf-30999a1804a1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 66,
+      "total_deletions": 40,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    },
+    "48d05ca9c75884b9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "00bfd5e1-dead-46ae-84aa-654a280d5f51",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1944,
+      "total_deletions": 28,
+      "accepted_lines": 1930,
+      "overriden_lines": 0
+    },
+    "58fd82695e8d9e79": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "050ffced-66bc-4273-b419-bbf0dea6444b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1728,
+      "total_deletions": 775,
+      "accepted_lines": 1701,
+      "overriden_lines": 0
+    },
+    "8ef96b45cc44e3bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bdd363da-3f51-4ca1-a8dc-e53ab982c7c9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 30,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    },
+    "9413a43274ad154a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c9e56e1-c42d-44d5-9599-ba9f93ccbd94",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 4,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "94a4c346aa3d0eed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d52df280-1efa-4fa6-89bd-f16452ade911",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 8,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "ba85c08d7ed4ed51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f901175-e56c-43b0-9ed4-7a402154bdbf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 69,
+      "accepted_lines": 90,
+      "overriden_lines": 0
+    },
+    "c0f7733eae062c13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7fa9df2f-f5b8-4ab5-8d4f-271f106dcf52",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 914,
+      "total_deletions": 258,
+      "accepted_lines": 914,
+      "overriden_lines": 0
+    },
+    "f20307f1adf48276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1f2dadc-159a-41cb-a363-0ed9a9885af9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 642,
+      "total_deletions": 254,
+      "accepted_lines": 584,
+      "overriden_lines": 1
+    },
+    "ff2ac4230eb0ae06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa5eb0fb-b32f-4ebb-9d9d-30ee3ce46abf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1521,
+      "total_deletions": 814,
+      "accepted_lines": 912,
+      "overriden_lines": 0
+    }
+  }
+}

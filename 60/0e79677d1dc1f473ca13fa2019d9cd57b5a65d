@@ -1,0 +1,31 @@
+packages/triggers/src/trigger-queue-manager.ts
+  f6269b598276a041 1-153
+packages/triggers/src/trigger-queue-manager.test.ts
+  f6269b598276a041 1-482
+docker-compose.yml
+  f6269b598276a041 48-52
+packages/triggers/src/index.ts
+  f6269b598276a041 31-33
+apps/api/src/routes/trigger-adapters.ts
+  f6269b598276a041 5,11-12,188-191,193-203,206,211,224,288,294-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "600e79677d1dc1f473ca13fa2019d9cd57b5a65d",
+  "prompts": {
+    "f6269b598276a041": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae8f4bff-8298-4b07-b00b-d562e3e2fb84",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 670,
+      "total_deletions": 8,
+      "accepted_lines": 669,
+      "overriden_lines": 0
+    }
+  }
+}

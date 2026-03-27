@@ -1,0 +1,63 @@
+packages/core/package.json
+  69d66e49be73924c 5
+packages/db/package.json
+  69d66e49be73924c 5
+packages/storage/package.json
+  69d66e49be73924c 5
+apps/cli/package.json
+  69d66e49be73924c 5
+packages/guard-api/package.json
+  69d66e49be73924c 5
+packages/o11y/package.json
+  69d66e49be73924c 5
+apps/dashboard/package.json
+  69d66e49be73924c 5
+tests/package.json
+  69d66e49be73924c 4
+apps/api/package.json
+  69d66e49be73924c 5
+apps/trigger-gateway/package.json
+  69d66e49be73924c 5
+package.json
+  69d66e49be73924c 4-8
+packages/runtime-kubernetes/package.json
+  69d66e49be73924c 5
+packages/envoy-config/package.json
+  69d66e49be73924c 5
+packages/driver-claude-code/package.json
+  69d66e49be73924c 5
+packages/runtime-docker/package.json
+  69d66e49be73924c 5
+packages/triggers/package.json
+  69d66e49be73924c 5
+README.md
+  69d66e49be73924c 1-15
+Dockerfile
+  69d66e49be73924c 1,4-6,8,10,18-19
+workloads/package.json
+  69d66e49be73924c 5
+packages/driver-openclaw/package.json
+  69d66e49be73924c 5
+packages/guard-allowlist/package.json
+  69d66e49be73924c 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "5e586ec85a5490c082e60c244af90fcff924c424",
+  "prompts": {
+    "69d66e49be73924c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dacb5ca1-16e9-4184-95d0-3dac0b4376fc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 86,
+      "total_deletions": 60,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}

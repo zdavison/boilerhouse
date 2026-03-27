@@ -1,0 +1,40 @@
+docs/plans/prometheus.md
+  4abe564834dab930 1-593
+docs/plans/lifecycle-hooks.md
+  f1e6a90246150199 1-321
+docs/plans/unfinished.md
+  f1e6a90246150199 1-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "65efb7448157980e56c2fcc1120ed19aaf0ff40f",
+  "prompts": {
+    "4abe564834dab930": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6311de80-eab9-4133-92e4-408cdb509c8e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 878,
+      "total_deletions": 285,
+      "accepted_lines": 593,
+      "overriden_lines": 0
+    },
+    "f1e6a90246150199": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac8acd3d-aff7-41a5-9cc2-33e3673654c3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 615,
+      "total_deletions": 154,
+      "accepted_lines": 461,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,31 @@
+packages/o11y/src/metrics/tenants.ts
+  b462ad3524a51a52 9,15-16,59-69
+apps/dashboard/src/pages/MetricsPage.tsx
+  b462ad3524a51a52 1,6,107-111,114-139,143,145-150,152-154,156-173,179-181,183-189,193,196-233,245-253,255-259,264-266,268-269,271-280,283,354,356-358,360-368,370-374,377,382-384,386-408,416-419,425-427,429-436,438-462,464-470,474,476-479,482-484,486-491,494,500-502,504-505,507,509,511-514,521-523,526,528-532,619-620
+packages/o11y/src/metrics/node.ts
+  b462ad3524a51a52 2-3,9-10,28-91,95-98,103,110,118-119,122-123,126-127,129-130,141,155,160
+packages/o11y/src/instrument.ts
+  b462ad3524a51a52 1-2,98-117,285,296
+deploy/grafana/boilerhouse.json
+  b462ad3524a51a52 529,535,578
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "3dade2f64b0281fd35b64b4066726aaac5bbea74",
+  "prompts": {
+    "b462ad3524a51a52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b6f31237-5cf5-4e44-bde7-bc863863e989",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 485,
+      "total_deletions": 319,
+      "accepted_lines": 406,
+      "overriden_lines": 0
+    }
+  }
+}

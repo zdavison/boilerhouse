@@ -1,0 +1,25 @@
+packages/runtime-docker/src/runtime.ts
+  ef6419271f50ebf8 233-234
+packages/runtime-docker/src/client.ts
+  ef6419271f50ebf8 220-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "969171b0ebb1b53ea6579ee509423157630194fb",
+  "prompts": {
+    "ef6419271f50ebf8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c27c5c8e-87b0-4950-b3b1-2f7e91c34522",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 1,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}

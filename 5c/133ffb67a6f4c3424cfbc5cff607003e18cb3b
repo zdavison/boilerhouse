@@ -1,0 +1,47 @@
+tests/e2e/pause-before-extract.e2e.test.ts
+  69d66e49be73924c 3
+packages/triggers/src/dispatcher.ts
+  69d66e49be73924c 152
+packages/envoy-config/src/config.test.ts
+  69d66e49be73924c 4
+packages/guard-api/src/index.test.ts
+  69d66e49be73924c 14
+apps/api/src/routes/tenants.test.ts
+  69d66e49be73924c 41,103,156
+packages/storage/src/encrypted-store.ts
+  69d66e49be73924c 2-3
+packages/triggers/src/dispatcher.test.ts
+  69d66e49be73924c 3,433,446
+apps/api/src/routes/workloads.test.ts
+  69d66e49be73924c 4
+packages/triggers/src/trigger-queue-manager.test.ts
+  69d66e49be73924c 1
+packages/runtime-kubernetes/src/client.ts
+  69d66e49be73924c 93
+packages/o11y/src/instrument.ts
+  69d66e49be73924c 350
+apps/api/src/routes/input-guards.ts
+  69d66e49be73924c 11
+apps/api/src/health-check.test.ts
+  69d66e49be73924c 249,251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "5c133ffb67a6f4c3424cfbc5cff607003e18cb3b",
+  "prompts": {
+    "69d66e49be73924c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dacb5ca1-16e9-4184-95d0-3dac0b4376fc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 22,
+      "total_deletions": 48,
+      "accepted_lines": 20,
+      "overriden_lines": 0
+    }
+  }
+}

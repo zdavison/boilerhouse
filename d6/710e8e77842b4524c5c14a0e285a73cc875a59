@@ -1,0 +1,137 @@
+packages/runtime-docker/src/image-resolver.test.ts
+  58fd82695e8d9e79 1-101
+apps/api/src/routes/instances.ts
+  58fd82695e8d9e79 6
+apps/api/src/bootstrap.ts
+  58fd82695e8d9e79 1-324
+packages/runtime-kubernetes/src/minikube.ts
+  58fd82695e8d9e79 2,5-6,17,23-30,42
+workloads/claude-code/bridge.mjs
+  6b7eda4d0cfd6ef7 1-232
+apps/api/src/transitions.ts
+  58fd82695e8d9e79 11,130-136
+apps/api/src/instance-manager.ts
+  58fd82695e8d9e79 1,13,15,18,23,25,214,216-217,221,232
+apps/api/src/tenant-manager.ts
+  58fd82695e8d9e79 9,11-12,22,29,64-65,130-277,279-280,322-323,331-332
+packages/core/src/snapshot.ts
+  58fd82695e8d9e79 89-95
+packages/core/src/index.ts
+  58fd82695e8d9e79 79,150-160
+packages/runtime-kubernetes/src/runtime.ts
+  58fd82695e8d9e79 11-12,32,57,83-84,323-325,357-381
+packages/runtime-docker/src/sidecar.ts
+  58fd82695e8d9e79 1-151
+workloads/claude-code.workload.ts
+  6b7eda4d0cfd6ef7 1-45
+packages/runtime-docker/src/runtime.ts
+  58fd82695e8d9e79 1,3,6,13-15,24-25,33-34,39-40,59,96,98,100-105,151-153,159-160,162-165,167,176,189,200-201,292-305
+packages/core/src/image-resolver.ts
+  58fd82695e8d9e79 1-35
+apps/api/src/bootstrap.test.ts
+  58fd82695e8d9e79 1-208
+packages/driver-claude-code/src/index.ts
+  6b7eda4d0cfd6ef7 1
+docs/plans/refactoring-26_03_2026.md
+  58fd82695e8d9e79 1-152
+workloads/claude-code/Dockerfile
+  6b7eda4d0cfd6ef7 1-28
+apps/api/src/event-bus.ts
+  58fd82695e8d9e79 8
+apps/api/src/routes/errors.ts
+  58fd82695e8d9e79 2
+packages/runtime-docker/src/index.ts
+  58fd82695e8d9e79 4
+packages/driver-claude-code/tsconfig.json
+  6b7eda4d0cfd6ef7 1-11
+.kadai/actions/kill.sh
+  68a87ea743b5a6ab 1-59
+packages/core/src/fake-runtime.ts
+  58fd82695e8d9e79 135-140
+packages/core/src/claim-result.ts
+  58fd82695e8d9e79 1-16
+apps/api/src/proxy/config.ts
+  58fd82695e8d9e79 1-42
+apps/api/src/tenant-data.ts
+  58fd82695e8d9e79 104-118
+packages/triggers/src/dispatcher.ts
+  58fd82695e8d9e79 1,5
+packages/core/src/runtime.ts
+  58fd82695e8d9e79 118-126
+apps/api/src/server.ts
+  58fd82695e8d9e79 1-2,5-6,8,10-11
+packages/runtime-docker/src/image-resolver.ts
+  58fd82695e8d9e79 1-82
+workloads/tg-claude-code.trigger.ts
+  6b7eda4d0cfd6ef7 1-15
+packages/driver-claude-code/package.json
+  6b7eda4d0cfd6ef7 1-15
+packages/driver-claude-code/src/claude-code.ts
+  6b7eda4d0cfd6ef7 1-87
+.kadai/actions/presets/claude-code.sh
+  6b7eda4d0cfd6ef7 1-3,5-77
+.kadai/actions/dev.sh
+  fe80e1f0936f4ac7 12-13,18-19,102-104,124-129
+  58fd82695e8d9e79 113-123
+packages/runtime-docker/src/sidecar.test.ts
+  58fd82695e8d9e79 1-235
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "d6710e8e77842b4524c5c14a0e285a73cc875a59",
+  "prompts": {
+    "58fd82695e8d9e79": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "050ffced-66bc-4273-b419-bbf0dea6444b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 1728,
+      "total_deletions": 775,
+      "accepted_lines": 1701,
+      "overriden_lines": 0
+    },
+    "68a87ea743b5a6ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "893d374a-a18d-4336-bf4b-b82db8dbbf36",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 1,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    },
+    "6b7eda4d0cfd6ef7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f0b6cb4f-6aef-41c0-91f4-b5f82e3b9a44",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 847,
+      "total_deletions": 127,
+      "accepted_lines": 719,
+      "overriden_lines": 1
+    },
+    "fe80e1f0936f4ac7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6bdd3cb6-677c-4d66-8f99-a4b26d8a57e4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 2,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}

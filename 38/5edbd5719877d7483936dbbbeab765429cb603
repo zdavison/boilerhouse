@@ -1,0 +1,63 @@
+.kadai/actions/e2e.sh
+  9ac51c5ff152bc62 89-90,94,97
+apps/api/src/e2e/e2e-helpers.ts
+  9ac51c5ff152bc62 91-96,106
+packages/runtime-kubernetes/src/client.ts
+  9ac51c5ff152bc62 7-8,165-212
+packages/runtime-kubernetes/src/runtime.ts
+  9ac51c5ff152bc62 19,90,93-102,105-106,115-124,131,133-135,140-141,175,179-183,264-266,282-292,297-307,314-315
+packages/runtime-kubernetes/src/types.ts
+  9ac51c5ff152bc62 108,176-196
+packages/runtime-kubernetes/src/translator.ts
+  9ac51c5ff152bc62 3,9-11,15,31,38,136-163,205-235
+apps/boilerhouse-podmand/src/main.ts
+  9ac51c5ff152bc62 428,431-433
+.kadai/actions/minikube.sh
+  9ac51c5ff152bc62 85,87-89,106-110
+packages/runtime-kubernetes/src/translator.test.ts
+  9ac51c5ff152bc62 3,284-368
+packages/db/src/workload-loader.test.ts
+  9ac51c5ff152bc62 2,104-105,107-108
+docs/plans/envoy-sidecar-proxy.md
+  d0932d65f8d46640 6-8,10-59,62-64,66,68-74,113,116,119-120,122-123,131,133,135,142,144-145,147-150,152,156,162-163,167,180,206,229-230,248-249,252-254,256-258,262-264,266,268-273
+  9ac51c5ff152bc62 9
+packages/runtime-kubernetes/src/runtime.integration.test.ts
+  9ac51c5ff152bc62 26-28,30,42-43,51,66-99,106-109,233-296
+apps/api/src/e2e/secret-gateway.e2e.test.ts
+  9ac51c5ff152bc62 123-124
+apps/boilerhouse-podmand/src/main.test.ts
+  9ac51c5ff152bc62 153-158,162,171-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "385edbd5719877d7483936dbbbeab765429cb603",
+  "prompts": {
+    "9ac51c5ff152bc62": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cc3c12b-cc08-42a1-bd99-7eecf5f1edfe",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 548,
+      "total_deletions": 137,
+      "accepted_lines": 450,
+      "overriden_lines": 0
+    },
+    "d0932d65f8d46640": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0dd3a817-7770-47ea-bf54-27ec631b2596",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 112,
+      "total_deletions": 459,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    }
+  }
+}

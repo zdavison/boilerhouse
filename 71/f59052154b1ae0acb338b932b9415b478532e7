@@ -1,0 +1,121 @@
+apps/api/src/snapshot-manager.ts
+  45d584b33594b67b 72,86-102,104-109,131-150,161-167
+scripts/start-boilerhoused.sh
+  e95ee971bd38fcd3 9-14,18-26,29-33,35-36,42-43,78-79,84-95,99,105,107-111,116-118,148-149,151,155,157-160,163
+  3658fd8889697daf 27-28,115
+packages/runtime-podman/src/client.ts
+  45d584b33594b67b 385-402
+  e95ee971bd38fcd3 83
+packages/runtime-podman/src/backend.ts
+  45d584b33594b67b 13-20,47,92-98
+apps/api/src/e2e/runtime-detect.ts
+  45d584b33594b67b 2,31
+apps/api/src/e2e/e2e-helpers.ts
+  45d584b33594b67b 2,97
+packages/runtime-podman/src/index.ts
+  45d584b33594b67b 8
+apps/boilerhoused/package.json
+  45d584b33594b67b 12
+packages/runtime-podman/src/runtime.integration.test.ts
+  45d584b33594b67b 2,10
+packages/runtime-podman/src/daemon-backend.test.ts
+  45d584b33594b67b 98,101,105-106
+apps/boilerhoused/src/main.ts
+  3658fd8889697daf 2,108-110,112,301-309,311-322
+  45d584b33594b67b 4,8,48-49,111,246-251,291,293,299,323,461-471,501-503
+  e95ee971bd38fcd3 37-38,40-44,46-47,50-55,113
+.kadai/actions/daemon.sh
+  e95ee971bd38fcd3 11-66,70,72,75,80,86-90
+  45d584b33594b67b 93
+workloads/openclaw/Dockerfile
+  3658fd8889697daf 4,9-11
+  45d584b33594b67b 15-17,19-20
+workloads/openclaw.workload.ts
+  45d584b33594b67b 5-6,25,30,32-33
+packages/runtime-podman/src/types.ts
+  45d584b33594b67b 11
+scripts/setup-boilerhoused.sh
+  45d584b33594b67b 19
+CLAUDE.md
+  e95ee971bd38fcd3 15
+apps/api/src/server.ts
+  45d584b33594b67b 3,42
+apps/boilerhoused/src/macos.ts
+  45d584b33594b67b 1-89
+packages/core/src/index.ts
+  45d584b33594b67b 126-130
+packages/core/src/paths.ts
+  45d584b33594b67b 1-29
+packages/core/src/fake-runtime.ts
+  45d584b33594b67b 60
+packages/runtime-podman/src/daemon-backend.ts
+  45d584b33594b67b 2,30,39-43,102-109
+packages/runtime-podman/src/runtime.ts
+  45d584b33594b67b 5,33,45-53,58-64,283-290
+README.md
+  e95ee971bd38fcd3 63,83,111
+packages/core/src/runtime.ts
+  45d584b33594b67b 47,83-88
+.kadai/actions/containers.sh
+  45d584b33594b67b 8-12,14
+  e95ee971bd38fcd3 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "71f59052154b1ae0acb338b932b9415b478532e7",
+  "prompts": {
+    "3658fd8889697daf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c90c28fb-d4f2-4bcd-b266-1c625a5bc29b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 115,
+      "total_deletions": 63,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "45d584b33594b67b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "284d93cc-de8f-4e69-b65a-390071b7bd23",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 404,
+      "total_deletions": 169,
+      "accepted_lines": 324,
+      "overriden_lines": 2
+    },
+    "86f9f675c436b33c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dad07148-5219-468b-9a42-cb642e1875a5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 428,
+      "total_deletions": 0,
+      "accepted_lines": 428,
+      "overriden_lines": 0
+    },
+    "e95ee971bd38fcd3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ea5a63a-c37c-429d-a9f8-92dabfd72100",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 255,
+      "total_deletions": 72,
+      "accepted_lines": 148,
+      "overriden_lines": 0
+    }
+  }
+}

@@ -1,0 +1,79 @@
+apps/api/src/routes/errors.ts
+  c0f7733eae062c13 3,5-11,13-16,18-25,27-35
+apps/api/src/idle-integration.test.ts
+  c0f7733eae062c13 26,89-90,97
+apps/api/src/test-helpers.ts
+  c0f7733eae062c13 3,5,12,24-30,41,54,59
+apps/dashboard/src/pages/InstanceDetail.tsx
+  c0f7733eae062c13 1-247
+apps/api/src/app.ts
+  c0f7733eae062c13 30
+packages/triggers/src/adapters/cron.ts
+  c0f7733eae062c13 6,12,14-15,41-43
+apps/api/src/routes/tenants.ts
+  c0f7733eae062c13 8,17,67-70,123
+apps/api/src/recovery.test.ts
+  c0f7733eae062c13 31-32,40,128,153,168,181,195,219,236-237,247,262,277,292,306,310,314
+apps/api/src/instance-manager.test.ts
+  c0f7733eae062c13 21,68,107,111-115,125
+apps/dashboard/src/app.tsx
+  c0f7733eae062c13 8,43-44
+apps/dashboard/src/pages/ActivityLog.tsx
+  c0f7733eae062c13 1,32-38,76-85,124-126,129-133
+apps/trigger-gateway/src/server.ts
+  c0f7733eae062c13 32-34,44,50,97,126,133,147
+apps/api/src/routes/activity.ts
+  c0f7733eae062c13 2-4,8,14-36,39-50
+apps/api/src/audit-logger.ts
+  c0f7733eae062c13 1-163
+apps/api/src/tenant-manager.test.ts
+  c0f7733eae062c13 28,86-88,93,307
+apps/dashboard/src/api.ts
+  c0f7733eae062c13 231-239,260-262
+apps/api/src/routes/workloads.ts
+  c0f7733eae062c13 8,78
+apps/api/src/recovery.ts
+  c0f7733eae062c13 4,6,34,60,76,102-103
+apps/api/src/pool-manager.ts
+  c0f7733eae062c13 10,16,25,35,56,170,183-184
+apps/api/src/tenant-manager.ts
+  c0f7733eae062c13 18,28,50,122,364
+apps/dashboard/src/pages/WorkloadList.tsx
+  c0f7733eae062c13 248,250
+apps/api/src/routes/instances.ts
+  c0f7733eae062c13 10,100-129,150,184,217
+apps/api/src/idle-monitor.ts
+  c0f7733eae062c13 2,27,30,32,110
+apps/api/src/bootstrap.ts
+  c0f7733eae062c13 23,124,165,170,176,182,216,226
+docs/plans/holistic-logging.md
+  c0f7733eae062c13 1-208
+apps/api/src/pool-manager.test.ts
+  c0f7733eae062c13 20,80
+apps/api/src/routes/access-log.ts
+  c0f7733eae062c13 4-9,12,19,24-27,33-35,39
+apps/api/src/instance-manager.ts
+  c0f7733eae062c13 14,21,31,70-71,87,91,124,157
+apps/api/src/watch-dirs-poller.test.ts
+  c0f7733eae062c13 12,16,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "eb7d65a05557f8cbb495cad90165579eb8b853e9",
+  "prompts": {
+    "c0f7733eae062c13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7fa9df2f-f5b8-4ab5-8d4f-271f106dcf52",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 914,
+      "total_deletions": 258,
+      "accepted_lines": 914,
+      "overriden_lines": 0
+    }
+  }
+}

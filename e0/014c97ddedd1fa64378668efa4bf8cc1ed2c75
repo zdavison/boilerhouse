@@ -1,0 +1,152 @@
+apps/api/src/server.ts
+  f20307f1adf48276 176,186-187
+packages/core/src/instance-state.test.ts
+  cd65d08a4408b4ab 16-17,20-33,40-45,48-49,56-57,62,74-75,100,102,106,111-112,114-115,118
+tests/e2e/data-persistence.e2e.test.ts
+  f20307f1adf48276 82,114
+apps/api/src/tenant-manager.test.ts
+  f20307f1adf48276 129,227,312-366,409,450,466,482,501,509
+docs/plans/parallel-golden-restores.md
+  e71bfb62f69a1af6 1-379
+tests/e2e/instance-lifecycle.e2e.test.ts
+  f20307f1adf48276 69
+packages/core/src/work-queue.ts
+  3b1fbee5dc6f92e3 1-120
+tests/e2e/multi-tenant-claim.e2e.test.ts
+  f20307f1adf48276 58,63,72,75
+tests/e2e/concurrent-tenants.e2e.test.ts
+  f20307f1adf48276 72
+scripts/start-boilerhouse-podmand.sh
+  cd65d08a4408b4ab 129-132,146
+apps/api/src/idle-integration.test.ts
+  f20307f1adf48276 121,178
+packages/db/src/schema.ts
+  f20307f1adf48276 7,132,146
+tests/e2e/tenant-lifecycle.e2e.test.ts
+  f20307f1adf48276 58-61,71-73,80,90-91,109-111
+tests/e2e/snapshot-lifecycle.e2e.test.ts
+  f20307f1adf48276 51,93
+tests/e2e/events.e2e.test.ts
+  f20307f1adf48276 72
+tests/e2e/idle-timeout.e2e.test.ts
+  f20307f1adf48276 18-19,84-85
+apps/api/src/instance-manager.ts
+  cd65d08a4408b4ab 32,166-176,181-188,222,342-344,362
+  f20307f1adf48276 2,20,117,121-122,127,229,242,249-250,255,280-286,289,314-330,335,353-358,384-393
+tests/e2e/multi-workload-claim.e2e.test.ts
+  f20307f1adf48276 1-109
+apps/api/src/routes/tenants.ts
+  f20307f1adf48276 2,9-14,90,95,97,99-108,113,118,123,135-138,143,147,149,154-169,172-182,184-194,196
+apps/api/src/routes/secrets.ts
+  f20307f1adf48276 6,23,32,39
+packages/core/src/work-queue.test.ts
+  3b1fbee5dc6f92e3 1-151
+apps/api/src/transitions.ts
+  f20307f1adf48276 9,74,81,90,95
+tests/e2e/e2e-helpers.ts
+  f20307f1adf48276 167,173
+packages/core/src/instance-state.ts
+  cd65d08a4408b4ab 15,17,25-26,28-29,41,43,51-52,54-55,63-67
+packages/runtime-podman/src/runtime.ts
+  f20307f1adf48276 123-124,338-343
+apps/api/src/recovery.ts
+  f20307f1adf48276 1,64,116,119,132,135,138
+  cd65d08a4408b4ab 17,82,88
+apps/api/src/routes/instances.test.ts
+  cd65d08a4408b4ab 122,124-126
+apps/api/src/transitions.test.ts
+  f20307f1adf48276 224,231,238,246,254
+  cd65d08a4408b4ab 149,152-158,163-188
+apps/api/src/tenant-manager.ts
+  f20307f1adf48276 46-54,83-94,104,107,127,131-139,142-144,146-151,163,207,219,251,255,263,295,298,305,324-334,345-347,356,379-407,428-429,431,434,437,444,451-463,465-481
+  cd65d08a4408b4ab 97,108
+apps/api/src/routes/access-log.ts
+  f20307f1adf48276 7-9,12-14,16-18,20,23-27,31-32
+apps/api/src/routes/tenants.test.ts
+  f20307f1adf48276 151-155,329-333,350,355-359,382-387
+  cd65d08a4408b4ab 340,342-345
+tests/e2e/error-recovery.e2e.test.ts
+  f20307f1adf48276 87
+apps/api/src/tenant-data.test.ts
+  f20307f1adf48276 128,135
+tests/e2e/http-connectivity.e2e.test.ts
+  f20307f1adf48276 68
+tests/e2e/overlay-restore.e2e.test.ts
+  f20307f1adf48276 85,138
+tests/e2e/instance-actions.e2e.test.ts
+  f20307f1adf48276 102-103,151
+packages/core/src/index.ts
+  3b1fbee5dc6f92e3 142-143
+apps/api/src/golden-creator.ts
+  3b1fbee5dc6f92e3 2-3,13,25-33,38,43,48
+tests/e2e/secret-gateway.e2e.test.ts
+  f20307f1adf48276 129
+apps/boilerhouse-podmand/src/macos.ts
+  cd65d08a4408b4ab 3-18,27-29,32-37,43-45,47,49-53,59-61,68-71
+apps/api/src/routes/instances.ts
+  cd65d08a4408b4ab 78,135
+.kadai/actions/nuke.sh
+  f20307f1adf48276 42-50,58-73,78-79,83
+  cd65d08a4408b4ab 74-75,77,80-81,84-97
+apps/api/src/tenant-data.ts
+  f20307f1adf48276 3,28,46,54,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "e0014c97ddedd1fa64378668efa4bf8cc1ed2c75",
+  "prompts": {
+    "3b1fbee5dc6f92e3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f2c60058-d709-4f20-b96f-eb4811732d96",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 288,
+      "total_deletions": 70,
+      "accepted_lines": 288,
+      "overriden_lines": 0
+    },
+    "cd65d08a4408b4ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6cb127da-07b8-4cd2-8085-519e3ae54c4e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 229,
+      "total_deletions": 110,
+      "accepted_lines": 202,
+      "overriden_lines": 0
+    },
+    "e71bfb62f69a1af6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f448eafd-a320-4afb-9e90-fbf70061e1ec",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 381,
+      "total_deletions": 2,
+      "accepted_lines": 379,
+      "overriden_lines": 0
+    },
+    "f20307f1adf48276": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a1f2dadc-159a-41cb-a363-0ed9a9885af9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 642,
+      "total_deletions": 254,
+      "accepted_lines": 584,
+      "overriden_lines": 1
+    }
+  }
+}

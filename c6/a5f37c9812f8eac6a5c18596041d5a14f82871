@@ -1,0 +1,23 @@
+docs/plans/hot-pooling.md
+  1ff5ef1b5ba62624 5-6,8,70-76,90-100,141-143,172,179-183,195-197,200-202,234-237,239-267,301,303-304,306,308,315,317,337,346-349,351,380-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "c6a5f37c9812f8eac6a5c18596041d5a14f82871",
+  "prompts": {
+    "1ff5ef1b5ba62624": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd1281df-010e-42fb-862d-5bfbdbaa319b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 159,
+      "total_deletions": 105,
+      "accepted_lines": 144,
+      "overriden_lines": 0
+    }
+  }
+}

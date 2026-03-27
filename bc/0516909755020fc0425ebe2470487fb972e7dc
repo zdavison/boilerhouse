@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "bc0516909755020fc0425ebe2470487fb972e7dc",
+  "prompts": {
+    "0e6897682e065ae1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad061c0d-08a7-43aa-b374-5010a98d5ab6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 55,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  }
+}

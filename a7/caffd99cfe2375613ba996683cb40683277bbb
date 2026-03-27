@@ -1,0 +1,60 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "a7caffd99cfe2375613ba996683cb40683277bbb",
+  "prompts": {
+    "0afbbab91a95db05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c48408d-571f-4a51-bd9f-a088a4866bb7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 2271,
+      "total_deletions": 209,
+      "accepted_lines": 2137,
+      "overriden_lines": 0
+    },
+    "45d584b33594b67b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "284d93cc-de8f-4e69-b65a-390071b7bd23",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zachary.davison@meetsmore.com>",
+      "messages": [],
+      "total_additions": 404,
+      "total_deletions": 169,
+      "accepted_lines": 324,
+      "overriden_lines": 2
+    },
+    "ba85c08d7ed4ed51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f901175-e56c-43b0-9ed4-7a402154bdbf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 69,
+      "accepted_lines": 90,
+      "overriden_lines": 0
+    },
+    "d0932d65f8d46640": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0dd3a817-7770-47ea-bf54-27ec631b2596",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 112,
+      "total_deletions": 459,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    }
+  }
+}

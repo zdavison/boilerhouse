@@ -1,0 +1,166 @@
+apps/api/src/e2e/http-connectivity.e2e.test.ts
+  2bc03677e9a4828e 2,30-31,33,68
+apps/api/src/routes/tenants.test.ts
+  2bc03677e9a4828e 8-12,135,150,159,166,181,197,204-205,263,278,297,342,375
+packages/db/src/snapshot-helpers.ts
+  ba85c08d7ed4ed51 32
+deploy/prometheus/prometheus.yml
+  783e6cf59ba8273e 5-7
+apps/api/src/instance-manager.ts
+  ba85c08d7ed4ed51 192
+packages/runtime-podman/src/backend.ts
+  ba85c08d7ed4ed51 11-12,77,86
+apps/api/src/routes/access-log.ts
+  2bc03677e9a4828e 1-44
+packages/runtime-kubernetes/src/runtime.ts
+  ba85c08d7ed4ed51 17,44,68,239-245,270,334,336-345,354-357
+apps/api/src/test-helpers.ts
+  2bc03677e9a4828e 1,14,64,78
+apps/api/src/e2e/instance-actions.e2e.test.ts
+  2bc03677e9a4828e 2,44,65,70,73,98,124,148,159,194
+apps/api/src/server.ts
+  ba85c08d7ed4ed51 92-93
+  2bc03677e9a4828e 67,69-72,74-76,218,254-255,257
+apps/api/src/e2e/instance-lifecycle.e2e.test.ts
+  2bc03677e9a4828e 3,34-35,37,69
+apps/api/src/e2e/runtime-matrix.ts
+  2bc03677e9a4828e 22-25,60-61,82-83,125-126,168-169
+apps/api/src/e2e/multi-tenant-claim.e2e.test.ts
+  2bc03677e9a4828e 2,30-32,34,43,55,60,72,75
+apps/api/src/e2e/secret-gateway.e2e.test.ts
+  2bc03677e9a4828e 2,45,68,94
+apps/api/src/routes/secrets.test.ts
+  2bc03677e9a4828e 6-7,10,16-18,20,27-28,30,34,37,39,44
+apps/api/src/routes/security-headers.ts
+  2bc03677e9a4828e 1-10
+docs/deploy-vm.md
+  783e6cf59ba8273e 1-360
+apps/boilerhouse-podmand/src/main.ts
+  ba85c08d7ed4ed51 27-28,462,477,482-485,487-489,497,508,512,515,517-529,531,706,716
+  2bc03677e9a4828e 702-705
+packages/db/src/schema.ts
+  ba85c08d7ed4ed51 111
+packages/core/src/index.ts
+  ba85c08d7ed4ed51 137-142
+docs/security-recommendations.md
+  ba85c08d7ed4ed51 269,276-279,281-285,342
+apps/api/src/e2e/data-persistence.e2e.test.ts
+  2bc03677e9a4828e 2,51
+apps/api/src/e2e/events.e2e.test.ts
+  2bc03677e9a4828e 2,39-40,56,68,72,81
+apps/api/src/e2e/tenant-lifecycle.e2e.test.ts
+  2bc03677e9a4828e 3,32-35,45,55,70,74,85-86,92,98,106,113
+deploy/nftables.conf
+  2bc03677e9a4828e 1-37
+apps/api/src/snapshot-manager.ts
+  ba85c08d7ed4ed51 231
+scripts/start-boilerhouse-podmand.sh
+  2bc03677e9a4828e 115
+packages/runtime-kubernetes/src/types.ts
+  ba85c08d7ed4ed51 35-41
+apps/api/src/e2e/snapshot-lifecycle.e2e.test.ts
+  2bc03677e9a4828e 2,29-33,39,42,48,51,65,70,93
+docs/plans/binary-releases.md
+  783e6cf59ba8273e 1-299
+apps/api/src/e2e/destroy.e2e.test.ts
+  2bc03677e9a4828e 2,30-31,33
+apps/api/src/app.ts
+  2bc03677e9a4828e 2,6,8,21-37
+deploy/install.sh
+  783e6cf59ba8273e 1-239
+packages/runtime-podman/src/runtime.ts
+  ba85c08d7ed4ed51 273,324
+apps/api/src/e2e/fixtures/workload-k8s-minimal.workload.ts
+  2bc03677e9a4828e 9
+packages/core/src/archive-crypto.test.ts
+  ba85c08d7ed4ed51 1-112
+apps/api/src/e2e/fixtures/workload-k8s-wsecho.workload.ts
+  2bc03677e9a4828e 88
+apps/api/src/e2e/error-recovery.e2e.test.ts
+  2bc03677e9a4828e 2,44-45,76-77,85
+apps/api/src/routes/deps.ts
+  2bc03677e9a4828e 25
+packages/core/src/snapshot.ts
+  ba85c08d7ed4ed51 55-56,83-84
+apps/api/src/e2e/fixtures/workload-k8s-httpserver.workload.ts
+  2bc03677e9a4828e 12
+docs/deploy-kubernetes.md
+  783e6cf59ba8273e 1-275
+Dockerfile
+  783e6cf59ba8273e 1-21
+packages/core/src/archive-crypto.ts
+  ba85c08d7ed4ed51 1-125
+apps/api/src/routes/tenants.ts
+  2bc03677e9a4828e 9-10,85,117-118,173-174
+apps/api/src/e2e/concurrent-tenants.e2e.test.ts
+  2bc03677e9a4828e 2,31
+apps/api/src/routes/rate-limit.ts
+  2bc03677e9a4828e 1-58
+deploy/Caddyfile
+  2bc03677e9a4828e 1-4,7-19,21-35,37-51
+  783e6cf59ba8273e 5-6,20,36
+packages/o11y/src/provider.ts
+  2bc03677e9a4828e 17-20,49
+apps/api/src/e2e/fixtures/workload-k8s-openclaw.workload.ts
+  2bc03677e9a4828e 21
+.dockerignore
+  783e6cf59ba8273e 1-13
+apps/api/src/routes/trigger-adapters.ts
+  2bc03677e9a4828e 23,155
+apps/api/src/routes/input-guards.test.ts
+  2bc03677e9a4828e 59
+deploy/boilerhouse-api.service
+  2bc03677e9a4828e 1-34
+apps/api/src/routes/secrets.ts
+  2bc03677e9a4828e 6,23,31-32,38-39
+packages/runtime-podman/src/daemon-backend.ts
+  ba85c08d7ed4ed51 79,87
+docs/deploy-checklist.md
+  783e6cf59ba8273e 1-65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "64e8ea52b8502e6cd75fad49cdbc3b1d03ba98e2",
+  "prompts": {
+    "2bc03677e9a4828e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba5b1657-cea1-4ed8-b57f-8037651cb47a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 457,
+      "total_deletions": 158,
+      "accepted_lines": 425,
+      "overriden_lines": 0
+    },
+    "783e6cf59ba8273e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6ad9877a-0582-4846-a2ac-03eca4e978f0",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 2352,
+      "total_deletions": 665,
+      "accepted_lines": 1691,
+      "overriden_lines": 0
+    },
+    "ba85c08d7ed4ed51": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4f901175-e56c-43b0-9ed4-7a402154bdbf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 342,
+      "total_deletions": 22,
+      "accepted_lines": 341,
+      "overriden_lines": 0
+    }
+  }
+}

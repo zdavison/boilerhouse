@@ -1,0 +1,33 @@
+.kadai/actions/presets/_lib.sh
+  22da814774f1f314 1-212
+.gitignore
+  22da814774f1f314 14-15
+workloads/package.json
+  22da814774f1f314 7-8
+.kadai/actions/presets/openclaw.sh
+  22da814774f1f314 1-82
+packages/db/src/trigger-loader.ts
+  22da814774f1f314 49
+packages/db/src/workload-loader.ts
+  22da814774f1f314 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "fc7a58aad6a487b432df9cbc55c394f559a58933",
+  "prompts": {
+    "22da814774f1f314": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ace8d398-c81a-4a63-b828-a3a2c75145e2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 300,
+      "total_deletions": 4,
+      "accepted_lines": 300,
+      "overriden_lines": 0
+    }
+  }
+}

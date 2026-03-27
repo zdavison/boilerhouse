@@ -1,0 +1,68 @@
+tests/package.json
+  c7bb92983166f130 1-16
+apps/boilerhouse-podmand/src/main.test.ts
+  c7bb92983166f130 8-14,256,269,280,291,301,311,327,342,361,394
+deploy/seccomp.json
+  c7bb92983166f130 1-401
+packages/runtime-podman/src/hardening.ts
+  c7bb92983166f130 1-17
+.kadai/actions/tests/e2e.sh
+  c7bb92983166f130 94,97
+package.json
+  c7bb92983166f130 4,9
+.kadai/actions/tests/security-breakout.sh
+  a92832f1e8cbf7b4 89-109,111-112
+packages/runtime-podman/src/types.ts
+  c7bb92983166f130 14-23
+CLAUDE.md
+  c7bb92983166f130 7-8,12,15-16,18,20,22,25,28-29,32,37,40-41,43-45,48-50,52-63
+tests/security/container-breakout/breakout.ts
+  c7bb92983166f130 2,9,18-20,71-83,89-90,92-94,99-115,117-155,157-158
+tests/integration/kubernetes.integration.test.ts
+  c7bb92983166f130 3
+packages/runtime-podman/src/runtime.ts
+  c7bb92983166f130 15,35,39,140-143
+apps/boilerhouse-podmand/src/validate.ts
+  c7bb92983166f130 40-53,72
+tests/e2e/e2e-helpers.ts
+  c7bb92983166f130 11-20
+packages/runtime-podman/src/client.ts
+  c7bb92983166f130 28-44,483-494
+apps/boilerhouse-podmand/src/validate.test.ts
+  c7bb92983166f130 10-12,103-139
+tests/integration/podman.integration.test.ts
+  c7bb92983166f130 4-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "7c1bf0ce4fbe8b574bde4a500d07194a34104cb6",
+  "prompts": {
+    "a92832f1e8cbf7b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "247d350d-6eb7-46ff-a36b-45d8733a8c0f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 1,
+      "accepted_lines": 23,
+      "overriden_lines": 1
+    },
+    "c7bb92983166f130": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4ec4c90b-2730-4c65-b171-fd4e20a7e7a1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 725,
+      "total_deletions": 160,
+      "accepted_lines": 698,
+      "overriden_lines": 0
+    }
+  }
+}

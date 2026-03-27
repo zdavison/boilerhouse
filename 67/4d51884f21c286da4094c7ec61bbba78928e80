@@ -1,0 +1,81 @@
+tests/security/nuclei-templates/api-enumeration/trigger-port-api-leak.yaml
+  0afbbab91a95db05 1-75
+docs/security-recommendations.md
+  7c07b89afdcb99e2 1-362
+tests/security/nuclei-templates/resource-exhaustion/rapid-fire-claims.yaml
+  0afbbab91a95db05 9-11,13-36
+tests/security/nuclei-templates/tenant-isolation/cross-tenant-activity-log.yaml
+  0afbbab91a95db05 10,13-35,43-47,56-60
+packages/core/src/workload.ts
+  0afbbab91a95db05 83
+apps/api/src/routes/secrets.ts
+  0afbbab91a95db05 5-6,17-19
+apps/api/src/routes/input-guards.ts
+  0afbbab91a95db05 1-78
+apps/api/src/app.ts
+  0afbbab91a95db05 5,20
+tests/security/nuclei-templates/tenant-isolation/cross-tenant-release-impact.yaml
+  0afbbab91a95db05 10,13-35,62-66
+.kadai/actions/security.sh
+  0afbbab91a95db05 1-28
+docs/architecture-pentest.md
+  e64801334c4a0e52 1-313
+tests/security/nuclei-templates/input-fuzzing/empty-tenant-id.yaml
+  0afbbab91a95db05 9-11,13-36
+apps/trigger-gateway/src/server.ts
+  0afbbab91a95db05 1-158
+apps/trigger-gateway/package.json
+  0afbbab91a95db05 1-14
+apps/api/src/routes/input-guards.test.ts
+  0afbbab91a95db05 1-79
+tests/security/run-security-tests.ts
+  0afbbab91a95db05 12-42,116,130,136-141,144,149,215-282,300-301,351,364,373
+tests/security/nuclei-templates/secret-extraction/secret-scan-all-endpoints.yaml
+  0afbbab91a95db05 10,13-35,43-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "674d51884f21c286da4094c7ec61bbba78928e80",
+  "prompts": {
+    "0afbbab91a95db05": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c48408d-571f-4a51-bd9f-a088a4866bb7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 2271,
+      "total_deletions": 209,
+      "accepted_lines": 2137,
+      "overriden_lines": 0
+    },
+    "7c07b89afdcb99e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65882158-678c-404a-b92e-a050d58a4b7b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 362,
+      "total_deletions": 0,
+      "accepted_lines": 362,
+      "overriden_lines": 0
+    },
+    "e64801334c4a0e52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "960db820-3f2b-4523-8bc5-dc0cffbf4c2a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent <deer@noreply>",
+      "messages": [],
+      "total_additions": 313,
+      "total_deletions": 0,
+      "accepted_lines": 313,
+      "overriden_lines": 0
+    }
+  }
+}
