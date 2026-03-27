@@ -1,9 +1,9 @@
-FROM oven/bun:1.3.3-alpine AS build
+FROM oven/bun:1.3.9-debian AS build
 
 WORKDIR /app
 COPY . .
 RUN bun install --frozen-lockfile
-RUN bun build --compile --target=bun-linux-x64 apps/dashboard/src/server.ts --outfile dashboard
+RUN bun build --compile apps/dashboard/src/server.ts --outfile dashboard
 
 FROM gcr.io/distroless/base-nossl-debian12
 
