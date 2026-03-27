@@ -1,6 +1,6 @@
 {
   "name": "@boilerhouse/dashboard",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "license": "BUSL-1.1",
   "type": "module",
