@@ -1,12 +1,14 @@
 {
   "name": "@boilerhouse/core",
-  "version": "0.0.9",
-  "private": true,
+  "version": "0.1.0",
   "license": "BUSL-1.1",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

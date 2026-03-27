@@ -12,6 +12,11 @@ FROM gcr.io/distroless/base-nossl-debian12
 COPY --from=build /app/boilerhouse /boilerhouse
 COPY --from=build /app/packages/db/drizzle /drizzle
 
+# @boilerhouse/core + deps so dynamically-imported workload files can resolve it
+COPY --from=build /app/packages/core /workloads/node_modules/@boilerhouse/core
+COPY --from=build /app/node_modules/@sinclair /workloads/node_modules/@sinclair
+COPY --from=build /app/node_modules/age-encryption /workloads/node_modules/age-encryption
+
 EXPOSE 3000 9464
 
 ENV NODE_ENV=production

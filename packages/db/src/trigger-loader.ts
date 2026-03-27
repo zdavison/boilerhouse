@@ -14,6 +14,8 @@ interface TriggerFileConfig {
 	config: Record<string, unknown>;
 	driver?: string;
 	driverOptions?: Record<string, unknown>;
+	guard?: string;
+	guardOptions?: Record<string, unknown>;
 }
 
 export interface TriggerLoaderResult {
@@ -97,6 +99,8 @@ export async function loadTriggersFromDir(
 					config: def.config,
 					driver: def.driver ?? null,
 					driverOptions: def.driverOptions ?? null,
+					guard: def.guard ?? null,
+					guardOptions: def.guardOptions ?? null,
 					enabled: 1,
 					createdAt: now,
 					updatedAt: now,
@@ -109,9 +113,11 @@ export async function loadTriggersFromDir(
 				existing.type !== def.type ||
 				existing.workload !== def.workload ||
 				existing.driver !== (def.driver ?? null) ||
+				existing.guard !== (def.guard ?? null) ||
 				JSON.stringify(existing.tenant) !== JSON.stringify(def.tenant) ||
 				JSON.stringify(existing.config) !== JSON.stringify(def.config) ||
-				JSON.stringify(existing.driverOptions) !== JSON.stringify(def.driverOptions ?? null);
+				JSON.stringify(existing.driverOptions) !== JSON.stringify(def.driverOptions ?? null) ||
+				JSON.stringify(existing.guardOptions) !== JSON.stringify(def.guardOptions ?? null);
 
 			if (changed) {
 				db.update(triggers)
@@ -122,6 +128,8 @@ export async function loadTriggersFromDir(
 						config: def.config,
 						driver: def.driver ?? null,
 						driverOptions: def.driverOptions ?? null,
+						guard: def.guard ?? null,
+						guardOptions: def.guardOptions ?? null,
 						updatedAt: now,
 					})
 					.where(eq(triggers.id, existing.id))
