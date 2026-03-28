@@ -126,6 +126,8 @@ ensure_runtime_type() {
     local sock=""
     if [ -S "/var/run/docker.sock" ]; then
       sock="/var/run/docker.sock"
+    elif [ -S "$HOME/.orbstack/run/docker.sock" ]; then
+      sock="$HOME/.orbstack/run/docker.sock"
     elif [ -S "$HOME/.docker/run/docker.sock" ]; then
       sock="$HOME/.docker/run/docker.sock"
     fi

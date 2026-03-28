@@ -95,6 +95,7 @@ export class DockerClient {
 	private static detectSocketPath(): string {
 		const candidates = [
 			"/var/run/docker.sock",
+			path.join(os.homedir(), ".orbstack/run/docker.sock"),
 			path.join(os.homedir(), ".docker/run/docker.sock"),
 		];
 		for (const p of candidates) {
