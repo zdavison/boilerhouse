@@ -1,0 +1,70 @@
+packages/triggers/src/trigger-queue-manager.ts
+  dc50e95a5d031a23 7,208-228
+packages/triggers/src/adapters/telegram-poll.ts
+  dc50e95a5d031a23 77,190-191
+packages/db/src/schema.ts
+  dc50e95a5d031a23 261,263,265-266
+packages/triggers/src/adapters/slack.ts
+  dc50e95a5d031a23 134,163-164
+packages/db/src/trigger-loader.ts
+  dc50e95a5d031a23 17,101-103,119,130-132
+Dockerfile
+  fba09568d0bf2096 1,7-9,11-13,15,17-18,20,24-26,28-33,35-37,39-44
+packages/runtime-docker/src/runtime.ts
+  fba09568d0bf2096 39,43,151,244,276
+packages/triggers/src/dispatcher.test.ts
+  dc50e95a5d031a23 4,584-588,603,624,653,678-679,709-827
+Dockerfile.dashboard
+  fba09568d0bf2096 1-2,14
+packages/triggers/src/config.ts
+  dc50e95a5d031a23 38-45,78-86,88
+packages/triggers/src/adapters/webhook.ts
+  dc50e95a5d031a23 80,97-98
+packages/triggers/src/index.ts
+  dc50e95a5d031a23 16,43
+Dockerfile.trigger-gateway
+  fba09568d0bf2096 1-2,14
+packages/triggers/src/guard.ts
+  dc50e95a5d031a23 18-25
+workloads/tg-openclaw.trigger.ts
+  dc50e95a5d031a23 18-26
+apps/api/src/routes/trigger-adapters.ts
+  dc50e95a5d031a23 93-112,156,167-184,186-192
+workloads/tg-claude-code.trigger.ts
+  dc50e95a5d031a23 15-23
+packages/triggers/src/dispatcher.ts
+  dc50e95a5d031a23 3,73-74,118-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "cfd16915f3fc5cc5702fba2ac26b6d02a6a302a4",
+  "prompts": {
+    "dc50e95a5d031a23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "745eafbc-19cc-489b-b5e8-f60d11726c27",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 308,
+      "total_deletions": 128,
+      "accepted_lines": 301,
+      "overriden_lines": 0
+    },
+    "fba09568d0bf2096": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5b4e1-753d-4c9b-9b59-400ebf98d262",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 168,
+      "total_deletions": 159,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    }
+  }
+}
