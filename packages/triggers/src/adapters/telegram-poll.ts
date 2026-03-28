@@ -150,6 +150,7 @@ export class TelegramPollAdapter {
 							chatId: parsed.chatId,
 							userId: parsed.userId,
 							username: parsed.senderUsername,
+							usernameOrId: parsed.senderUsername ?? String(parsed.userId ?? parsed.chatId ?? ""),
 							text: parsed.text,
 							updateType: parsed.updateType,
 						});

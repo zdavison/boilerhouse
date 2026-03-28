@@ -4,7 +4,7 @@ export default defineTrigger({
 	name: "tg-claude-code",
 	type: "telegram-poll",
 	workload: "claude-code",
-	tenant: { fromField: "username", prefix: "tg-" },
+	tenant: { fromField: "usernameOrId", prefix: "tg-" },
 	config: {
 		botToken: process.env.TELEGRAM_BOT_TOKEN_CC ?? "",
 		updateTypes: ["message"],

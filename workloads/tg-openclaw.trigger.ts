@@ -5,7 +5,7 @@ export default defineTrigger({
 	name: "tg-openclaw",
 	type: "telegram-poll",
 	workload: "openclaw",
-	tenant: { fromField: "username", prefix: "tg-" },
+	tenant: { fromField: "usernameOrId", prefix: "tg-" },
 	config: {
 		botToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
 		updateTypes: ["message"],
