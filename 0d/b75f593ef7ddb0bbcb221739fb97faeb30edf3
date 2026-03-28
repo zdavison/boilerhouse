@@ -1,0 +1,58 @@
+packages/core/src/index.ts
+  fba09568d0bf2096 161-162
+packages/triggers/src/dispatcher.ts
+  fba09568d0bf2096 6,77-78
+packages/runtime-docker/src/templates.ts
+  fba09568d0bf2096 1-2,12
+packages/db/src/trigger-loader.ts
+  fba09568d0bf2096 4
+apps/trigger-gateway/src/server.ts
+  fba09568d0bf2096 21,55
+packages/triggers/src/reply.ts
+  fba09568d0bf2096 1-58
+packages/triggers/src/trigger-queue-manager.ts
+  fba09568d0bf2096 7-8,16,31,69,105-113,151,169,204
+packages/core/src/env-interpolate.ts
+  fba09568d0bf2096 1-42
+packages/triggers/src/adapters/slack.ts
+  fba09568d0bf2096 32,144,155-160
+apps/dashboard/src/server.ts
+  bb1bbd30e6b50014 77,94,97
+packages/triggers/src/index.ts
+  fba09568d0bf2096 33-37
+packages/triggers/src/adapters/telegram-poll.ts
+  fba09568d0bf2096 165,177-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "0db75f593ef7ddb0bbcb221739fb97faeb30edf3",
+  "prompts": {
+    "bb1bbd30e6b50014": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ed3ffb2-d180-47ee-9884-0607d845114e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 18,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "fba09568d0bf2096": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5b4e1-753d-4c9b-9b59-400ebf98d262",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 152,
+      "total_deletions": 57,
+      "accepted_lines": 152,
+      "overriden_lines": 0
+    }
+  }
+}
