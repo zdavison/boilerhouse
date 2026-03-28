@@ -30,9 +30,6 @@ function makeCtx(options: Record<string, unknown> = {}): GuardContext {
 		tenantId: "tg-123",
 		payload: {
 			text: "hello",
-			senderId: "123456789",
-			senderName: "Alice",
-			channelId: "123456789",
 			source: "telegram",
 			raw: {},
 		},

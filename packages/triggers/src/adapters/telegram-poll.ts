@@ -149,6 +149,7 @@ export class TelegramPollAdapter {
 						tenantId = resolveTenantId(trigger.tenant, {
 							chatId: parsed.chatId,
 							userId: parsed.userId,
+							username: parsed.senderUsername,
 							text: parsed.text,
 							updateType: parsed.updateType,
 						});

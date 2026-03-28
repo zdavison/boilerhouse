@@ -81,8 +81,6 @@ export function createWebhookRoutes(
 
 				const triggerPayload: TriggerPayload = {
 					text: typeof payload.text === "string" ? payload.text : "",
-					senderId: typeof payload.senderId === "string" ? payload.senderId : "",
-					channelId: typeof payload.channelId === "string" ? payload.channelId : "",
 					source: "webhook",
 					raw: payload,
 				};

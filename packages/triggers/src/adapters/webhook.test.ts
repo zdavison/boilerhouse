@@ -324,8 +324,6 @@ test("builds TriggerPayload correctly from webhook body", async () => {
 
 	const payload = dispatchedPayload as Record<string, unknown>;
 	expect(payload.text).toBe("hello");
-	expect(payload.senderId).toBe("user-1");
-	expect(payload.channelId).toBe("ch-1");
 	expect(payload.source).toBe("webhook");
 	expect(payload.raw).toBeDefined();
 

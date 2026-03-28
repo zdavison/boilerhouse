@@ -21,8 +21,6 @@ export class CronAdapter {
 			const job = new Cron(trigger.config.schedule, () => {
 				const payload: TriggerPayload = {
 					text: "",
-					senderId: "cron",
-					channelId: "",
 					source: "cron",
 					raw: trigger.config.payload ?? {},
 				};

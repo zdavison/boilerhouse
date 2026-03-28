@@ -13,11 +13,13 @@ import {
 	createWebhookRoutes,
 	createSlackRoutes,
 	resolveDriver,
+	resolveGuard,
 } from "@boilerhouse/triggers";
 import type {
 	DispatcherDeps,
 	TriggerDefinition,
 	DriverMap,
+	GuardMap,
 	WebhookConfig,
 	SlackConfig,
 	TelegramPollConfig,
@@ -96,6 +98,8 @@ function loadTriggersFromDb(deps: RouteDeps): TriggerDefinition[] {
 		config: row.config as unknown as TriggerDefinition["config"],
 		driver: row.driver ?? undefined,
 		driverOptions: row.driverOptions ?? undefined,
+		guard: row.guard ?? undefined,
+		guardOptions: row.guardOptions ?? undefined,
 	}));
 }
 
@@ -137,6 +141,36 @@ async function resolveDriversForTriggers(
 	}
 
 	return driverMap;
+}
+
+/**
+ * Resolve guards for all triggers that declare one.
+ * Called once at startup — imports happen here, not per-request.
+ */
+async function resolveGuardsForTriggers(
+	allTriggers: TriggerDefinition[],
+	log?: RouteDeps["log"],
+): Promise<GuardMap> {
+	const guardMap: GuardMap = new Map();
+
+	for (const trigger of allTriggers) {
+		// Cron triggers skip guards (no user to deny)
+		if (trigger.type === "cron" || !trigger.guard) continue;
+		try {
+			const guard = await resolveGuard(trigger.guard);
+			if (guard) {
+				guardMap.set(trigger.name, guard);
+				log?.info({ trigger: trigger.name, guard: trigger.guard }, "Resolved guard for trigger");
+			}
+		} catch (err) {
+			log?.error(
+				{ trigger: trigger.name, guard: trigger.guard, err: err instanceof Error ? err.stack ?? err.message : err },
+				"Failed to resolve guard for trigger",
+			);
+		}
+	}
+
+	return guardMap;
 }
 
 export function triggerAdapterPlugin(deps: RouteDeps) {
@@ -196,7 +230,10 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		});
 	}
 
-	resolveDriversForTriggers(allTriggers, deps.log).then((driverMap) => {
+	Promise.all([
+		resolveDriversForTriggers(allTriggers, deps.log),
+		resolveGuardsForTriggers(allTriggers, deps.log),
+	]).then(([driverMap, guardMap]) => {
 		// Create queue manager and register all triggers
 		queueManager = new TriggerQueueManager(redis, dispatcher, driverMap);
 		for (const trigger of allTriggers) {
@@ -205,8 +242,8 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		const queuedDispatcher = new QueuedDispatcher(queueManager);
 
 		// Pass queuedDispatcher to adapters — structurally compatible with Dispatcher
-		webhookRoutes = createWebhookRoutes(webhookTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
-		slackRoutes = createSlackRoutes(slackTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
+		webhookRoutes = createWebhookRoutes(webhookTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap, guardMap);
+		slackRoutes = createSlackRoutes(slackTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap, guardMap);
 
 		if (cronTriggers.length > 0) {
 			cronAdapter.start(cronTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
@@ -214,14 +251,14 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		}
 
 		if (telegramPollTriggers.length > 0) {
-			telegramPollAdapter.start(telegramPollTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
+			telegramPollAdapter.start(telegramPollTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap, guardMap);
 			deps.log?.info({ count: telegramPollTriggers.length }, "Started telegram-poll triggers");
 		}
 
 		routesReady = true;
-		deps.log?.info({ driverCount: driverMap.size }, "Trigger routes ready (queued)");
+		deps.log?.info({ driverCount: driverMap.size, guardCount: guardMap.size }, "Trigger routes ready (queued)");
 	}).catch((err) => {
-		deps.log?.error({ err: err instanceof Error ? err.stack ?? err.message : err }, "Fatal: failed to initialize trigger drivers");
+		deps.log?.error({ err: err instanceof Error ? err.stack ?? err.message : err }, "Fatal: failed to initialize trigger drivers/guards");
 	});
 
 	// Build per-path rate limiters from trigger configs.

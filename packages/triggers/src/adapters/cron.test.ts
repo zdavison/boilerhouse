@@ -165,8 +165,6 @@ test("CronAdapter builds TriggerPayload with source cron and static payload", as
 	expect(capturedPayload).not.toBeNull();
 	const payload = capturedPayload as Record<string, unknown>;
 	expect(payload.text).toBe("");
-	expect(payload.senderId).toBe("cron");
-	expect(payload.channelId).toBe("");
 	expect(payload.source).toBe("cron");
 	expect(payload.raw).toEqual({ type: "scheduled" });
 

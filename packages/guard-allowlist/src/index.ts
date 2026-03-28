@@ -1,23 +1,26 @@
 import type { Guard, GuardContext, GuardResult } from "@boilerhouse/triggers";
 
 /**
- * Allowlist guard — rejects any sender not in a static list.
+ * Allowlist guard — rejects any tenant not in a static list.
+ *
+ * Matches against the resolved `tenantId`, which is adapter-agnostic.
+ * Comparison is case-insensitive.
  *
  * @example
  * guardOptions: {
- *   senderIds: ["123456789", "987654321"],
+ *   tenantIds: ["tg-thingsdoer", "tg-alice"],
  *   denyMessage: "You are not authorised to use this service.",
  * }
  */
 const allowlistGuard: Guard = {
 	async check(ctx: GuardContext): Promise<GuardResult> {
-		const senderIds = ctx.options.senderIds;
-		if (!Array.isArray(senderIds)) {
-			return { ok: false, message: "Guard misconfigured: senderIds must be an array." };
+		const tenantIds = ctx.options.tenantIds;
+		if (!Array.isArray(tenantIds)) {
+			return { ok: false, message: "Guard misconfigured: tenantIds must be an array." };
 		}
 
-		const senderId = ctx.payload.senderId;
-		if (senderIds.includes(senderId)) {
+		const normalised = ctx.tenantId.toLowerCase();
+		if (tenantIds.some((id: string) => id.toLowerCase() === normalised)) {
 			return { ok: true };
 		}
 

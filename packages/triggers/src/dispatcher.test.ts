@@ -594,7 +594,7 @@ test("guard: allow — proceeds to claim and dispatch normally", async () => {
 		triggerName: "test-trigger",
 		tenantId: "t-1",
 		workload: "my-workload",
-		payload: { text: "hello", senderId: "user1", channelId: "c1", source: "webhook", raw: {} },
+		payload: { text: "hello", source: "webhook", raw: {} },
 		guard: makeAllowGuard(),
 		triggerDef: testTriggerDef,
 	});
@@ -615,7 +615,7 @@ test("guard: deny — throws DispatchError 403 and does not claim", async () => 
 			triggerName: "test-trigger",
 			tenantId: "t-1",
 			workload: "my-workload",
-			payload: { text: "hello", senderId: "user1", channelId: "c1", source: "webhook", raw: {} },
+			payload: { text: "hello", source: "webhook", raw: {} },
 			guard: makeDenyGuard("Not authorised."),
 			triggerDef: testTriggerDef,
 		});
@@ -644,7 +644,7 @@ test("guard: deny — calls respond callback with denial message", async () => {
 			triggerName: "test-trigger",
 			tenantId: "t-1",
 			workload: "my-workload",
-			payload: { text: "hello", senderId: "user1", channelId: "c1", source: "webhook", raw: {} },
+			payload: { text: "hello", source: "webhook", raw: {} },
 			guard: makeDenyGuard("You are blocked."),
 			triggerDef: testTriggerDef,
 			respond: async (msg) => {
@@ -669,7 +669,7 @@ test("guard: throwing guard — fails closed with 403", async () => {
 			triggerName: "test-trigger",
 			tenantId: "t-1",
 			workload: "my-workload",
-			payload: { text: "hello", senderId: "user1", channelId: "c1", source: "webhook", raw: {} },
+			payload: { text: "hello", source: "webhook", raw: {} },
 			guard: makeThrowingGuard(),
 			triggerDef: { ...testTriggerDef, guardOptions: { denyMessage: "Service error." } },
 		});

@@ -13,7 +13,7 @@ const TIMEOUT_MS = 3_000;
  * }
  *
  * The endpoint receives:
- *   { tenantId, senderId, senderName, source }
+ *   { tenantId, source }
  *
  * Expected response:
  *   { ok: true }
@@ -48,8 +48,6 @@ const apiGuard: Guard = {
 
 		const body = JSON.stringify({
 			tenantId: ctx.tenantId,
-			senderId: ctx.payload.senderId,
-			senderName: ctx.payload.senderName,
 			source: ctx.payload.source,
 		});
 

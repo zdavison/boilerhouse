@@ -8,12 +8,6 @@
 export interface TriggerPayload {
 	/** The message text. Empty string for non-text events. */
 	text: string;
-	/** Unique identifier of the sender (user ID, bot ID, etc). */
-	senderId: string;
-	/** Display name of the sender, if available. */
-	senderName?: string;
-	/** Channel or chat identifier where the message was sent. */
-	channelId: string;
 	/** Which adapter produced this event. */
 	source: "telegram" | "slack" | "webhook" | "cron";
 	/** Raw adapter-specific event data. */

@@ -58,7 +58,7 @@ test("resolves guard from file with named export", async () => {
 	expect(guard).not.toBeNull();
 	const result = await guard!.check({
 		tenantId: "t-1",
-		payload: { text: "", senderId: "", channelId: "", source: "webhook", raw: {} },
+		payload: { text: "", source: "webhook", raw: {} },
 		trigger: { name: "t", type: "webhook", tenant: { static: "t" }, workload: "w", config: { path: "/test" } },
 		options: {},
 	});

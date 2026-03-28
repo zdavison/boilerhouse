@@ -12,6 +12,7 @@ export interface ParsedTelegramUpdate {
 	userId: number | undefined;
 	text: string | undefined;
 	senderName: string | undefined;
+	senderUsername: string | undefined;
 }
 
 /**
@@ -48,8 +49,9 @@ export function parseTelegramUpdate(
 	const senderName = from
 		? [from.first_name, from.last_name].filter(Boolean).join(" ") || from.username
 		: undefined;
+	const senderUsername = from?.username;
 
-	return { updateType, updateId, chatId, userId, text, senderName };
+	return { updateType, updateId, chatId, userId, text, senderName, senderUsername };
 }
 
 /** Send a message via the Telegram Bot API. */
@@ -78,9 +80,6 @@ export function telegramUpdateToPayload(
 ): TriggerPayload {
 	return {
 		text: parsed.text ?? "",
-		senderId: String(parsed.userId ?? ""),
-		senderName: parsed.senderName,
-		channelId: String(parsed.chatId ?? ""),
 		source: "telegram",
 		raw,
 	};

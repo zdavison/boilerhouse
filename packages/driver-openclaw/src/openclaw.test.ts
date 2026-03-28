@@ -121,7 +121,7 @@ test("send() happy path — sends chat.send, collects until final, extracts text
 
 	const result = (await openclawDriver.send(
 		endpoint(),
-		{ text: "hi", senderId: "u1", channelId: "c1", source: "telegram" as const, raw: {} },
+		{ text: "hi", source: "telegram" as const, raw: {} },
 		sendContext,
 		driverConfig,
 	)) as Record<string, unknown>;
@@ -135,7 +135,7 @@ test("send() throws on rejected ack", async () => {
 	try {
 		await openclawDriver.send(
 			endpoint(),
-			{ text: "hi", senderId: "u1", channelId: "c1", source: "telegram" as const, raw: {} },
+			{ text: "hi", source: "telegram" as const, raw: {} },
 			sendContext,
 			driverConfig,
 		);
@@ -152,7 +152,7 @@ test("send() throws on error state", async () => {
 	try {
 		await openclawDriver.send(
 			endpoint(),
-			{ text: "hi", senderId: "u1", channelId: "c1", source: "telegram" as const, raw: {} },
+			{ text: "hi", source: "telegram" as const, raw: {} },
 			sendContext,
 			driverConfig,
 		);
@@ -169,7 +169,7 @@ test("send() returns fallback when no text content in final", async () => {
 
 	const result = (await openclawDriver.send(
 		endpoint(),
-		{ text: "hi", senderId: "u1", channelId: "c1", source: "telegram" as const, raw: {} },
+		{ text: "hi", source: "telegram" as const, raw: {} },
 		sendContext,
 		driverConfig,
 	)) as Record<string, unknown>;
@@ -187,7 +187,7 @@ test("send() uses eventId as runId for idempotency", async () => {
 
 	await openclawDriver.send(
 		endpoint(),
-		{ text: "test", senderId: "u1", channelId: "c1", source: "telegram" as const, raw: {} },
+		{ text: "test", source: "telegram" as const, raw: {} },
 		{ ...sendContext, eventId: "my-unique-event-id" },
 		driverConfig,
 	);

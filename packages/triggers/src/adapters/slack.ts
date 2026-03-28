@@ -135,8 +135,6 @@ export function createSlackRoutes(
 
 				const payload: TriggerPayload = {
 					text: text ?? "",
-					senderId: user ?? "",
-					channelId: channel ?? "",
 					source: "slack",
 					raw: event,
 				};
