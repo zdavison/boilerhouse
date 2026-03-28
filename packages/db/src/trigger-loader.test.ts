@@ -11,12 +11,11 @@ import type { DrizzleDb } from "./database";
 const VALID_TRIGGER = `
 export default {
 	name: "tg-support",
-	type: "telegram",
+	type: "telegram-poll",
 	tenant: { fromField: "chatId", prefix: "tg-" },
 	workload: "support-agent",
 	config: {
 		botToken: "123:ABC",
-		secretToken: "sec",
 		updateTypes: ["message"],
 	},
 };
@@ -37,7 +36,7 @@ export default {
 const TRIGGER_WITH_DRIVER = `
 export default {
 	name: "tg-openclaw",
-	type: "telegram",
+	type: "telegram-poll",
 	tenant: { fromField: "chatId", prefix: "oc-" },
 	workload: "openclaw-agent",
 	config: {
@@ -52,12 +51,11 @@ export default {
 const UPDATED_TRIGGER = `
 export default {
 	name: "tg-support",
-	type: "telegram",
+	type: "telegram-poll",
 	tenant: { fromField: "chatId", prefix: "tg-" },
 	workload: "support-agent-v2",
 	config: {
 		botToken: "789:GHI",
-		secretToken: "new-sec",
 		updateTypes: ["message", "callback_query"],
 	},
 };
@@ -215,12 +213,11 @@ describe("loadTriggersFromDir", () => {
 		const withDriver = `
 export default {
 	name: "tg-support",
-	type: "telegram",
+	type: "telegram-poll",
 	tenant: { fromField: "chatId", prefix: "tg-" },
 	workload: "support-agent",
 	config: {
 		botToken: "123:ABC",
-		secretToken: "sec",
 		updateTypes: ["message"],
 	},
 	driver: "@boilerhouse/driver-openclaw",

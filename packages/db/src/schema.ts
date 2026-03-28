@@ -239,8 +239,8 @@ export const buildLogs = sqliteTable(
 /** Adapter-specific configuration stored as JSON. */
 type TriggerAdapterConfig = Record<string, unknown>;
 
-/** @example "webhook" | "slack" | "telegram" | "telegram-poll" | "cron" */
-type TriggerType = "webhook" | "slack" | "telegram" | "telegram-poll" | "cron";
+/** @example "webhook" | "slack" | "telegram-poll" | "cron" */
+type TriggerType = "webhook" | "slack" | "telegram-poll" | "cron";
 
 /** How to resolve tenant ID for a trigger event. */
 type TenantMapping =

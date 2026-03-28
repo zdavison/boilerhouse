@@ -18,10 +18,13 @@ function createMockClient() {
 		waitContainer: [] as MockCall<[string]>[],
 		containerLogs: [] as MockCall<[string, number]>[],
 		removeContainer: [] as MockCall<[string]>[],
+		imageExists: [] as MockCall<[string]>[],
+		pullImage: [] as MockCall<[string]>[],
 	};
 
 	let waitResult: { StatusCode: number } = { StatusCode: 0 };
 	let logsResult = "";
+	let imageExistsResult = true;
 
 	const client = {
 		createContainer: async (name: string, body: ContainerCreateBody) => {
@@ -42,6 +45,13 @@ function createMockClient() {
 		removeContainer: async (id: string) => {
 			calls.removeContainer.push({ args: [id] });
 		},
+		imageExists: async (ref: string) => {
+			calls.imageExists.push({ args: [ref] });
+			return imageExistsResult;
+		},
+		pullImage: async (ref: string) => {
+			calls.pullImage.push({ args: [ref] });
+		},
 	} as unknown as DockerClient;
 
 	return {
@@ -49,6 +59,7 @@ function createMockClient() {
 		calls,
 		setWaitResult: (result: { StatusCode: number }) => { waitResult = result; },
 		setLogsResult: (result: string) => { logsResult = result; },
+		setImageExists: (result: boolean) => { imageExistsResult = result; },
 	};
 }
 
@@ -155,6 +166,38 @@ describe("DockerSidecar", () => {
 			expect(state.configPath).toBeDefined();
 			expect(state.certsDir).toBeDefined();
 			expect(state.certsDir).toStartWith(join(tmpdir(), `boilerhouse-${instanceId}-certs-`));
+		});
+
+		test("checks if sidecar images exist before creating containers", async () => {
+			await sidecar.create(instanceId, { proxyConfig: "cfg" });
+
+			// Should have checked both envoy and alpine images
+			expect(mock.calls.imageExists.length).toBe(2);
+			const checkedImages = mock.calls.imageExists.map(c => c.args[0]);
+			expect(checkedImages).toContainEqual(expect.stringContaining("envoy"));
+			expect(checkedImages).toContainEqual(expect.stringContaining("alpine"));
+		});
+
+		test("pulls sidecar images when they don't exist locally", async () => {
+			mock.setImageExists(false);
+			await sidecar.create(instanceId, { proxyConfig: "cfg" });
+
+			// Should have pulled both images
+			expect(mock.calls.pullImage.length).toBe(2);
+			const pulledImages = mock.calls.pullImage.map(c => c.args[0]);
+			expect(pulledImages).toContainEqual(expect.stringContaining("envoy"));
+			expect(pulledImages).toContainEqual(expect.stringContaining("alpine"));
+
+			// imageExists should be called before any createContainer
+			expect(mock.calls.imageExists.length).toBeGreaterThan(0);
+		});
+
+		test("skips pull when sidecar images already exist", async () => {
+			mock.setImageExists(true);
+			await sidecar.create(instanceId, { proxyConfig: "cfg" });
+
+			expect(mock.calls.imageExists.length).toBe(2);
+			expect(mock.calls.pullImage.length).toBe(0);
 		});
 	});
 

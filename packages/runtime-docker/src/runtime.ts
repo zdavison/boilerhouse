@@ -35,12 +35,14 @@ export class DockerRuntime implements Runtime {
 	private readonly sidecar: DockerSidecar;
 	private readonly imageResolver: ImageResolver;
 	private readonly seccompProfilePath?: string;
+	private readonly endpointHost: string;
 
 	constructor(config: DockerConfig = {}) {
 		this.client = new DockerClient({ socketPath: config.socketPath });
-		this.sidecar = new DockerSidecar(this.client);
+		this.sidecar = new DockerSidecar(this.client, config.sidecarTmpDir);
 		this.imageResolver = new DockerImageResolver(this.client);
 		this.seccompProfilePath = config.seccompProfilePath;
+		this.endpointHost = config.endpointHost ?? "127.0.0.1";
 	}
 
 	async available(): Promise<boolean> {
@@ -317,7 +319,7 @@ export class DockerRuntime implements Runtime {
 			if (instance) instance.ports = ports;
 		}
 
-		return { host: "127.0.0.1", ports };
+		return { host: this.endpointHost, ports };
 	}
 
 	async list(): Promise<InstanceId[]> {

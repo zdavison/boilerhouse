@@ -1,6 +1,5 @@
 /**
- * Shared Telegram update parsing — used by both the webhook adapter
- * and the polling adapter.
+ * Shared Telegram utilities — parsing and Bot API helpers.
  */
 
 import type { TriggerPayload } from "../config";
@@ -51,6 +50,23 @@ export function parseTelegramUpdate(
 		: undefined;
 
 	return { updateType, updateId, chatId, userId, text, senderName };
+}
+
+/** Send a message via the Telegram Bot API. */
+export async function sendTelegramMessage(
+	botToken: string,
+	chatId: number,
+	text: string,
+	apiBaseUrl = "https://api.telegram.org",
+): Promise<void> {
+	await fetch(
+		`${apiBaseUrl}/bot${botToken}/sendMessage`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ chat_id: chatId, text }),
+		},
+	);
 }
 
 /**

@@ -1,10 +1,23 @@
-import { Glob } from "bun";
+import { Glob, plugin } from "bun";
 import { resolve, isAbsolute } from "node:path";
 import { eq, and } from "drizzle-orm";
+import * as boilerhouseCore from "@boilerhouse/core";
 import { resolveWorkloadConfig, generateWorkloadId } from "@boilerhouse/core";
 import type { WorkloadConfig } from "@boilerhouse/core";
 import type { DrizzleDb } from "./database";
 import { workloads } from "./schema";
+
+// Register @boilerhouse/core as a virtual module so dynamically-imported
+// workload files can resolve it even in compiled binaries.
+plugin({
+	name: "boilerhouse-core-virtual",
+	setup(build) {
+		build.module("@boilerhouse/core", () => ({
+			exports: boilerhouseCore,
+			loader: "object",
+		}));
+	},
+});
 
 export interface WorkloadLoaderResult {
 	/** New workloads inserted. */

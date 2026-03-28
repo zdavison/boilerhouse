@@ -24,7 +24,6 @@ export { resolveTenantId, TenantResolutionError } from "./resolve-tenant";
 
 export { createWebhookRoutes } from "./adapters/webhook";
 export { createSlackRoutes } from "./adapters/slack";
-export { createTelegramRoutes, registerTelegramWebhooks } from "./adapters/telegram";
 export { TelegramPollAdapter } from "./adapters/telegram-poll";
 export { CronAdapter } from "./adapters/cron";
 
@@ -38,7 +37,6 @@ export type {
 	TriggerDefinition,
 	WebhookConfig,
 	SlackConfig,
-	TelegramConfig,
 	TelegramPollConfig,
 	CronConfig,
 	RateLimitConfig,

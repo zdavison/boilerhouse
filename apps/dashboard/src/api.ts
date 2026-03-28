@@ -183,7 +183,7 @@ export interface TriggerSummary {
 
 export interface CreateTriggerInput {
 	name: string;
-	type: "webhook" | "slack" | "telegram" | "cron";
+	type: "webhook" | "slack" | "telegram-poll" | "cron";
 	tenant: TenantMapping;
 	workload: string;
 	config: Record<string, unknown>;

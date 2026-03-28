@@ -11,8 +11,7 @@ import type { GuardMap } from "../guard";
 import type { Dispatcher } from "../dispatcher";
 import { createLogger } from "@boilerhouse/o11y";
 import { resolveTenantId, TenantResolutionError } from "../resolve-tenant";
-import { parseTelegramUpdate, telegramUpdateToPayload } from "./telegram-parse";
-import { sendTelegramMessage } from "./telegram";
+import { parseTelegramUpdate, telegramUpdateToPayload, sendTelegramMessage } from "./telegram-parse";
 
 const log = createLogger("telegram-poll");
 

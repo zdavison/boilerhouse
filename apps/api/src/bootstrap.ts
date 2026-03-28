@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { eq } from "drizzle-orm";
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import type { Runtime, RuntimeType, NodeId } from "@boilerhouse/core";
@@ -80,7 +81,7 @@ export function configFromEnv(): BootstrapConfig {
 		port: Number(process.env.PORT ?? 3000),
 		listenHost: process.env.LISTEN_HOST ?? "127.0.0.1",
 		dbPath: process.env.DB_PATH ?? "boilerhouse.db",
-		storagePath: process.env.STORAGE_PATH ?? "./data",
+		storagePath: resolve(process.env.STORAGE_PATH ?? "./data"),
 		runtimeType: (process.env.RUNTIME_TYPE ?? "docker") as RuntimeType,
 		maxInstances: Number(process.env.MAX_INSTANCES ?? 100),
 		workloadsDir: process.env.WORKLOADS_DIR,
@@ -133,6 +134,7 @@ export async function bootstrap(config: BootstrapConfig): Promise<AppContext> {
 	const log = createLogger("server");
 
 	mkdirSync(config.storagePath, { recursive: true });
+	mkdirSync(join(config.storagePath, "sidecar"), { recursive: true });
 
 	const db = initDatabase(config.dbPath);
 	const existingNode = db.select().from(nodes).get();
@@ -348,7 +350,12 @@ async function createRuntime(
 ): Promise<Runtime> {
 	if (config.runtimeType === "docker") {
 		log.info({ socketPath: config.dockerSocket ?? "/var/run/docker.sock" }, "Using Docker runtime");
-		return new DockerRuntime({ socketPath: config.dockerSocket, seccompProfilePath: config.seccompProfilePath });
+		return new DockerRuntime({
+			socketPath: config.dockerSocket,
+			seccompProfilePath: config.seccompProfilePath,
+			sidecarTmpDir: join(config.storagePath, "sidecar"),
+			endpointHost: process.env.DOCKER_HOST_ADDRESS ?? "127.0.0.1",
+		});
 	}
 
 	if (config.runtimeType === "kubernetes") {

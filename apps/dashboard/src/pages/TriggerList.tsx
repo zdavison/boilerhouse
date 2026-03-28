@@ -14,7 +14,7 @@ import {
 const TYPE_COLORS: Record<string, string> = {
 	webhook: "text-status-blue bg-status-blue/10 border-status-blue/20",
 	slack: "text-status-green bg-status-green/10 border-status-green/20",
-	telegram: "text-accent bg-accent/10 border-accent/20",
+	"telegram-poll": "text-accent bg-accent/10 border-accent/20",
 	cron: "text-status-yellow bg-status-yellow/10 border-status-yellow/20",
 };
 
@@ -49,7 +49,7 @@ function timeAgo(date: string | Date): string {
 const TENANT_DEFAULTS: Record<string, { mode: "static" | "dynamic"; fromField: string; prefix: string }> = {
 	webhook: { mode: "dynamic", fromField: "tenantId", prefix: "" },
 	slack: { mode: "dynamic", fromField: "user", prefix: "slack-" },
-	telegram: { mode: "dynamic", fromField: "chatId", prefix: "tg-" },
+	"telegram-poll": { mode: "dynamic", fromField: "chatId", prefix: "tg-" },
 	cron: { mode: "static", fromField: "", prefix: "" },
 };
 
@@ -81,7 +81,6 @@ function CreateTriggerModal({
 	const [slackBotToken, setSlackBotToken] = useState("");
 	const [slackEventTypes, setSlackEventTypes] = useState("");
 	const [telegramBotToken, setTelegramBotToken] = useState("");
-	const [telegramSecretToken, setTelegramSecretToken] = useState("");
 	const [telegramUpdateTypes, setTelegramUpdateTypes] = useState("message");
 	const [cronSchedule, setCronSchedule] = useState("");
 	const [cronPayload, setCronPayload] = useState("");
@@ -154,9 +153,8 @@ function CreateTriggerModal({
 					botToken: slackBotToken,
 					eventTypes: slackEventTypes.split(",").map((s) => s.trim()).filter(Boolean),
 				};
-			case "telegram": {
+			case "telegram-poll": {
 				const cfg: Record<string, unknown> = { botToken: telegramBotToken };
-				if (telegramSecretToken) cfg.secretToken = telegramSecretToken;
 				cfg.updateTypes = telegramUpdateTypes.split(",").map((s) => s.trim()).filter(Boolean);
 				return cfg;
 			}
@@ -224,7 +222,7 @@ function CreateTriggerModal({
 					>
 						<option value="webhook">webhook</option>
 						<option value="slack">slack</option>
-						<option value="telegram">telegram</option>
+						<option value="telegram-poll">telegram</option>
 						<option value="cron">cron</option>
 					</select>
 				</div>
@@ -374,7 +372,7 @@ function CreateTriggerModal({
 					</>
 				)}
 
-				{type === "telegram" && (
+				{type === "telegram-poll" && (
 					<>
 						<div>
 							<label className={labelCls}>Bot Token</label>
@@ -385,15 +383,6 @@ function CreateTriggerModal({
 								onChange={(e) => setTelegramBotToken(e.target.value)}
 								placeholder="123456:ABC-..."
 								required
-							/>
-						</div>
-						<div>
-							<label className={labelCls}>Secret Token (optional)</label>
-							<input
-								className={inputCls}
-								type="password"
-								value={telegramSecretToken}
-								onChange={(e) => setTelegramSecretToken(e.target.value)}
 							/>
 						</div>
 						<div>
@@ -588,7 +577,7 @@ function TestTriggerModal({
 			return cronConfig.payload ? JSON.stringify(cronConfig.payload, null, 2) : "{}";
 		}
 		if (trigger.type === "slack") return JSON.stringify({ type: "app_mention", text: "hello", channel: "C0001", user: "U0001" }, null, 2);
-		if (trigger.type === "telegram") return JSON.stringify({ message: { text: "hello", chat: { id: 12345 }, from: { id: 67890 } } }, null, 2);
+		if (trigger.type === "telegram-poll") return JSON.stringify({ message: { text: "hello", chat: { id: 12345 }, from: { id: 67890 } } }, null, 2);
 		return "{}";
 	});
 	const [testing, setTesting] = useState(false);

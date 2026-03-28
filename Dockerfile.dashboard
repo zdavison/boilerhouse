@@ -7,7 +7,8 @@ COPY . .
 RUN bun install
 RUN NODE_ENV=production bun build --compile apps/dashboard/src/server.ts --outfile dashboard
 
-FROM gcr.io/distroless/base-nossl-debian12
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/dashboard /dashboard
 

@@ -9,7 +9,6 @@
  *   PORT              — listen port (default 3001)
  *   API_URL           — internal API base URL (default http://localhost:3000)
  *   TRIGGERS_CONFIG   — path to triggers JSON config file
- *   TRIGGERS_PUBLIC_URL — public URL for registering Telegram webhooks
  */
 import { Elysia } from "elysia";
 import {
@@ -18,8 +17,6 @@ import {
 	CronAdapter,
 	createWebhookRoutes,
 	createSlackRoutes,
-	createTelegramRoutes,
-	registerTelegramWebhooks,
 	resolveGuard,
 } from "@boilerhouse/triggers";
 import type {
@@ -27,7 +24,6 @@ import type {
 	TriggerDefinition,
 	WebhookConfig,
 	SlackConfig,
-	TelegramConfig,
 	CronConfig,
 	GuardMap,
 } from "@boilerhouse/triggers";
@@ -53,7 +49,10 @@ async function loadTriggers(): Promise<TriggerDefinition[]> {
 		return [];
 	}
 
-	const raw = await file.json();
+	let text = await file.text();
+	// Interpolate ${ENV_VAR} references from process.env
+	text = text.replace(/\$\{(\w+)\}/g, (_, key) => process.env[key] ?? "");
+	const raw = JSON.parse(text);
 	if (!Array.isArray(raw)) {
 		throw new Error("TRIGGERS_CONFIG must be a JSON array of trigger definitions");
 	}
@@ -127,9 +126,6 @@ const webhookTriggers = triggers.filter(
 const slackTriggers = triggers.filter(
 	(t): t is TriggerDefinition & { config: SlackConfig } => t.type === "slack",
 );
-const telegramTriggers = triggers.filter(
-	(t): t is TriggerDefinition & { config: TelegramConfig } => t.type === "telegram",
-);
 const cronTriggers = triggers.filter(
 	(t): t is TriggerDefinition & { config: CronConfig } => t.type === "cron",
 );
@@ -137,7 +133,6 @@ const cronTriggers = triggers.filter(
 // Build adapter routes
 const webhookRoutes = createWebhookRoutes(webhookTriggers, dispatcher, undefined, guardMap);
 const slackRoutes = createSlackRoutes(slackTriggers, dispatcher, undefined, guardMap);
-const telegramRoutes = createTelegramRoutes(telegramTriggers, dispatcher, undefined, guardMap);
 
 // Start cron adapter
 const cronAdapter = new CronAdapter();
@@ -146,19 +141,11 @@ if (cronTriggers.length > 0) {
 	log.info({ count: cronTriggers.length }, "Started cron triggers");
 }
 
-// Register Telegram webhooks if public URL is set
-const publicUrl = process.env.TRIGGERS_PUBLIC_URL;
-if (telegramTriggers.length > 0 && publicUrl) {
-	registerTelegramWebhooks(telegramTriggers, publicUrl).catch((err) => {
-		log.error({ err }, "Failed to register Telegram webhooks");
-	});
-}
-
 // Mount all adapter routes
 const app = new Elysia()
 	.get("/healthz", () => ({ status: "ok" }));
 
-const allRoutes = { ...webhookRoutes, ...slackRoutes, ...telegramRoutes };
+const allRoutes = { ...webhookRoutes, ...slackRoutes };
 for (const [path, handler] of Object.entries(allRoutes)) {
 	app.post(path, async ({ request }) => handler(request));
 }

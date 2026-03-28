@@ -12,8 +12,6 @@ import {
 	QueuedDispatcher,
 	createWebhookRoutes,
 	createSlackRoutes,
-	createTelegramRoutes,
-	registerTelegramWebhooks,
 	resolveDriver,
 } from "@boilerhouse/triggers";
 import type {
@@ -22,7 +20,6 @@ import type {
 	DriverMap,
 	WebhookConfig,
 	SlackConfig,
-	TelegramConfig,
 	TelegramPollConfig,
 	CronConfig,
 } from "@boilerhouse/triggers";
@@ -157,9 +154,6 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 	const slackTriggers = allTriggers.filter(
 		(t): t is TriggerDefinition & { config: SlackConfig } => t.type === "slack",
 	);
-	const telegramTriggers = allTriggers.filter(
-		(t): t is TriggerDefinition & { config: TelegramConfig } => t.type === "telegram",
-	);
 	const telegramPollTriggers = allTriggers.filter(
 		(t): t is TriggerDefinition & { config: TelegramPollConfig } => t.type === "telegram-poll",
 	);
@@ -173,14 +167,12 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 	let routesReady = false;
 	let webhookRoutes: Record<string, (req: Request) => Promise<Response>> = {};
 	let slackRoutes: Record<string, (req: Request) => Promise<Response>> = {};
-	let telegramRoutes: Record<string, (req: Request) => Promise<Response>> = {};
 	const cronAdapter = new CronAdapter();
 	const telegramPollAdapter = new TelegramPollAdapter();
 
 	deps.log?.info({
 		webhook: webhookTriggers.length,
 		slack: slackTriggers.length,
-		telegram: telegramTriggers.length,
 		telegramPoll: telegramPollTriggers.length,
 		cron: cronTriggers.length,
 	}, "Trigger types loaded");
@@ -215,7 +207,6 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		// Pass queuedDispatcher to adapters — structurally compatible with Dispatcher
 		webhookRoutes = createWebhookRoutes(webhookTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
 		slackRoutes = createSlackRoutes(slackTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
-		telegramRoutes = createTelegramRoutes(telegramTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
 
 		if (cronTriggers.length > 0) {
 			cronAdapter.start(cronTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
@@ -225,14 +216,6 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		if (telegramPollTriggers.length > 0) {
 			telegramPollAdapter.start(telegramPollTriggers, queuedDispatcher as unknown as typeof dispatcher, driverMap);
 			deps.log?.info({ count: telegramPollTriggers.length }, "Started telegram-poll triggers");
-		}
-
-		// Register Telegram webhooks if public URL is set
-		const publicUrl = process.env.TRIGGERS_PUBLIC_URL;
-		if (telegramTriggers.length > 0 && publicUrl) {
-			registerTelegramWebhooks(telegramTriggers, publicUrl).catch((err) => {
-				deps.log?.error({ err }, "Failed to register Telegram webhooks");
-			});
 		}
 
 		routesReady = true;
@@ -250,10 +233,6 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 		const rl = t.config.rateLimit ?? DEFAULT_RATE_LIMIT;
 		pathRateLimiters.set(t.config.path, createRateLimiter(rl));
 	}
-	for (const t of telegramTriggers) {
-		const rl = t.config.rateLimit ?? DEFAULT_RATE_LIMIT;
-		pathRateLimiters.set(`/telegram/${t.name}`, createRateLimiter(rl));
-	}
 	if (slackTriggers.length > 0) {
 		const rl = slackTriggers.find((t) => t.config.rateLimit)?.config.rateLimit ?? DEFAULT_RATE_LIMIT;
 		pathRateLimiters.set("/slack/events", createRateLimiter(rl));
@@ -266,7 +245,6 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 	// Handlers are looked up at request time from the lazily-populated maps.
 	const allPaths = new Set<string>();
 	for (const t of webhookTriggers) allPaths.add(t.config.path);
-	for (const t of telegramTriggers) allPaths.add(`/telegram/${t.name}`);
 	if (slackTriggers.length > 0) allPaths.add("/slack/events");
 
 	for (const path of allPaths) {
@@ -287,7 +265,7 @@ export function triggerAdapterPlugin(deps: RouteDeps) {
 				set.headers["Retry-After"] = String(result.retryAfter);
 				return { error: "Too many requests" };
 			}
-			const allRoutes = { ...webhookRoutes, ...slackRoutes, ...telegramRoutes };
+			const allRoutes = { ...webhookRoutes, ...slackRoutes };
 			const handler = allRoutes[path];
 			if (!handler) {
 				set.status = 404;

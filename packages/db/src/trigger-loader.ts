@@ -8,7 +8,7 @@ import { triggers } from "./schema";
 /** Shape of a trigger definition file's default export. */
 interface TriggerFileConfig {
 	name: string;
-	type: "webhook" | "slack" | "telegram" | "cron";
+	type: "webhook" | "slack" | "telegram-poll" | "cron";
 	tenant: { static: string } | { fromField: string; prefix?: string };
 	workload: string;
 	config: Record<string, unknown>;

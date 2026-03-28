@@ -31,7 +31,11 @@ export interface SidecarCreateOptions {
  * Each instance that needs network policy enforcement gets a sidecar.
  */
 export class DockerSidecar {
-	constructor(private readonly client: DockerClient) {}
+	private readonly tmpBase: string;
+
+	constructor(private readonly client: DockerClient, tmpBase?: string) {
+		this.tmpBase = tmpBase ?? tmpdir();
+	}
 
 	/**
 	 * Prepares CA cert for mount into the workload container and returns
@@ -41,13 +45,21 @@ export class DockerSidecar {
 		instanceId: string,
 		proxyCaCert: string,
 	): { caCertPath: string; binds: string[]; env: Record<string, string> } {
-		const caCertPath = join(tmpdir(), `boilerhouse-${instanceId}-ca.crt`);
+		const caCertPath = join(this.tmpBase, `boilerhouse-${instanceId}-ca.crt`);
 		writeFileSync(caCertPath, proxyCaCert);
 		return {
 			caCertPath,
 			binds: [`${caCertPath}:/etc/boilerhouse/proxy-ca.crt:ro`],
 			env: { NODE_EXTRA_CA_CERTS: "/etc/boilerhouse/proxy-ca.crt" },
 		};
+	}
+
+	/** Pull an image if it doesn't exist locally. */
+	private async ensureImage(image: string): Promise<void> {
+		const exists = await this.client.imageExists(image);
+		if (!exists) {
+			await this.client.pullImage(image);
+		}
 	}
 
 	/**
@@ -58,14 +70,14 @@ export class DockerSidecar {
 		instanceId: string,
 		options: SidecarCreateOptions,
 	): Promise<SidecarState> {
-		const configPath = join(tmpdir(), `boilerhouse-${instanceId}-envoy.yaml`);
+		const configPath = join(this.tmpBase, `boilerhouse-${instanceId}-envoy.yaml`);
 		writeFileSync(configPath, options.proxyConfig);
 
 		// Write per-domain TLS certs for MITM
 		const envoyBinds: string[] = [`${configPath}:/etc/envoy/envoy.yaml:ro`];
 		let certsDir: string | undefined;
 		if (options.proxyCerts && options.proxyCerts.length > 0) {
-			certsDir = mkdtempSync(join(tmpdir(), `boilerhouse-${instanceId}-certs-`));
+			certsDir = mkdtempSync(join(this.tmpBase, `boilerhouse-${instanceId}-certs-`));
 			for (const { domain, cert, key } of options.proxyCerts) {
 				const safe = domain.replace(/[.*]/g, "_").replace(/^_+/, "");
 				writeFileSync(join(certsDir, `${safe}.crt`), cert);
@@ -73,6 +85,10 @@ export class DockerSidecar {
 			}
 			envoyBinds.push(`${certsDir}:/etc/envoy/certs:ro`);
 		}
+
+		// Ensure sidecar images are available
+		await this.ensureImage(ENVOY_IMAGE);
+		await this.ensureImage(IPTABLES_IMAGE);
 
 		// Envoy sidecar — shares workload's network namespace
 		await this.client.createContainer(`${instanceId}-proxy`, {

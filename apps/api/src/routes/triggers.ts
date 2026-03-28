@@ -18,7 +18,6 @@ const TriggerBodySchema = t.Object({
 	type: t.Union([
 		t.Literal("webhook"),
 		t.Literal("slack"),
-		t.Literal("telegram"),
 		t.Literal("telegram-poll"),
 		t.Literal("cron"),
 	]),
@@ -65,7 +64,7 @@ export function triggerRoutes(deps: RouteDeps) {
 				const row = {
 					id: generateTriggerId(),
 					name: body.name,
-					type: body.type as "webhook" | "slack" | "telegram" | "telegram-poll" | "cron",
+					type: body.type as "webhook" | "slack" | "telegram-poll" | "cron",
 					tenant: body.tenant as { static: string } | { fromField: string; prefix?: string },
 					workload: body.workload,
 					config: body.config as Record<string, unknown>,
@@ -98,7 +97,7 @@ export function triggerRoutes(deps: RouteDeps) {
 				db.update(triggers)
 					.set({
 						name: body.name,
-						type: body.type as "webhook" | "slack" | "telegram" | "telegram-poll" | "cron",
+						type: body.type as "webhook" | "slack" | "telegram-poll" | "cron",
 						tenant: body.tenant as { static: string } | { fromField: string; prefix?: string },
 						workload: body.workload,
 						config: body.config as Record<string, unknown>,

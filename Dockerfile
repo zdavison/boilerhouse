@@ -7,20 +7,15 @@ COPY . .
 RUN bun install
 RUN NODE_ENV=production bun build --compile apps/cli/src/main.ts --outfile boilerhouse
 
-# Install @boilerhouse/core from npm so workload files can import it
-WORKDIR /workloads
-RUN bun init -y && bun add @boilerhouse/core
-
-FROM gcr.io/distroless/base-nossl-debian12
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/boilerhouse /boilerhouse
 COPY --from=build /app/packages/db/drizzle /drizzle
-COPY --from=build /workloads/node_modules /opt/workload-deps/node_modules
 
 EXPOSE 3000 9464
 
 ENV NODE_ENV=production
-ENV NODE_PATH=/opt/workload-deps/node_modules
 ENV MIGRATIONS_DIR=/drizzle
 ENV RUNTIME_TYPE=docker
 ENV LISTEN_HOST=0.0.0.0

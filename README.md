@@ -1,12 +1,20 @@
 # Boilerhouse
 
-Multi-tenant container orchestration platform.
+Multi-tenant container orchestration for building SaaS products, built for AI agents first.
 
-<!-- WRITE: one-paragraph pitch — what it does, who it's for -->
+Some use cases:
+  - Giving users their own persistent AI agent container that only exists while theyre using it.
+  - Slack bot that runs AI agents to automatically debug alerts.
+  - On-demand coding agents.
+  - 
 
 ## Features
 
-<!-- WRITE: bullet list of key capabilities — multi-runtime, pooling, hibernation, triggers, tenant isolation, observability -->
+- Spin up containers on-demand in response to **Triggers** (e.g. Telegram, Slack, Webhook, Cron)
+- Spin down those container when idle.
+- Persist tenant data and restore it on next claim.
+- Maintain warm container pools so tenants can claim containers as quickly as possible.
+- Isolate containers such that users can run whatever you want on them, safely.
 
 ## Quick Start
 

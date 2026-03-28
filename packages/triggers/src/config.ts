@@ -48,7 +48,7 @@ export interface TriggerDefinition {
 	name: string;
 
 	/** Adapter type. */
-	type: "webhook" | "slack" | "telegram" | "telegram-poll" | "cron";
+	type: "webhook" | "slack" | "telegram-poll" | "cron";
 
 	/** How to resolve the tenant ID from each event. */
 	tenant: TenantMapping;
@@ -57,7 +57,7 @@ export interface TriggerDefinition {
 	workload: string;
 
 	/** Adapter-specific configuration. */
-	config: WebhookConfig | SlackConfig | TelegramConfig | TelegramPollConfig | CronConfig;
+	config: WebhookConfig | SlackConfig | TelegramPollConfig | CronConfig;
 
 	/**
 	 * Driver for WebSocket protocol translation.
@@ -123,27 +123,6 @@ export interface SlackConfig {
 	rateLimit?: RateLimitConfig;
 }
 
-export interface TelegramConfig {
-	/** Telegram bot token from @BotFather.
-	 * @example "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-	 */
-	botToken: string;
-
-	/** Webhook secret token for verifying incoming updates.
-	 * Telegram sends this in the X-Telegram-Bot-Api-Secret-Token header.
-	 */
-	secretToken?: string;
-
-	/** Message types to handle.
-	 * @default ["message"]
-	 * @example ["message", "callback_query"]
-	 */
-	updateTypes?: string[];
-
-	/** Rate limit for this trigger's endpoint. */
-	rateLimit?: RateLimitConfig;
-}
-
 export interface TelegramPollConfig {
 	/** Telegram bot token from @BotFather.
 	 * @example "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
@@ -182,7 +161,7 @@ export interface CronConfig {
  * ```ts
  * export default defineTrigger({
  *   name: "tg-support",
- *   type: "telegram",
+ *   type: "telegram-poll",
  *   workload: "support-agent",
  *   ...
  * });
