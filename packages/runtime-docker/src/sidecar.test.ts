@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DockerClient } from "./client";
@@ -148,6 +148,16 @@ describe("DockerSidecar", () => {
 			expect(proxyBody.HostConfig.Binds).toContainEqual(
 				`${state.certsDir}:/etc/envoy/certs:ro`,
 			);
+		});
+
+		test("certs directory is world-readable for envoy user", async () => {
+			const state = await sidecar.create(instanceId, {
+				proxyConfig: "cfg",
+				proxyCerts: [{ domain: "a.com", cert: "c", key: "k" }],
+			});
+
+			const mode = statSync(state.certsDir!).mode & 0o777;
+			expect(mode).toBe(0o755);
 		});
 
 		test("returns SidecarState with correct paths", async () => {

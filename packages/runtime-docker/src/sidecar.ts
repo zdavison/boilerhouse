@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, unlinkSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, unlinkSync, rmSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DockerClient } from "./client";
@@ -78,6 +78,7 @@ export class DockerSidecar {
 		let certsDir: string | undefined;
 		if (options.proxyCerts && options.proxyCerts.length > 0) {
 			certsDir = mkdtempSync(join(this.tmpBase, `boilerhouse-${instanceId}-certs-`));
+			chmodSync(certsDir, 0o755);
 			for (const { domain, cert, key } of options.proxyCerts) {
 				const safe = domain.replace(/[.*]/g, "_").replace(/^_+/, "");
 				writeFileSync(join(certsDir, `${safe}.crt`), cert);
