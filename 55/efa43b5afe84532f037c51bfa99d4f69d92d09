@@ -1,0 +1,25 @@
+packages/runtime-docker/src/sidecar.test.ts
+  3a3272f54903a1c7 2,153-162
+packages/runtime-docker/src/sidecar.ts
+  3a3272f54903a1c7 1,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "55efa43b5afe84532f037c51bfa99d4f69d92d09",
+  "prompts": {
+    "3a3272f54903a1c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4eb04749-9593-4165-bb2d-29d1cab1afbc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 2,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
