@@ -1,0 +1,36 @@
+docs/superpowers/specs/2026-04-02-boilerhouse-operator-design.md
+  648c08999a339baf 134-138,158,179,192-196,210,296-298,303,338,346
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "46896b873b0d948d72f728f7faf11568975c7c35",
+  "prompts": {
+    "2b6cd2584b49ac7f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2feb56c-1de8-4256-8531-5881bf115f30",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "648c08999a339baf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e168362e-1805-4182-8589-1a5eeb10b526",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 11,
+      "accepted_lines": 19,
+      "overriden_lines": 0
+    }
+  }
+}
