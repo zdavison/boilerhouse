@@ -1,0 +1,25 @@
+apps/operator/deploy/rbac.yaml
+  648c08999a339baf 1-54
+apps/operator/deploy/deployment.yaml
+  648c08999a339baf 1-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "c4b9ed268d09033074c3b1de6b2d3781218ab4ae",
+  "prompts": {
+    "648c08999a339baf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e168362e-1805-4182-8589-1a5eeb10b526",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 168,
+      "overriden_lines": 0
+    }
+  }
+}
