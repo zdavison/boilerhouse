@@ -22,3 +22,27 @@ export type {
 	K8sPodSpec,
 	K8sObjectMeta,
 } from "./types";
+export {
+	API_GROUP,
+	API_VERSION,
+} from "./crd-types";
+export type {
+	BoilerhouseWorkloadSpec,
+	BoilerhouseWorkloadStatus,
+	BoilerhouseWorkload,
+	BoilerhousePoolSpec,
+	BoilerhousePoolStatus,
+	BoilerhousePool,
+	BoilerhouseClaimSpec,
+	BoilerhouseClaimStatus,
+	BoilerhouseClaim,
+	BoilerhouseTriggerSpec,
+	BoilerhouseTriggerStatus,
+	BoilerhouseTrigger,
+	CrdList,
+	WatchEvent,
+} from "./crd-types";
+export { KubeWatcher } from "./watch";
+export type { KubeWatcherOptions, WatchEventHandler } from "./watch";
+export { FINALIZER, addFinalizer, removeFinalizer, KubeStatusPatcher } from "./status";
+export type { StatusPatcher, FinalizableMetadata } from "./status";
