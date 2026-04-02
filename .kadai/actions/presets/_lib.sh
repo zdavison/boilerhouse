@@ -9,6 +9,61 @@ PRESET_ENV_FILE="$PRESET_ROOT/apps/api/.env"
 PRESET_WORKLOADS_DIR="$PRESET_ROOT/workloads"
 PRESET_STAGING_DIR="$PRESET_ROOT/.boilerhouse-preset/workloads"
 
+# ── Prerequisite checks ──────────────────────────────────────────────────────
+
+# Returns 0 if version $1 >= $2 (both as x.y.z).
+_version_gte() {
+  local IFS=.
+  local -a a b
+  read -ra a <<< "$1"
+  read -ra b <<< "$2"
+  for i in 0 1 2; do
+    local va="${a[$i]:-0}" vb="${b[$i]:-0}"
+    if [ "$va" -gt "$vb" ]; then return 0; fi
+    if [ "$va" -lt "$vb" ]; then return 1; fi
+  done
+  return 0
+}
+
+# Abort if bun is not installed or older than MIN_BUN_VERSION.
+ensure_bun_version() {
+  local min="1.3.11"
+  local current
+  if ! current=$(bun --version 2>/dev/null); then
+    echo "Error: bun is not installed or not on PATH." >&2
+    echo "Install it from https://bun.sh" >&2
+    exit 1
+  fi
+  if ! _version_gte "$current" "$min"; then
+    echo "Error: bun $current is too old (need >= $min)." >&2
+    echo "Upgrade with: curl -fsSL https://bun.sh/install | bash" >&2
+    exit 1
+  fi
+  echo "  bun $current ✓"
+}
+
+# Start docker compose services if not already running.
+ensure_compose_up() {
+  local compose_file="$PRESET_ROOT/docker-compose.yml"
+
+  if ! docker info &>/dev/null; then
+    echo "  Warning: Docker daemon not running — skipping compose services" >&2
+    return 0
+  fi
+
+  local running
+  running=$(docker compose -f "$compose_file" ps --services --filter "status=running" 2>/dev/null | wc -l | tr -d ' ')
+
+  if [ "$running" -gt 0 ]; then
+    echo "  Docker compose services already running ($running up)"
+    return 0
+  fi
+
+  echo "  Starting docker compose services..."
+  docker compose -f "$compose_file" up -d --quiet-pull
+  echo "  Docker compose services started"
+}
+
 # ── Env helpers ──────────────────────────────────────────────────────────────
 
 load_env() {

@@ -19,6 +19,13 @@ echo ""
 
 load_env
 
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+
+echo "Prerequisites:"
+ensure_bun_version
+ensure_compose_up
+echo ""
+
 # ── Core settings ────────────────────────────────────────────────────────────
 
 echo "Core settings:"
