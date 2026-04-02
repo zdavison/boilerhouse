@@ -1,0 +1,34 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "2026bec07cf07038161d056c192bd2e61c2313da",
+  "prompts": {
+    "dc50e95a5d031a23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "745eafbc-19cc-489b-b5e8-f60d11726c27",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 308,
+      "total_deletions": 128,
+      "accepted_lines": 301,
+      "overriden_lines": 0
+    },
+    "fba09568d0bf2096": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7e5b4e1-753d-4c9b-9b59-400ebf98d262",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Zachary Davison <zac.developer@gmail.com>",
+      "messages": [],
+      "total_additions": 168,
+      "total_deletions": 159,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    }
+  }
+}
