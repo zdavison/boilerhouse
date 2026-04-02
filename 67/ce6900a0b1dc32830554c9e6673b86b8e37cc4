@@ -1,0 +1,25 @@
+packages/domain/src/secret-resolver.ts
+  648c08999a339baf 1-13
+packages/domain/src/index.ts
+  648c08999a339baf 3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "67ce6900a0b1dc32830554c9e6673b86b8e37cc4",
+  "prompts": {
+    "648c08999a339baf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e168362e-1805-4182-8589-1a5eeb10b526",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 0,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
