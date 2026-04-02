@@ -1,0 +1,21 @@
+{
+  "name": "@boilerhouse/operator",
+  "version": "0.1.11",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts",
+    "start": "bun run src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@boilerhouse/core": "workspace:*",
+    "@boilerhouse/db": "workspace:*",
+    "@boilerhouse/domain": "workspace:*",
+    "@boilerhouse/runtime-kubernetes": "workspace:*",
+    "@boilerhouse/storage": "workspace:*",
+    "@boilerhouse/o11y": "workspace:*",
+    "@boilerhouse/triggers": "workspace:*",
+    "drizzle-orm": "^0.38.0"
+  }
+}
