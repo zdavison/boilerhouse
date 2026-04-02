@@ -1,0 +1,37 @@
+apps/operator/src/bootstrap.ts
+  648c08999a339baf 20,33-34,37,91-98,124,127-180,208-214,216-221,228-234,236-241,255-259,274-280,282-290
+apps/operator/src/workload-controller.ts
+  648c08999a339baf 1,5,27-66,81
+packages/runtime-kubernetes/src/crd-types.ts
+  648c08999a339baf 44
+apps/operator/src/workload-controller.test.ts
+  648c08999a339baf 31,50
+apps/operator/src/trigger-controller.test.ts
+  648c08999a339baf 61
+apps/operator/src/pool-controller.ts
+  648c08999a339baf 29-47
+apps/operator/src/converters.ts
+  648c08999a339baf 12,42
+apps/operator/src/trigger-controller.ts
+  648c08999a339baf 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "ac94179871e13ba353967e8854626a07520dfbd0",
+  "prompts": {
+    "648c08999a339baf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e168362e-1805-4182-8589-1a5eeb10b526",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 185,
+      "total_deletions": 13,
+      "accepted_lines": 196,
+      "overriden_lines": 0
+    }
+  }
+}
