@@ -46,6 +46,7 @@ echo ""
 # ── OpenClaw-specific settings ───────────────────────────────────────────────
 
 echo "OpenClaw settings:"
+ensure_env_var ALLOWLIST_TENANT_IDS "Telegram allowlist tenant IDs (comma-separated, e.g. tg-yourusername)"
 ensure_env_var ANTHROPIC_API_KEY "Anthropic API key (sk-ant-...)" --secret
 ensure_env_var TELEGRAM_BOT_TOKEN "Telegram bot token"
 
@@ -65,6 +66,7 @@ echo ""
 echo "  Runtime:         $RUNTIME_TYPE"
 echo "  Storage:         $STORAGE_PATH"
 echo "  Workloads:       openclaw.workload.ts, tg-openclaw.trigger.ts"
+echo "  Allowlist:       $ALLOWLIST_TENANT_IDS"
 echo "  Telegram bot:    ${TELEGRAM_BOT_TOKEN:0:10}..."
 echo "  Anthropic key:   ${ANTHROPIC_API_KEY:0:12}..."
 echo ""

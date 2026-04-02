@@ -19,7 +19,7 @@ export default defineTrigger({
 		{
 			guard: "@boilerhouse/guard-allowlist",
 			guardOptions: {
-				tenantIds: ["tg-thingsdoer"],
+				tenantIds: (process.env.ALLOWLIST_TENANT_IDS ?? "").split(",").filter(Boolean),
 				denyMessage: "You are not authorised to use this service.",
 			},
 		},
