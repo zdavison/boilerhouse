@@ -1,0 +1,25 @@
+apps/operator/src/main.ts
+  648c08999a339baf 2,8-14
+apps/operator/src/bootstrap.ts
+  648c08999a339baf 1-264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "8094db4c7f4a42b72850c130a174f0f83469bad6",
+  "prompts": {
+    "648c08999a339baf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e168362e-1805-4182-8589-1a5eeb10b526",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 429,
+      "total_deletions": 4,
+      "accepted_lines": 440,
+      "overriden_lines": 0
+    }
+  }
+}
