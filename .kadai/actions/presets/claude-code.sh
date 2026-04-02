@@ -46,7 +46,7 @@ echo ""
 # ── Claude Code-specific settings ────────────────────────────────────────────
 
 echo "Claude Code settings:"
-ensure_env_var ALLOWLIST_TENANT_IDS "Telegram allowlist tenant IDs (comma-separated, e.g. tg-yourusername)"
+ensure_env_var BOILERHOUSE_ALLOWLIST_TENANT_IDS "Telegram allowlist tenant IDs (comma-separated, e.g. tg-yourusername)"
 ensure_env_var ANTHROPIC_API_KEY "Anthropic API key (sk-ant-...)" --secret
 ensure_env_var TELEGRAM_BOT_TOKEN_CC "Telegram bot token for Claude Code"
 
@@ -66,7 +66,7 @@ echo ""
 echo "  Runtime:         $RUNTIME_TYPE"
 echo "  Storage:         $STORAGE_PATH"
 echo "  Workloads:       claude-code.workload.ts, tg-claude-code.trigger.ts"
-echo "  Allowlist:       $ALLOWLIST_TENANT_IDS"
+echo "  Allowlist:       $BOILERHOUSE_ALLOWLIST_TENANT_IDS"
 echo "  Telegram bot:    ${TELEGRAM_BOT_TOKEN_CC:0:10}..."
 echo "  Anthropic key:   ${ANTHROPIC_API_KEY:0:12}..."
 echo ""
