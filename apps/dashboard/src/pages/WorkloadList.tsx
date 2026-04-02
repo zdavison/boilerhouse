@@ -102,7 +102,7 @@ function IconButton({
 
 // --- Claim Cell ---
 
-function ClaimCell({ workloadName, disabled, onClaim }: { workloadName: string; disabled?: boolean; onClaim?: () => void }) {
+function ClaimCell({ workloadName, disabled, onClaim }: { workloadName: string; disabled?: boolean; onClaim?: (source: string) => void }) {
 	const [expanded, setExpanded] = useState(false);
 	const [tenantId, setTenantId] = useState("");
 	const [claiming, setClaiming] = useState(false);
@@ -117,7 +117,7 @@ function ClaimCell({ workloadName, disabled, onClaim }: { workloadName: string; 
 		try {
 			const res = await api.claimWorkload(tenantId.trim(), workloadName);
 			setResult(res);
-			onClaim?.();
+			onClaim?.(res.source);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Claim failed");
 		} finally {
@@ -294,6 +294,19 @@ function InstanceRow({
 	);
 }
 
+// --- Pending Warm Placeholder ---
+
+function PendingWarmRow() {
+	return (
+		<div className="flex items-center h-7 px-2 text-sm font-mono border-b border-border/10">
+			<span style={{ width: GUTTER_W + STATUS_W }} className="shrink-0 flex items-center justify-end pr-2">
+				<Loader2 size={10} className="text-muted animate-spin" />
+			</span>
+			<span className="text-muted text-xs">warming…</span>
+		</div>
+	);
+}
+
 // --- Workload Group ---
 
 function InstanceSection({
@@ -350,6 +363,7 @@ function WorkloadGroup({
 	navigate,
 	busyInstances,
 	onClaim,
+	pendingWarm,
 }: {
 	node: WorkloadTreeNode;
 	expanded: boolean;
@@ -359,11 +373,12 @@ function WorkloadGroup({
 	onClaimInstance?: (instanceId: string, tenantId: string, workloadName: string) => void;
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
-	onClaim?: () => void;
+	onClaim?: (workloadId: string, source: string) => void;
+	pendingWarm?: boolean;
 }) {
 	const { workload, poolInstances, claimedInstances } = node;
 	const Chevron = expanded ? ChevronDown : ChevronRight;
-	const hasInstances = poolInstances.length > 0 || claimedInstances.length > 0;
+	const hasInstances = poolInstances.length > 0 || claimedInstances.length > 0 || !!pendingWarm;
 
 	return (
 		<div className="mb-3">
@@ -398,23 +413,26 @@ function WorkloadGroup({
 				<span className="flex-1" />
 
 				<div onClick={(e) => e.stopPropagation()}>
-					<ClaimCell workloadName={workload.name} disabled={workload.status !== "ready"} onClaim={onClaim} />
+					<ClaimCell workloadName={workload.name} disabled={workload.status !== "ready"} onClaim={(source) => onClaim?.(workload.workloadId, source)} />
 				</div>
 			</div>
 
 			{/* Expanded children */}
 			{expanded && hasInstances && (
 				<div className="mt-1">
-					{poolInstances.length > 0 && (
-						<InstanceSection
-							label="pool"
-							instances={poolInstances}
-							onAction={onAction}
-							onConnect={onConnect}
-							onClaimInstance={onClaimInstance}
-							workloadName={workload.name}
-							busyInstances={busyInstances}
-						/>
+					{(poolInstances.length > 0 || pendingWarm) && (
+						<>
+							<InstanceSection
+								label="pool"
+								instances={poolInstances}
+								onAction={onAction}
+								onConnect={onConnect}
+								onClaimInstance={onClaimInstance}
+								workloadName={workload.name}
+								busyInstances={busyInstances}
+							/>
+							{pendingWarm && <PendingWarmRow />}
+						</>
 					)}
 					{claimedInstances.length > 0 && (
 						<InstanceSection
@@ -444,13 +462,14 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 	const [initialized, setInitialized] = useState(false);
 	const [connectTarget, setConnectTarget] = useState<{ instanceId: string; workloadName: string } | null>(null);
 	const [busyInstances, setBusyInstances] = useState<Set<string>>(new Set());
+	const [pendingWarms, setPendingWarms] = useState<Set<string>>(new Set());
 
 	// Auto-refresh when instance state changes (e.g. idle timeout fires, claim released)
 	const { refetch: refetchWorkloads } = workloadsApi;
 	const { refetch: refetchInstances, update: updateInstances } = instancesApi;
 	useWebSocket(useCallback((event) => {
-		const e = event as { type: string; instanceId?: string; lastActivity?: string };
-		if (e.type === "instance.state" || e.type === "tenant.released" || e.type === "tenant.claimed") {
+		const e = event as { type: string; instanceId?: string; workloadId?: string; tenantId?: string | null; lastActivity?: string };
+		if (e.type === "instance.state" || e.type === "tenant.released" || e.type === "tenant.claimed" || e.type === "pool.instance.ready") {
 			// Optimistically update lastActivity so the idle bar resets immediately
 			if (e.type === "tenant.claimed" && e.instanceId) {
 				const now = e.lastActivity ?? new Date().toISOString();
@@ -459,6 +478,15 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 						inst.instanceId === e.instanceId ? { ...inst, lastActivity: now } : inst,
 					) ?? null,
 				);
+			}
+			// Clear pending warm once the real pool instance starts appearing
+			if (e.type === "instance.state" && !e.tenantId && e.workloadId) {
+				setPendingWarms((prev) => {
+					if (!prev.has(e.workloadId!)) return prev;
+					const next = new Set(prev);
+					next.delete(e.workloadId!);
+					return next;
+				});
 			}
 			refetchWorkloads();
 			refetchInstances();
@@ -497,7 +525,14 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 		instancesApi.refetch();
 	}
 
-	async function handleClaim(instanceId: string, tenantId: string, workloadName: string) {
+	function handleClaim(workloadId: string, source: string) {
+		if (source === "pool" || source === "pool+data") {
+			setPendingWarms((prev) => new Set(prev).add(workloadId));
+		}
+		refetchAll();
+	}
+
+	async function handleClaimInstance(instanceId: string, tenantId: string, workloadName: string) {
 		setBusyInstances((prev) => new Set(prev).add(instanceId));
 		try {
 			await api.claimWorkload(tenantId, workloadName);
@@ -548,10 +583,11 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 							onToggle={() => toggleExpanded(node.workload.workloadId)}
 							onAction={handleAction}
 							onConnect={(id, name) => setConnectTarget({ instanceId: id, workloadName: name })}
-							onClaimInstance={handleClaim}
+							onClaimInstance={handleClaimInstance}
 							navigate={navigate}
 							busyInstances={busyInstances}
-							onClaim={refetchAll}
+							onClaim={handleClaim}
+							pendingWarm={pendingWarms.has(node.workload.workloadId)}
 						/>
 					))}
 				</div>
