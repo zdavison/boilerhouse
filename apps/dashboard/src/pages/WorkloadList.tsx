@@ -216,6 +216,7 @@ function InstanceRow({
 	instance,
 	onAction,
 	onConnect,
+	onClaimInstance,
 	workloadName,
 	busy,
 	idleTimeoutSeconds,
@@ -223,6 +224,7 @@ function InstanceRow({
 	instance: InstanceSummary;
 	onAction: (id: string, action: "destroy" | "hibernate") => void;
 	onConnect: (id: string, workloadName: string) => void;
+	onClaimInstance?: (instanceId: string, tenantId: string, workloadName: string) => void;
 	workloadName: string;
 	/** When true, action buttons are replaced with a spinner. */
 	busy?: boolean;
@@ -272,6 +274,14 @@ function InstanceRow({
 								<IconButton icon={Moon} title="Hibernate" variant="warning" onClick={() => onAction(instance.instanceId, "hibernate")} />
 							</>
 						)}
+						{instance.status === "hibernated" && instance.tenantId !== null && (
+							<IconButton
+								icon={UserPlus}
+								title="Claim"
+								variant="info"
+								onClick={() => onClaimInstance?.(instance.instanceId, instance.tenantId!, workloadName)}
+							/>
+						)}
 						<IconButton icon={Trash2} title="Destroy" variant="danger" onClick={() => onAction(instance.instanceId, "destroy")} />
 					</div>
 				)
@@ -291,6 +301,7 @@ function InstanceSection({
 	instances,
 	onAction,
 	onConnect,
+	onClaimInstance,
 	workloadName,
 	busyInstances,
 	idleTimeoutSeconds,
@@ -299,6 +310,7 @@ function InstanceSection({
 	instances: InstanceNode[];
 	onAction: (id: string, action: "destroy" | "hibernate") => void;
 	onConnect: (id: string, workloadName: string) => void;
+	onClaimInstance?: (instanceId: string, tenantId: string, workloadName: string) => void;
 	workloadName: string;
 	busyInstances: Set<string>;
 	idleTimeoutSeconds?: number | null;
@@ -318,6 +330,7 @@ function InstanceSection({
 					instance={inst.instance}
 					onAction={onAction}
 					onConnect={onConnect}
+					onClaimInstance={onClaimInstance}
 					workloadName={workloadName}
 					busy={busyInstances.has(inst.instance.instanceId)}
 					idleTimeoutSeconds={idleTimeoutSeconds}
@@ -333,6 +346,7 @@ function WorkloadGroup({
 	onToggle,
 	onAction,
 	onConnect,
+	onClaimInstance,
 	navigate,
 	busyInstances,
 	onClaim,
@@ -342,6 +356,7 @@ function WorkloadGroup({
 	onToggle: () => void;
 	onAction: (id: string, action: "destroy" | "hibernate") => void;
 	onConnect: (id: string, workloadName: string) => void;
+	onClaimInstance?: (instanceId: string, tenantId: string, workloadName: string) => void;
 	navigate: (path: string) => void;
 	busyInstances: Set<string>;
 	onClaim?: () => void;
@@ -396,6 +411,7 @@ function WorkloadGroup({
 							instances={poolInstances}
 							onAction={onAction}
 							onConnect={onConnect}
+							onClaimInstance={onClaimInstance}
 							workloadName={workload.name}
 							busyInstances={busyInstances}
 						/>
@@ -406,6 +422,7 @@ function WorkloadGroup({
 							instances={claimedInstances}
 							onAction={onAction}
 							onConnect={onConnect}
+							onClaimInstance={onClaimInstance}
 							workloadName={workload.name}
 							busyInstances={busyInstances}
 							idleTimeoutSeconds={workload.idleTimeoutSeconds}
@@ -480,6 +497,22 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 		instancesApi.refetch();
 	}
 
+	async function handleClaim(instanceId: string, tenantId: string, workloadName: string) {
+		setBusyInstances((prev) => new Set(prev).add(instanceId));
+		try {
+			await api.claimWorkload(tenantId, workloadName);
+			refetchAll();
+		} catch (err) {
+			alert(err instanceof Error ? err.message : "Claim failed");
+		} finally {
+			setBusyInstances((prev) => {
+				const next = new Set(prev);
+				next.delete(instanceId);
+				return next;
+			});
+		}
+	}
+
 	async function handleAction(instanceId: string, action: "destroy" | "hibernate") {
 		setBusyInstances((prev) => new Set(prev).add(instanceId));
 		try {
@@ -515,6 +548,7 @@ export function WorkloadList({ navigate }: { navigate: (path: string) => void })
 							onToggle={() => toggleExpanded(node.workload.workloadId)}
 							onAction={handleAction}
 							onConnect={(id, name) => setConnectTarget({ instanceId: id, workloadName: name })}
+							onClaimInstance={handleClaim}
 							navigate={navigate}
 							busyInstances={busyInstances}
 							onClaim={refetchAll}
