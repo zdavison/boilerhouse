@@ -1,0 +1,78 @@
+apps/api/src/routes/workloads.ts
+  53352e6c3aa69b55 3-4,88-150
+packages/core/src/fake-runtime.ts
+  53352e6c3aa69b55 40-41,65-78,80,88,105-109
+apps/api/src/workload-watcher.test.ts
+  53352e6c3aa69b55 1-171
+packages/db/src/workload-loader.ts
+  53352e6c3aa69b55 31-34,58-59,117,120,130,141
+apps/api/src/pool-manager.ts
+  53352e6c3aa69b55 42-45,47,51-58,69-80
+tests/e2e/workload-update.e2e.test.ts
+  53352e6c3aa69b55 1-215
+tests/e2e/e2e-helpers.ts
+  53352e6c3aa69b55 13,128,132,140,153
+apps/api/src/workload-watcher.ts
+  53352e6c3aa69b55 1-71
+apps/api/src/bootstrap.ts
+  53352e6c3aa69b55 7,33,292-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "709a8e4ffaa080cebb83c06e7f1ba0389ea29b3f",
+  "prompts": {
+    "3a3272f54903a1c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4eb04749-9593-4165-bb2d-29d1cab1afbc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "53352e6c3aa69b55": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb69dea3-d65d-4f2f-984e-b808ea2024fd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 682,
+      "total_deletions": 78,
+      "accepted_lines": 613,
+      "overriden_lines": 0
+    },
+    "94a883dfa57d4e83": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5c1643f-dcad-41af-98b4-9897121cb637",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 287,
+      "total_deletions": 0,
+      "accepted_lines": 287,
+      "overriden_lines": 0
+    },
+    "97ec300ce7f217d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c995bd0f-c212-479d-987f-e6b398894716",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 51,
+      "total_deletions": 0,
+      "accepted_lines": 51,
+      "overriden_lines": 0
+    }
+  }
+}
