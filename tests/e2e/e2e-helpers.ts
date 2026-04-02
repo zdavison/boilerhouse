@@ -6,17 +6,19 @@ import { eq } from "drizzle-orm";
 import { createTestDatabase, ActivityLog, nodes, claims } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
-import { InstanceManager } from "../../apps/api/src/instance-manager";
-import { TenantManager } from "../../apps/api/src/tenant-manager";
-import { TenantDataStore } from "../../apps/api/src/tenant-data";
-import { EventBus } from "../../apps/api/src/event-bus";
-import { AuditLogger } from "../../apps/api/src/audit-logger";
-import { BootstrapLogStore } from "../../apps/api/src/bootstrap-log-store";
-import { PoolManager } from "../../apps/api/src/pool-manager";
+import {
+	InstanceManager,
+	TenantManager,
+	TenantDataStore,
+	EventBus,
+	AuditLogger,
+	BootstrapLogStore,
+	PoolManager,
+	IdleMonitor,
+	WatchDirsPoller,
+} from "@boilerhouse/domain";
 import { ResourceLimiter } from "../../apps/api/src/resource-limits";
 import { SecretStore } from "../../apps/api/src/secret-store";
-import { IdleMonitor } from "../../apps/api/src/idle-monitor";
-import { WatchDirsPoller } from "../../apps/api/src/watch-dirs-poller";
 import { createApp } from "../../apps/api/src/app";
 import { E2E_TIMEOUTS } from "./runtime-matrix";
 

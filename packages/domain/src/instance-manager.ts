@@ -19,10 +19,18 @@ import {
 } from "./transitions";
 import type { Logger } from "@boilerhouse/o11y";
 import type { AuditLogger } from "./audit-logger";
-import type { SecretStore } from "./secret-store";
-import { buildProxyCreateOptions } from "./proxy/config";
 
 export { instanceHandleFrom } from "./transitions";
+
+/**
+ * Optional callback that builds CreateOptions (e.g. Envoy sidecar proxy config)
+ * for a workload instance. Stays in the API layer since it depends on SecretStore
+ * and envoy-config which are not domain concerns.
+ */
+export type ProxyConfigBuilder = (
+	workload: Workload,
+	tenantId?: TenantId,
+) => CreateOptions | undefined;
 
 export class InstanceManager {
 	constructor(
@@ -31,7 +39,7 @@ export class InstanceManager {
 		private readonly audit: AuditLogger,
 		private readonly nodeId: NodeId,
 		private readonly log?: Logger,
-		private readonly secretStore?: SecretStore,
+		private readonly proxyConfigBuilder?: ProxyConfigBuilder,
 	) {}
 
 	async create(
@@ -213,6 +221,7 @@ export class InstanceManager {
 		workload: Workload,
 		tenantId?: TenantId,
 	): CreateOptions | undefined {
-		return buildProxyCreateOptions(workload, this.secretStore, tenantId);
+		if (!this.proxyConfigBuilder) return undefined;
+		return this.proxyConfigBuilder(workload, tenantId);
 	}
 }

@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import type { RouteDeps } from "./deps";
-import type { DomainEvent } from "../event-bus";
+import type { DomainEvent } from "@boilerhouse/domain";
 
 export function wsPlugin(deps: RouteDeps) {
 	const { eventBus, apiKey } = deps;

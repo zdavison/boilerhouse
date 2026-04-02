@@ -15,19 +15,22 @@ import {
 	wrapTenantManager,
 	wrapInstanceManager,
 } from "@boilerhouse/o11y";
-import { InstanceManager } from "./instance-manager";
-import { TenantManager } from "./tenant-manager";
-import { TenantDataStore } from "./tenant-data";
-import { IdleMonitor } from "./idle-monitor";
-import { WatchDirsPoller } from "./watch-dirs-poller";
-import { EventBus } from "./event-bus";
-import { AuditLogger } from "./audit-logger";
-import { BootstrapLogStore } from "./bootstrap-log-store";
-import { PoolManager } from "./pool-manager";
+import {
+	InstanceManager,
+	TenantManager,
+	TenantDataStore,
+	IdleMonitor,
+	WatchDirsPoller,
+	EventBus,
+	AuditLogger,
+	BootstrapLogStore,
+	PoolManager,
+	recoverState,
+} from "@boilerhouse/domain";
 import { createApp } from "./app";
-import { recoverState } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { SecretStore } from "./secret-store";
+import { buildProxyCreateOptions } from "./proxy/config";
 import { prewarmPools } from "./startup-prewarm";
 import { ContainerStatsPoller } from "./container-stats-poller";
 import { WorkloadWatcher } from "./workload-watcher";
@@ -216,10 +219,15 @@ export async function bootstrap(config: BootstrapConfig): Promise<AppContext> {
 		}
 	}
 
+	const proxyConfigBuilder = secretStore
+		? (workload: Parameters<typeof buildProxyCreateOptions>[0], tenantId?: Parameters<typeof buildProxyCreateOptions>[2]) =>
+			buildProxyCreateOptions(workload, secretStore, tenantId)
+		: undefined;
+
 	const instanceManager = new InstanceManager(
 		runtime, db, audit, nodeId,
 		createLogger("InstanceManager"),
-		secretStore,
+		proxyConfigBuilder,
 	);
 	const tenantDataStore = new TenantDataStore(config.storagePath, db, runtime, {
 		blobStore: overlayStore,

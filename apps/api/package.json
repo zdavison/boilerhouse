@@ -15,6 +15,7 @@
   "dependencies": {
     "@boilerhouse/core": "workspace:*",
     "@boilerhouse/db": "workspace:*",
+    "@boilerhouse/domain": "workspace:*",
     "@boilerhouse/envoy-config": "workspace:*",
     "@boilerhouse/o11y": "workspace:*",
     "@boilerhouse/runtime-docker": "workspace:*",

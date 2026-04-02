@@ -3,7 +3,7 @@ import { generateWorkloadId } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
 import { workloads } from "@boilerhouse/db";
 import { createTestApp, apiRequest } from "../test-helpers";
-import type { DomainEvent } from "../event-bus";
+import type { DomainEvent } from "@boilerhouse/domain";
 
 const MINIMAL_WORKLOAD: Workload = {
 	workload: { name: "test", version: "1.0.0" },

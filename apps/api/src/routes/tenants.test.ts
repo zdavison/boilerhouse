@@ -3,7 +3,7 @@ import { generateWorkloadId, generateTenantId } from "@boilerhouse/core";
 import type { Workload } from "@boilerhouse/core";
 import { workloads } from "@boilerhouse/db";
 import { createTestApp, apiRequest } from "../test-helpers";
-import type { DomainEvent } from "../event-bus";
+import type { DomainEvent } from "@boilerhouse/domain";
 
 // Fixed UUIDs for deterministic multi-tenant tests
 const ZAC_ID = "00000000-0000-4000-8000-00000000000a" as any;
