@@ -125,6 +125,7 @@ function runPrompt(tenantId, text) {
 	});
 
 	let stdout = "";
+	let stderr = "";
 
 	proc.on("error", (err) => {
 		console.error(`[bridge] Failed to spawn claude for ${tenantId}:`, err.message);
@@ -137,7 +138,9 @@ function runPrompt(tenantId, text) {
 	});
 
 	proc.stderr.on("data", (chunk) => {
-		console.error(`[bridge] claude stderr (${tenantId}): ${chunk.toString().trim()}`);
+		const text = chunk.toString().trim();
+		stderr += chunk.toString();
+		console.error(`[bridge] claude stderr (${tenantId}): ${text}`);
 	});
 
 	proc.on("exit", (code) => {
@@ -161,7 +164,7 @@ function runPrompt(tenantId, text) {
 			}
 			broadcast(tenant, { type: "idle" });
 		} else {
-			broadcast(tenant, { type: "exit", code: code ?? 1 });
+			broadcast(tenant, { type: "exit", code: code ?? 1, stderr: stderr.trim() });
 		}
 	});
 }
