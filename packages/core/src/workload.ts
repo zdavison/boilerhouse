@@ -31,7 +31,7 @@ const PortExposeSchema = Type.Object({
 
 const NetworkAccessSchema = Type.Union([
 	Type.Literal("none"),
-	Type.Literal("outbound"),
+	Type.Literal("unrestricted"),
 	Type.Literal("restricted"),
 ], { default: "none" });
 

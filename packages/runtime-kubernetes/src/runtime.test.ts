@@ -185,7 +185,7 @@ describe("KubernetesRuntime", () => {
 		setup();
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 8080, host_range: [0, 0] }],
 			},
 		});
@@ -215,7 +215,7 @@ describe("KubernetesRuntime", () => {
 		setup();
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 8080, host_range: [0, 0] }],
 			},
 		});
@@ -241,7 +241,7 @@ describe("KubernetesRuntime", () => {
 		setup();
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 8080, host_range: [0, 0] }],
 			},
 		});

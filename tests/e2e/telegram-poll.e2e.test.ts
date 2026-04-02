@@ -224,7 +224,7 @@ describe("telegram-poll → openclaw E2E", () => {
 			image: { dockerfile: resolve(workloadsDir, "openclaw/Dockerfile") },
 			resources: { vcpus: 2, memory_mb: 2048, disk_gb: 10 },
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 18789, host_range: [30000, 30099] }],
 				websocket: "/",
 				credentials: [{

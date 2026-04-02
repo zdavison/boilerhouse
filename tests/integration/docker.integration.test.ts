@@ -37,7 +37,7 @@ const TEST_WORKLOAD_WITH_PORT: Workload = {
 	image: { ref: ALPINE_IMAGE },
 	resources: { vcpus: 1, memory_mb: 128 },
 	network: {
-		access: "outbound",
+		access: "unrestricted",
 		expose: [{ guest: 8080, host_range: [0, 0] }],
 	},
 	idle: { action: "destroy" },

@@ -93,7 +93,7 @@ describe("workloadToPod", () => {
 	test("maps expose ports to container ports", () => {
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [
 					{ guest: 8080, host_range: [0, 0] },
 					{ guest: 9090, host_range: [0, 0] },
@@ -111,7 +111,7 @@ describe("workloadToPod", () => {
 	test("creates Service when ports are exposed", () => {
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 8080, host_range: [0, 0] }],
 			},
 		});
@@ -132,7 +132,7 @@ describe("workloadToPod", () => {
 	test("Service ports have names when multiple ports exposed", () => {
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [
 					{ guest: 8080, host_range: [0, 0] },
 					{ guest: 8081, host_range: [0, 0] },
@@ -157,7 +157,7 @@ describe("workloadToPod", () => {
 	test("maps HTTP health check to readinessProbe", () => {
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 8080, host_range: [0, 0] }],
 			},
 			health: {
@@ -281,7 +281,7 @@ describe("workloadToPod", () => {
 	test("health check uses first exposed port as default", () => {
 		const workload = makeWorkload({
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				expose: [{ guest: 3000, host_range: [0, 0] }],
 			},
 			health: {
@@ -433,8 +433,8 @@ describe("workloadToPod", () => {
 		expect(networkPolicy!.spec.egress).toEqual([]);
 	});
 
-	test("NetworkPolicy for access: outbound allows DNS + all TCP egress", () => {
-		const workload = makeWorkload({ network: { access: "outbound" } });
+	test("NetworkPolicy for access: unrestricted allows DNS + all TCP egress", () => {
+		const workload = makeWorkload({ network: { access: "unrestricted" } });
 		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
 
 		expect(networkPolicy).toBeDefined();
@@ -447,8 +447,8 @@ describe("workloadToPod", () => {
 		expect(egress[1]!.to).toBeDefined();
 	});
 
-	test("NetworkPolicy blocks link-local range (covers metadata server) for outbound access", () => {
-		const workload = makeWorkload({ network: { access: "outbound" } });
+	test("NetworkPolicy blocks link-local range (covers metadata server) for unrestricted access", () => {
+		const workload = makeWorkload({ network: { access: "unrestricted" } });
 		const { networkPolicy } = workloadToPod(workload, INSTANCE_ID, NAMESPACE);
 
 		const allTrafficRule = networkPolicy!.spec.egress![1]!;

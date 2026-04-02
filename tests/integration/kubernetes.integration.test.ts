@@ -186,7 +186,7 @@ describe.skipIf(!available)("KubernetesRuntime integration", () => {
 			workload: { name: "int-test-endpoint", version: "1.0.0" },
 			image: { ref: "docker.io/library/python:3-alpine" },
 			resources: { vcpus: 1, memory_mb: 256 },
-			network: { access: "outbound", expose: [{ guest: 8080, host_range: [0, 0] }] },
+			network: { access: "unrestricted", expose: [{ guest: 8080, host_range: [0, 0] }] },
 			entrypoint: { cmd: "python3", args: ["-m", "http.server", "8080"] },
 		}), id);
 		handles.push(handle);

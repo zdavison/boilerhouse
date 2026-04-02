@@ -520,7 +520,7 @@ describe("DockerRuntime", () => {
 			const instanceId = generateInstanceId();
 			const workload: Workload = {
 				...minimalWorkload(),
-				network: { access: "outbound" },
+				network: { access: "unrestricted" },
 			};
 			await runtime.create(workload, instanceId);
 

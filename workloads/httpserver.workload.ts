@@ -6,7 +6,7 @@ export default defineWorkload({
 	image: { dockerfile: "httpserver/Dockerfile" },
 	resources: { vcpus: 1, memory_mb: 256 },
 	network: {
-		access: "outbound",
+		access: "unrestricted",
 		expose: [{ guest: 8080, host_range: [30000, 31000] }],
 	},
 	idle: { timeout_seconds: 300, action: "hibernate" },

@@ -243,7 +243,7 @@ export function workloadToPod(
 	};
 
 	let networkPolicy: K8sNetworkPolicy;
-	if (access === "outbound") {
+	if (access === "unrestricted") {
 		networkPolicy = {
 			...networkPolicyBase,
 			spec: {

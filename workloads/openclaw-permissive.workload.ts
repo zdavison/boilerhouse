@@ -1,9 +1,9 @@
 // Permissive variant of openclaw.workload.ts.
 // Differences from the standard openclaw workload:
 //   - name: "openclaw-permissive" (runs as a separate workload)
-//   - network.access: "outbound" instead of "restricted" (unrestricted egress,
+//   - network.access: "unrestricted" instead of "restricted" (unrestricted egress,
 //     so the agent can apt-get install, pip install, curl, etc.)
-//   - network.allowlist: removed (not needed with "outbound" access)
+//   - network.allowlist: removed (not needed with "unrestricted" access)
 import { defineWorkload, secret } from "@boilerhouse/core";
 
 export const GATEWAY_TOKEN = "73307c8aab2b025f959a53f5095c0addec0be76fe4b5d470";
@@ -14,8 +14,8 @@ export default defineWorkload({
 	image: { dockerfile: "openclaw/Dockerfile" },
 	resources: { vcpus: 2, memory_mb: 2048, disk_gb: 10 },
 	network: {
-		// "outbound" = full egress (vs "restricted" + allowlist in standard openclaw)
-		access: "outbound",
+		// "unrestricted" = full egress (vs "restricted" + allowlist in standard openclaw)
+		access: "unrestricted",
 		expose: [{ guest: 18789, host_range: [30000, 30099] }],
 		websocket: "/",
 		credentials: [{

@@ -78,7 +78,7 @@ export default defineWorkload({
 	image: { ref: "docker.io/library/python:3-alpine" },
 	resources: { vcpus: 1, memory_mb: 256 },
 	network: {
-		access: "outbound",
+		access: "unrestricted",
 		expose: [
 			{ guest: 8080, host_range: [0, 0] },
 			{ guest: 8081, host_range: [0, 0] },

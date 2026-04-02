@@ -256,7 +256,7 @@ describe("validateWorkload()", () => {
 			image: { ref: "test:latest" },
 			resources: { vcpus: 2, memory_mb: 512 },
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				credentials: [
 					{ domain: "api.anthropic.com", headers: { "x-api-key": "key1" } },
 					{ domain: "api.openai.com", headers: { Authorization: "Bearer key2" } },
@@ -299,13 +299,13 @@ describe("validateWorkload()", () => {
 		})).toThrow(/allowlist/i);
 	});
 
-	test("accepts credentials with outbound access (no allowlist needed)", () => {
+	test("accepts credentials with unrestricted access (no allowlist needed)", () => {
 		const workload = validateWorkload({
 			workload: { name: "my-service", version: "1.0.0" },
 			image: { ref: "test:latest" },
 			resources: { vcpus: 2, memory_mb: 512 },
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				credentials: [{
 					domain: "api.anthropic.com",
 					headers: { "x-api-key": "key" },
@@ -405,7 +405,7 @@ describe("defineWorkload() + resolveWorkloadConfig()", () => {
 			image: { ref: "ghcr.io/org/my-service:latest" },
 			resources: { vcpus: 2, memory_mb: 512 },
 			network: {
-				access: "outbound",
+				access: "unrestricted",
 				credentials: [{
 					domain: "api.example.com",
 					headers: {
