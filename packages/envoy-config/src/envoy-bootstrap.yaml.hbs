@@ -11,6 +11,12 @@ static_resources:
       socket_address:
         address: 127.0.0.1
         port_value: {{port}}
+{{#if allowAll}}
+    listener_filters:
+    - name: envoy.filters.listener.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
+{{/if}}
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -74,6 +80,9 @@ static_resources:
         address: 127.0.0.1
         port_value: {{tlsPort}}
     listener_filters:
+    - name: envoy.filters.listener.original_dst
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.original_dst.v3.OriginalDst
     - name: envoy.filters.listener.tls_inspector
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
