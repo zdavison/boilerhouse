@@ -1,0 +1,57 @@
+tests/e2e/telegram-poll.e2e.test.ts
+  3a3272f54903a1c7 227
+tests/e2e/fixtures/workload-k8s-wsecho.workload.ts
+  3a3272f54903a1c7 81
+workloads/httpserver.workload.ts
+  3a3272f54903a1c7 9
+packages/runtime-kubernetes/src/translator.test.ts
+  3a3272f54903a1c7 96,114,135,160,284,436-437,450-451
+workloads/wsecho.workload.ts
+  3a3272f54903a1c7 9
+tests/e2e/fixtures/workload-k8s-httpserver.workload.ts
+  3a3272f54903a1c7 9
+packages/runtime-docker/src/runtime.test.ts
+  3a3272f54903a1c7 523
+tests/integration/kubernetes.integration.test.ts
+  3a3272f54903a1c7 189
+packages/core/src/workload.ts
+  3a3272f54903a1c7 34
+tests/e2e/fixtures/workload-docker-wsecho.workload.ts
+  3a3272f54903a1c7 82
+packages/core/src/workload.test.ts
+  3a3272f54903a1c7 259,302,308,408
+tests/e2e/fixtures/workload-docker-httpserver.workload.ts
+  3a3272f54903a1c7 9
+workloads/openclaw-permissive.workload.ts
+  3a3272f54903a1c7 4,6,17-18
+packages/runtime-kubernetes/src/runtime.test.ts
+  3a3272f54903a1c7 188,218,244
+tests/e2e/fixtures/workload-fake-httpserver.workload.ts
+  3a3272f54903a1c7 9
+packages/runtime-kubernetes/src/translator.ts
+  3a3272f54903a1c7 246
+tests/integration/docker.integration.test.ts
+  3a3272f54903a1c7 40
+tests/e2e/fixtures/workload-fake-wsecho.workload.ts
+  3a3272f54903a1c7 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "d9cc17ab172d4cd5f9d6fb3425cc0911d3bea6cd",
+  "prompts": {
+    "3a3272f54903a1c7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4eb04749-9593-4165-bb2d-29d1cab1afbc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 34,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    }
+  }
+}
