@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { eq, count, and, not } from "drizzle-orm";
-import { validateWorkload, generateWorkloadId } from "@boilerhouse/core";
+import { validateWorkload, generateWorkloadId, workloadTransition } from "@boilerhouse/core";
+import type { WorkloadStatus, WorkloadEvent } from "@boilerhouse/core";
 import { workloads, instances, snapshots } from "@boilerhouse/db";
 import type { RouteDeps } from "./deps";
 
@@ -83,6 +84,69 @@ export function workloadRoutes(deps: RouteDeps) {
 				version: workload.workload.version,
 				status: "creating" as const,
 			};
+		})
+		.put("/workloads/:name", async ({ params, request, set }) => {
+			let body: unknown;
+			try {
+				body = await request.json();
+			} catch {
+				set.status = 400;
+				return { error: "Invalid JSON" };
+			}
+
+			let workload;
+			try {
+				workload = validateWorkload(body);
+			} catch (err) {
+				set.status = 400;
+				const message = err instanceof Error ? err.message : "Invalid workload";
+				return { error: message };
+			}
+
+			const existing = db
+				.select()
+				.from(workloads)
+				.where(eq(workloads.name, params.name))
+				.get();
+
+			if (!existing) {
+				set.status = 404;
+				return { error: `Workload '${params.name}' not found` };
+			}
+
+			const configChanged =
+				JSON.stringify(existing.config) !== JSON.stringify(workload);
+
+			if (!configChanged) {
+				return { changed: false };
+			}
+
+			db.update(workloads)
+				.set({ config: workload, updatedAt: new Date() })
+				.where(eq(workloads.workloadId, existing.workloadId))
+				.run();
+
+			// Transition to "creating" so the prime/healthcheck flow can run
+			const event: WorkloadEvent = existing.status === "error" ? "retry" : "recover";
+			const next = workloadTransition(existing.status as WorkloadStatus, event);
+			db.update(workloads)
+				.set({ status: next })
+				.where(eq(workloads.workloadId, existing.workloadId))
+				.run();
+
+			if (poolManager) {
+				const pm = poolManager;
+				pm.prime(existing.workloadId, { drainExisting: true }).catch((err: unknown) => {
+					const message = err instanceof Error ? err.message : String(err);
+					db.update(workloads)
+						.set({ status: "error", statusDetail: message, updatedAt: new Date() })
+						.where(eq(workloads.workloadId, existing.workloadId))
+						.run();
+				});
+			}
+
+			log?.info({ workloadId: existing.workloadId, name: params.name }, "Workload updated");
+			return { changed: true };
 		})
 		.get("/workloads", () => {
 			const rows = db.select().from(workloads).all();

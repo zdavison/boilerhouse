@@ -28,6 +28,10 @@ export interface WorkloadLoaderResult {
 	unchanged: number;
 	/** Files that failed to parse. */
 	errors: Array<{ file: string; error: string }>;
+	/** IDs of newly inserted workloads. */
+	newWorkloadIds: string[];
+	/** IDs of workloads whose config was updated. */
+	updatedWorkloadIds: string[];
 }
 
 /**
@@ -51,6 +55,8 @@ export async function loadWorkloadsFromDir(
 		updated: 0,
 		unchanged: 0,
 		errors: [],
+		newWorkloadIds: [],
+		updatedWorkloadIds: [],
 	};
 
 	const glob = new Glob("**/*.workload.ts");
@@ -108,9 +114,10 @@ export async function loadWorkloadsFromDir(
 
 		if (!existing) {
 			const now = new Date();
+			const workloadId = generateWorkloadId();
 			db.insert(workloads)
 				.values({
-					workloadId: generateWorkloadId(),
+					workloadId,
 					name,
 					version,
 					config: workload,
@@ -120,6 +127,7 @@ export async function loadWorkloadsFromDir(
 				})
 				.run();
 			result.loaded++;
+			result.newWorkloadIds.push(workloadId);
 		} else {
 			const configChanged =
 				JSON.stringify(existing.config) !== JSON.stringify(workload);
@@ -130,6 +138,7 @@ export async function loadWorkloadsFromDir(
 					.where(eq(workloads.workloadId, existing.workloadId))
 					.run();
 				result.updated++;
+				result.updatedWorkloadIds.push(existing.workloadId);
 			} else {
 				result.unchanged++;
 			}

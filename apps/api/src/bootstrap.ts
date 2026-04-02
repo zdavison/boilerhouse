@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { FakeRuntime, generateNodeId } from "@boilerhouse/core";
 import type { Runtime, RuntimeType, NodeId } from "@boilerhouse/core";
 import { DockerRuntime } from "@boilerhouse/runtime-docker";
-import { initDatabase, ActivityLog, loadWorkloadsFromDir, loadTriggersFromDir } from "@boilerhouse/db";
+import { initDatabase, ActivityLog, loadWorkloadsFromDir, loadTriggersFromDir, workloads as workloadsTable } from "@boilerhouse/db";
 import { claims } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
@@ -30,6 +30,7 @@ import { ResourceLimiter } from "./resource-limits";
 import { SecretStore } from "./secret-store";
 import { prewarmPools } from "./startup-prewarm";
 import { ContainerStatsPoller } from "./container-stats-poller";
+import { WorkloadWatcher } from "./workload-watcher";
 import { createBlobStore } from "@boilerhouse/storage";
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -287,6 +288,32 @@ export async function bootstrap(config: BootstrapConfig): Promise<AppContext> {
 	);
 
 	prewarmPools(db, poolManager);
+
+	if (config.workloadsDir) {
+		const watcher = new WorkloadWatcher(db, config.workloadsDir, {
+			onNew: async (workloadId) => {
+				poolManager.prime(workloadId).catch((err: unknown) => {
+					const message = err instanceof Error ? err.message : String(err);
+					db.update(workloadsTable)
+						.set({ status: "error", statusDetail: message, updatedAt: new Date() })
+						.where(eq(workloadsTable.workloadId, workloadId))
+						.run();
+				});
+			},
+			onUpdated: async (workloadId) => {
+				poolManager.prime(workloadId, { drainExisting: true }).catch((err: unknown) => {
+					const message = err instanceof Error ? err.message : String(err);
+					db.update(workloadsTable)
+						.set({ status: "error", statusDetail: message, updatedAt: new Date() })
+						.where(eq(workloadsTable.workloadId, workloadId))
+						.run();
+				});
+			},
+			pollIntervalMs: 5000,
+		});
+		watcher.start();
+		log.info({ dir: config.workloadsDir, pollIntervalMs: 5000 }, "Workload file watcher started");
+	}
 
 	const { meter, tracer } = initO11y({
 		metricsPort: config.metricsPort,

@@ -37,6 +37,8 @@ interface FakeInstance {
 	ports: number[];
 	/** Simulated overlay data stored by extractOverlayArchive. */
 	overlayData?: Buffer;
+	/** HTTP servers started for health-checkable instances. */
+	httpServers?: Array<{ server: ReturnType<typeof Bun.serve>; port: number }>;
 }
 
 export class FakeRuntime implements Runtime {
@@ -60,8 +62,22 @@ export class FakeRuntime implements Runtime {
 		_options?: CreateOptions,
 	): Promise<InstanceHandle> {
 		await this.maybeDelay("create");
-		const ports = (workload.network.expose ?? []).map((e) => e.guest);
+		const exposedPorts = workload.network.expose ?? [];
+		const httpServers: FakeInstance["httpServers"] = [];
+		const ports: number[] = [];
+
+		for (const _exp of exposedPorts) {
+			// Start a real HTTP server on port 0 (OS-assigned) so health checks work
+			const server = Bun.serve({
+				port: 0,
+				fetch: () => new Response("ok"),
+			});
+			httpServers.push({ server, port: server.port });
+			ports.push(server.port);
+		}
+
 		if (ports.length === 0) ports.push(this.nextPort++);
+
 		const instance: FakeInstance = {
 			instanceId,
 			workload,
@@ -69,6 +85,7 @@ export class FakeRuntime implements Runtime {
 			paused: false,
 			destroyed: false,
 			ports,
+			httpServers: httpServers.length > 0 ? httpServers : undefined,
 		};
 		this.instances.set(instanceId, instance);
 		return { instanceId, running: false };
@@ -85,6 +102,11 @@ export class FakeRuntime implements Runtime {
 		await this.maybeDelay("destroy");
 		const instance = this.instances.get(handle.instanceId);
 		if (instance) {
+			if (instance.httpServers) {
+				for (const { server } of instance.httpServers) {
+					server.stop(true);
+				}
+			}
 			instance.destroyed = true;
 			instance.running = false;
 			this.instances.delete(handle.instanceId);

@@ -39,11 +39,23 @@ export class PoolManager {
 	 * Starts a single pool instance, waits for it to become healthy, then
 	 * transitions the workload to "created". Used during workload registration
 	 * when a pool is configured.
+	 *
+	 * When `drainExisting` is true (workload update flow), existing pool
+	 * instances are destroyed after the new instance passes health checks
+	 * but before the pool is replenished.
 	 */
-	async prime(workloadId: WorkloadId): Promise<void> {
+	async prime(workloadId: WorkloadId, options?: { drainExisting?: boolean }): Promise<void> {
 		const workloadRow = this.db.select().from(workloads).where(eq(workloads.workloadId, workloadId)).get();
 		if (!workloadRow) throw new Error(`Workload not found: ${workloadId}`);
 		const workload = workloadRow.config as Workload;
+
+		// Snapshot existing pool instance IDs before starting the new one
+		const oldPoolIds = options?.drainExisting
+			? this.db.select({ instanceId: instances.instanceId }).from(instances)
+				.where(and(eq(instances.workloadId, workloadId), inArray(instances.poolStatus, ["warming", "ready"])))
+				.all().map((r) => r.instanceId)
+			: [];
+
 		const startedAt = performance.now();
 		const handle = await this.startPoolInstance(workloadId, workload);
 		try {
@@ -54,6 +66,18 @@ export class PoolManager {
 		}
 		this.db.update(instances).set({ poolStatus: "ready" }).where(eq(instances.instanceId, handle.instanceId)).run();
 		this.audit?.poolInstanceReady(handle.instanceId, workloadId, (performance.now() - startedAt) / 1000);
+
+		// Drain old pool instances after healthcheck passes
+		if (oldPoolIds.length > 0) {
+			await Promise.all(oldPoolIds.map(async (id) => {
+				try {
+					await this.instanceManager.destroy(id);
+				} catch (err) {
+					log.warn({ instanceId: id, err }, "Failed to destroy old pool instance during update");
+				}
+			}));
+		}
+
 		applyWorkloadTransition(this.db, workloadId, "creating", "created");
 		await this.replenish(workloadId);
 	}

@@ -10,6 +10,7 @@ import { InstanceManager } from "../../apps/api/src/instance-manager";
 import { TenantManager } from "../../apps/api/src/tenant-manager";
 import { TenantDataStore } from "../../apps/api/src/tenant-data";
 import { EventBus } from "../../apps/api/src/event-bus";
+import { AuditLogger } from "../../apps/api/src/audit-logger";
 import { BootstrapLogStore } from "../../apps/api/src/bootstrap-log-store";
 import { PoolManager } from "../../apps/api/src/pool-manager";
 import { ResourceLimiter } from "../../apps/api/src/resource-limits";
@@ -124,19 +125,19 @@ export async function startE2EServer(
 	}
 
 	const log = createLogger("e2e");
+	const audit = new AuditLogger(activityLog, eventBus, nodeId);
 	const instanceManager = new InstanceManager(
 		runtime,
 		db,
-		activityLog,
+		audit,
 		nodeId,
-		eventBus,
 		log,
 		secretStore,
 	);
 
 	const tenantDataStore = new TenantDataStore("/tmp/boilerhouse-e2e", db, runtime);
 	const bootstrapLogStore = new BootstrapLogStore(db);
-	const poolManager = new PoolManager(instanceManager, runtime, db, { bootstrapLogStore, eventBus });
+	const poolManager = new PoolManager(instanceManager, runtime, db, { bootstrapLogStore, audit });
 
 	let idleMonitor: IdleMonitor | undefined;
 	let watchDirsPoller: WatchDirsPoller | undefined;
@@ -149,7 +150,7 @@ export async function startE2EServer(
 	const tenantManager = new TenantManager(
 		instanceManager,
 		db,
-		activityLog,
+		audit,
 		nodeId,
 		tenantDataStore,
 		{ idleMonitor, log, watchDirsPoller, poolManager },
