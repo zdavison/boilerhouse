@@ -131,8 +131,11 @@ spec:
     env:
       LOG_LEVEL: debug
     workdir: /app
-  metadata:
-    description: My AI agent
+  # Use standard K8s annotations/labels for descriptive metadata:
+  # metadata:
+  #   annotations:
+  #     boilerhouse.dev/description: "My AI agent"
+  #     boilerhouse.dev/owner: "team-x"
 status:
   phase: Ready                  # Creating | Ready | Error
   detail: ""
@@ -152,7 +155,7 @@ metadata:
   name: my-agent
   namespace: boilerhouse
 spec:
-  workloadRef: my-agent
+  workloadRef: my-agent       # metadata.name of a BoilerhouseWorkload in same namespace
   size: 3
   maxFillConcurrency: 2
 status:
@@ -173,7 +176,7 @@ metadata:
   namespace: boilerhouse
 spec:
   tenantId: alice
-  workloadRef: my-agent
+  workloadRef: my-agent       # metadata.name of a BoilerhouseWorkload in same namespace
 status:
   phase: Active                 # Pending | Active | Releasing | Released
   instanceId: inst-abc123
@@ -186,7 +189,11 @@ status:
 
 Deleting the CR triggers release (overlay extraction + hibernate/destroy via finalizer).
 
-When idle timeout fires, the operator sets `status.phase = Released` but does not delete the CR. If the CR still exists, the next reconcile re-claims — acting as a standing reservation. Deleting the CR means permanent release.
+When idle timeout fires, the operator sets `status.phase = Released` but does not delete the CR. Released claims stay Released — the operator does not auto-re-claim, which would create an infinite idle/re-provision cycle. To resume, the tenant or automation must either:
+- Delete and recreate the Claim CR (simple, GitOps-friendly)
+- Set `spec.resume: true` to signal the operator to re-claim (then the operator clears it after claiming)
+
+Trigger-created claims follow the same pattern: the trigger creates a new Claim on demand, and idle timeout releases it without re-provisioning.
 
 ### BoilerhouseTrigger
 
@@ -200,7 +207,7 @@ metadata:
   namespace: boilerhouse
 spec:
   type: slack                   # webhook | slack | telegram | cron
-  workloadRef: my-agent
+  workloadRef: my-agent       # metadata.name of a BoilerhouseWorkload in same namespace
   tenant:
     from: event
     prefix: "slack-"
@@ -286,13 +293,14 @@ Reconcile(claim):
   If status.phase is Active:
     - No-op (idempotent)
 
-  If status.phase is Released (idle timeout fired):
-    - Re-claim: TenantManager.claim(tenantId, workloadId)
-    - On success: set phase=Active with new instanceId/endpoint
+  If status.phase is Released:
+    - No-op (stays Released until user acts)
+    - If spec.resume is set: re-claim, set phase=Active, clear spec.resume
 
 Idle timeout (IdleMonitor → TenantManager.release()):
   - Operator sets claim status.phase = Released
   - Does NOT delete the CR
+  - Does NOT auto-re-claim (avoids infinite idle/re-provision cycle)
 ```
 
 ### Trigger Controller
@@ -327,7 +335,7 @@ K8s Lease object (`boilerhouse-operator-leader`). Only the leader runs reconcile
 
 ### Database
 
-SQLite on a PVC (`boilerhouse-operator-data`). The CRDs are the user-facing source of truth; the DB is an internal implementation detail for the domain managers' state machines and queries. Recovery logic reconciles DB vs actual pods on startup.
+SQLite stored locally in the operator pod. The CRDs are the user-facing source of truth; the DB is an internal implementation detail for the domain managers' state machines and queries. The DB is ephemeral — on pod restart or leader failover, recovery logic rebuilds state by reconciling CRDs and actual pods in the cluster. This is the same recovery pattern the API uses today, and avoids PVC complications with leader election (ReadWriteOnce PVCs can't be shared across replicas).
 
 ### Deployment Model
 
@@ -335,7 +343,7 @@ SQLite on a PVC (`boilerhouse-operator-data`). The CRDs are the user-facing sour
 Deployment: boilerhouse-operator
   replicas: 2 (one active via lease, one standby)
   volumes:
-    - boilerhouse-operator-data (PVC, SQLite)
+    - emptyDir for SQLite (ephemeral, rebuilt via recovery on restart)
   serviceAccount: boilerhouse-operator
 
 ClusterRole: boilerhouse-operator
