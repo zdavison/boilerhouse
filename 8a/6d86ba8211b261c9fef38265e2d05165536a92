@@ -1,0 +1,38 @@
+docs/plans/refactor-01_04_2026.md
+  94a883dfa57d4e83 1-287
+workloads/openclaw-permissive.workload.ts
+  97ec300ce7f217d3 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.4",
+  "base_commit_sha": "8a6d86ba8211b261c9fef38265e2d05165536a92",
+  "prompts": {
+    "94a883dfa57d4e83": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5c1643f-dcad-41af-98b4-9897121cb637",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 287,
+      "overriden_lines": 0
+    },
+    "97ec300ce7f217d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c995bd0f-c212-479d-987f-e6b398894716",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 51,
+      "overriden_lines": 0
+    }
+  }
+}
