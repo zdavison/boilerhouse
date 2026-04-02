@@ -15,6 +15,7 @@ interface BridgeMessage {
 	type: "ready" | "output" | "idle" | "exit" | "error";
 	text?: string;
 	code?: number;
+	stderr?: string;
 	message?: string;
 }
 
@@ -76,9 +77,10 @@ export const claudeCodeDriver: Driver<TriggerPayload> = {
 
 		const finalMsg = final as BridgeMessage;
 		if (finalMsg.type === "exit") {
-			// Claude exited — include exit code in response if text is empty
+			// Claude exited — include exit code and stderr in response if text is empty
 			if (!fullText.trim()) {
-				return { text: `Claude Code exited with code ${finalMsg.code ?? 1}` };
+				const detail = finalMsg.stderr ? `\n${finalMsg.stderr}` : "";
+				return { text: `Claude Code exited with code ${finalMsg.code ?? 1}${detail}` };
 			}
 		}
 
