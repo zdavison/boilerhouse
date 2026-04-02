@@ -12,7 +12,7 @@
     },
     "apps/api": {
       "name": "@boilerhouse/api",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/db": "workspace:*",
@@ -30,7 +30,7 @@
     },
     "apps/cli": {
       "name": "@boilerhouse/cli",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/api": "workspace:*",
         "@boilerhouse/core": "workspace:*",
@@ -39,7 +39,7 @@
     },
     "apps/dashboard": {
       "name": "@boilerhouse/dashboard",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "lucide-react": "^0.575.0",
         "react": "^19.0.0",
@@ -55,14 +55,14 @@
     },
     "apps/docs": {
       "name": "@boilerhouse/docs",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "devDependencies": {
         "vitepress": "^1.6.3",
       },
     },
     "apps/trigger-gateway": {
       "name": "@boilerhouse/trigger-gateway",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/o11y": "workspace:*",
         "@boilerhouse/triggers": "workspace:*",
@@ -71,7 +71,7 @@
     },
     "packages/core": {
       "name": "@boilerhouse/core",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@sinclair/typebox": "^0.34.48",
         "age-encryption": "^0.3.0",
@@ -79,7 +79,7 @@
     },
     "packages/db": {
       "name": "@boilerhouse/db",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "drizzle-orm": "^0.44.0",
@@ -88,23 +88,34 @@
         "drizzle-kit": "^0.31.0",
       },
     },
+    "packages/domain": {
+      "name": "@boilerhouse/domain",
+      "version": "0.1.11",
+      "dependencies": {
+        "@boilerhouse/core": "workspace:*",
+        "@boilerhouse/db": "workspace:*",
+        "@boilerhouse/o11y": "workspace:*",
+        "@boilerhouse/storage": "workspace:*",
+        "drizzle-orm": "^0.38.0",
+      },
+    },
     "packages/driver-claude-code": {
       "name": "@boilerhouse/driver-claude-code",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/triggers": "workspace:*",
       },
     },
     "packages/driver-openclaw": {
       "name": "@boilerhouse/driver-openclaw",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/triggers": "workspace:*",
       },
     },
     "packages/envoy-config": {
       "name": "@boilerhouse/envoy-config",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "handlebars": "^4.7.8",
       },
@@ -115,21 +126,21 @@
     },
     "packages/guard-allowlist": {
       "name": "@boilerhouse/guard-allowlist",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/triggers": "workspace:*",
       },
     },
     "packages/guard-api": {
       "name": "@boilerhouse/guard-api",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/triggers": "workspace:*",
       },
     },
     "packages/o11y": {
       "name": "@boilerhouse/o11y",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/db": "workspace:*",
@@ -150,7 +161,7 @@
     },
     "packages/runtime-docker": {
       "name": "@boilerhouse/runtime-docker",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "@opentelemetry/api": "^1.9.0",
@@ -158,14 +169,14 @@
     },
     "packages/runtime-kubernetes": {
       "name": "@boilerhouse/runtime-kubernetes",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
       },
     },
     "packages/storage": {
       "name": "@boilerhouse/storage",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@aws-sdk/client-s3": "^3.750.0",
         "@aws-sdk/lib-storage": "^3.750.0",
@@ -173,7 +184,7 @@
     },
     "packages/triggers": {
       "name": "@boilerhouse/triggers",
-      "version": "0.0.8",
+      "version": "0.1.11",
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/driver-claude-code": "workspace:*",
@@ -350,6 +361,8 @@
     "@boilerhouse/db": ["@boilerhouse/db@workspace:packages/db"],
 
     "@boilerhouse/docs": ["@boilerhouse/docs@workspace:apps/docs"],
+
+    "@boilerhouse/domain": ["@boilerhouse/domain@workspace:packages/domain"],
 
     "@boilerhouse/driver-claude-code": ["@boilerhouse/driver-claude-code@workspace:packages/driver-claude-code"],
 
@@ -1242,6 +1255,8 @@
     "@aws-crypto/sha256-browser/@smithy/util-utf8": ["@smithy/util-utf8@2.3.0", "", { "dependencies": { "@smithy/util-buffer-from": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A=="],
 
     "@aws-crypto/util/@smithy/util-utf8": ["@smithy/util-utf8@2.3.0", "", { "dependencies": { "@smithy/util-buffer-from": "^2.2.0", "tslib": "^2.6.2" } }, "sha512-R8Rdn8Hy72KKcebgLiv8jQcQkXoLMOGGv5uI1/k0l+snqkOzQ1R0ChUBCxWMlBsFMekWjq0wRudIweFs7sKT5A=="],
+
+    "@boilerhouse/domain/drizzle-orm": ["drizzle-orm@0.38.4", "", { "peerDependencies": { "@aws-sdk/client-rds-data": ">=3", "@cloudflare/workers-types": ">=4", "@electric-sql/pglite": ">=0.2.0", "@libsql/client": ">=0.10.0", "@libsql/client-wasm": ">=0.10.0", "@neondatabase/serverless": ">=0.10.0", "@op-engineering/op-sqlite": ">=2", "@opentelemetry/api": "^1.4.1", "@planetscale/database": ">=1", "@prisma/client": "*", "@tidbcloud/serverless": "*", "@types/better-sqlite3": "*", "@types/pg": "*", "@types/react": ">=18", "@types/sql.js": "*", "@vercel/postgres": ">=0.8.0", "@xata.io/client": "*", "better-sqlite3": ">=7", "bun-types": "*", "expo-sqlite": ">=14.0.0", "knex": "*", "kysely": "*", "mysql2": ">=2", "pg": ">=8", "postgres": ">=3", "react": ">=18", "sql.js": ">=1", "sqlite3": ">=5" }, "optionalPeers": ["@aws-sdk/client-rds-data", "@cloudflare/workers-types", "@electric-sql/pglite", "@libsql/client", "@libsql/client-wasm", "@neondatabase/serverless", "@op-engineering/op-sqlite", "@opentelemetry/api", "@planetscale/database", "@prisma/client", "@tidbcloud/serverless", "@types/better-sqlite3", "@types/pg", "@types/react", "@types/sql.js", "@vercel/postgres", "@xata.io/client", "better-sqlite3", "bun-types", "expo-sqlite", "knex", "kysely", "mysql2", "pg", "postgres", "react", "sql.js", "sqlite3"] }, "sha512-s7/5BpLKO+WJRHspvpqTydxFob8i1vo2rEx4pY6TGY7QSMuUfWUuzaY0DIpXCkgHOo37BaFC+SJQb99dDUXT3Q=="],
 
     "@esbuild-kit/core-utils/esbuild": ["esbuild@0.18.20", "", { "optionalDependencies": { "@esbuild/android-arm": "0.18.20", "@esbuild/android-arm64": "0.18.20", "@esbuild/android-x64": "0.18.20", "@esbuild/darwin-arm64": "0.18.20", "@esbuild/darwin-x64": "0.18.20", "@esbuild/freebsd-arm64": "0.18.20", "@esbuild/freebsd-x64": "0.18.20", "@esbuild/linux-arm": "0.18.20", "@esbuild/linux-arm64": "0.18.20", "@esbuild/linux-ia32": "0.18.20", "@esbuild/linux-loong64": "0.18.20", "@esbuild/linux-mips64el": "0.18.20", "@esbuild/linux-ppc64": "0.18.20", "@esbuild/linux-riscv64": "0.18.20", "@esbuild/linux-s390x": "0.18.20", "@esbuild/linux-x64": "0.18.20", "@esbuild/netbsd-x64": "0.18.20", "@esbuild/openbsd-x64": "0.18.20", "@esbuild/sunos-x64": "0.18.20", "@esbuild/win32-arm64": "0.18.20", "@esbuild/win32-ia32": "0.18.20", "@esbuild/win32-x64": "0.18.20" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-ceqxoedUrcayh7Y7ZX6NdbbDzGROiyVBgC4PriJThBKSVPWnnFHZAkfI1lJT8QFkOwH4qOS2SJkS4wvpGl8BpA=="],
 

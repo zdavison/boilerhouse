@@ -1,0 +1,16 @@
+{
+  "name": "@boilerhouse/domain",
+  "version": "0.1.11",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@boilerhouse/core": "workspace:*",
+    "@boilerhouse/db": "workspace:*",
+    "@boilerhouse/storage": "workspace:*",
+    "@boilerhouse/o11y": "workspace:*",
+    "drizzle-orm": "^0.38.0"
+  }
+}
