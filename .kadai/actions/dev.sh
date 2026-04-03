@@ -94,6 +94,9 @@ elif [ "$RUNTIME_TYPE" = "kubernetes" ]; then
   export K8S_CONTEXT="$PROFILE"
   export K8S_MINIKUBE_PROFILE="$PROFILE"
 
+  # In-cluster infra services
+  export REDIS_URL="redis://redis.${NAMESPACE}.svc.cluster.local:6379"
+
   echo "  API server: ${MINIKUBE_IP}:8443"
   echo ""
 fi
