@@ -15,19 +15,22 @@ import {
 	wrapTenantManager,
 	wrapInstanceManager,
 } from "@boilerhouse/o11y";
-import { InstanceManager } from "./instance-manager";
-import { TenantManager } from "./tenant-manager";
-import { TenantDataStore } from "./tenant-data";
-import { IdleMonitor } from "./idle-monitor";
-import { WatchDirsPoller } from "./watch-dirs-poller";
-import { EventBus } from "./event-bus";
-import { AuditLogger } from "./audit-logger";
-import { BootstrapLogStore } from "./bootstrap-log-store";
-import { PoolManager } from "./pool-manager";
+import {
+	InstanceManager,
+	TenantManager,
+	TenantDataStore,
+	IdleMonitor,
+	WatchDirsPoller,
+	EventBus,
+	AuditLogger,
+	BootstrapLogStore,
+	PoolManager,
+	recoverState,
+} from "@boilerhouse/domain";
 import { createApp } from "./app";
-import { recoverState } from "./recovery";
 import { ResourceLimiter } from "./resource-limits";
 import { SecretStore } from "./secret-store";
+import { buildProxyCreateOptions } from "./proxy/config";
 import { prewarmPools } from "./startup-prewarm";
 import { ContainerStatsPoller } from "./container-stats-poller";
 import { WorkloadWatcher } from "./workload-watcher";
@@ -216,10 +219,15 @@ export async function bootstrap(config: BootstrapConfig): Promise<AppContext> {
 		}
 	}
 
+	const proxyConfigBuilder = secretStore
+		? (workload: Parameters<typeof buildProxyCreateOptions>[0], tenantId?: Parameters<typeof buildProxyCreateOptions>[2]) =>
+			buildProxyCreateOptions(workload, secretStore, tenantId)
+		: undefined;
+
 	const instanceManager = new InstanceManager(
 		runtime, db, audit, nodeId,
 		createLogger("InstanceManager"),
-		secretStore,
+		proxyConfigBuilder,
 	);
 	const tenantDataStore = new TenantDataStore(config.storagePath, db, runtime, {
 		blobStore: overlayStore,
@@ -383,38 +391,6 @@ async function createRuntime(
 			sidecarTmpDir: join(config.storagePath, "sidecar"),
 			endpointHost: process.env.DOCKER_HOST_ADDRESS ?? "127.0.0.1",
 		});
-	}
-
-	if (config.runtimeType === "kubernetes") {
-		const { KubernetesRuntime, isInCluster } = await import("@boilerhouse/runtime-kubernetes");
-
-		const common = {
-			namespace: config.k8s?.namespace,
-			context: config.k8s?.context,
-			minikubeProfile: config.k8s?.minikubeProfile,
-			workloadsDir: config.workloadsDir,
-		};
-
-		if (config.k8s?.apiUrl && config.k8s.token) {
-			log.info({ apiUrl: config.k8s.apiUrl, namespace: config.k8s.namespace }, "Using Kubernetes runtime (external auth)");
-			return new KubernetesRuntime({
-				auth: "external",
-				apiUrl: config.k8s.apiUrl,
-				token: config.k8s.token,
-				caCert: config.k8s.caCert,
-				...common,
-			});
-		}
-
-		if (isInCluster()) {
-			log.info({ namespace: config.k8s?.namespace }, "Using Kubernetes runtime (in-cluster auth)");
-			return new KubernetesRuntime({ auth: "in-cluster", ...common });
-		}
-
-		throw new Error(
-			"Kubernetes runtime requires either K8S_API_URL + K8S_TOKEN env vars, " +
-			"or to be running inside a K8s pod with a mounted service account.",
-		);
 	}
 
 	return new FakeRuntime();

@@ -5,27 +5,23 @@ import { createTestDatabase, ActivityLog } from "@boilerhouse/db";
 import type { DrizzleDb } from "@boilerhouse/db";
 import { nodes } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
-import { InstanceManager } from "./instance-manager";
-import { TenantManager } from "./tenant-manager";
-import { TenantDataStore } from "./tenant-data";
-import { EventBus } from "./event-bus";
-import { AuditLogger } from "./audit-logger";
+import {
+	InstanceManager,
+	TenantManager,
+	TenantDataStore,
+	EventBus,
+	AuditLogger,
+	BootstrapLogStore,
+} from "@boilerhouse/domain";
 import { ResourceLimiter } from "./resource-limits";
-import { BootstrapLogStore } from "./bootstrap-log-store";
 import { SecretStore } from "./secret-store";
 import { createApp } from "./app";
 import type { RouteDeps } from "./routes/deps";
 
+export { createTestAudit } from "@boilerhouse/domain";
+
 export interface TestContext extends RouteDeps {
 	app: ReturnType<typeof createApp>;
-}
-
-/**
- * Creates an AuditLogger backed by a real ActivityLog and a fresh EventBus.
- * Suitable for unit tests where you need audit calls to not throw.
- */
-export function createTestAudit(db: DrizzleDb, nodeId?: NodeId): AuditLogger {
-	return new AuditLogger(new ActivityLog(db), new EventBus(), nodeId ?? generateNodeId());
 }
 
 /**

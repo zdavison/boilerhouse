@@ -9,12 +9,9 @@ import type {
 	ImageResolver,
 	ImageResolveResult,
 } from "@boilerhouse/core";
-import type { KubernetesConfig } from "./types";
-import { KubeClient } from "./client";
+import type { KubernetesConfig } from "@boilerhouse/k8s";
+import { KubeClient, KubernetesRuntimeError, MinikubeImageProvider, resolveInClusterConfig } from "@boilerhouse/k8s";
 import { workloadToPod, MANAGED_LABEL, ENVOY_IMAGE } from "./translator";
-import { KubernetesRuntimeError } from "./errors";
-import { MinikubeImageProvider } from "./minikube";
-import { resolveInClusterConfig } from "./in-cluster";
 
 interface ManagedPod {
 	instanceId: InstanceId;

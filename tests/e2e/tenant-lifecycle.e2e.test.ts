@@ -100,15 +100,17 @@ for (const rt of availableRuntimes()) {
 			});
 			expect(release2Res.status).toBe(200);
 
-			// Step 12: Verify activity log trail
-			const logs = server.db
-				.select()
-				.from(activityLog)
-				.where(eq(activityLog.tenantId, tenantId))
-				.all();
-			const events = logs.map((l) => l.event);
-			expect(events).toContain("tenant.claimed");
-			expect(events).toContain("tenant.released");
+			// Step 12: Verify activity log trail (skipped for external deployments)
+			if (server.db) {
+				const logs = server.db
+					.select()
+					.from(activityLog)
+					.where(eq(activityLog.tenantId, tenantId))
+					.all();
+				const events = logs.map((l) => l.event);
+				expect(events).toContain("tenant.claimed");
+				expect(events).toContain("tenant.released");
+			}
 		}, timeouts.operation);
 	});
 }

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { InstanceId } from "@boilerhouse/core";
 import { InvalidTransitionError, InstanceStatusSchema } from "@boilerhouse/core";
 import { instances, claims } from "@boilerhouse/db";
-import { instanceHandleFrom } from "../transitions";
+import { instanceHandleFrom } from "@boilerhouse/domain";
 import type { RouteDeps } from "./deps";
 
 export function instanceRoutes(deps: RouteDeps) {

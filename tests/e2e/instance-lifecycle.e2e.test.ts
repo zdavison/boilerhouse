@@ -88,16 +88,18 @@ for (const rt of availableRuntimes()) {
 			const isRunning = await rt.isInstanceRunning(instanceId);
 			expect(isRunning).toBe(false);
 
-			// Step 10: Verify activity log
-			const logs = server.db
-				.select()
-				.from(activityLog)
-				.where(eq(activityLog.instanceId, instanceId as InstanceId))
-				.all();
-			expect(logs.length).toBeGreaterThanOrEqual(2);
+			// Step 10: Verify activity log (skipped for external deployments)
+			if (server.db) {
+				const logs = server.db
+					.select()
+					.from(activityLog)
+					.where(eq(activityLog.instanceId, instanceId as InstanceId))
+					.all();
+				expect(logs.length).toBeGreaterThanOrEqual(2);
 
-			const events = logs.map((l) => l.event);
-			expect(events).toContain("tenant.claimed");
+				const events = logs.map((l) => l.event);
+				expect(events).toContain("tenant.claimed");
+			}
 		}, timeouts.operation);
 	});
 }

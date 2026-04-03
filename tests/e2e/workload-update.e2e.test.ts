@@ -50,6 +50,9 @@ for (const rt of availableRuntimes()) {
 		}, timeouts.operation);
 
 		test("updated workload goes through healthcheck before replacing pool", async () => {
+			// This test verifies internal pool state via the DB — skipped for external deployments
+			if (!server.db) return;
+
 			// Modify the workload config (change resource limits)
 			const updatedFixture = {
 				...fixture,

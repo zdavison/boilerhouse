@@ -3,7 +3,11 @@ export interface RuntimeAvailability {
 	fake: true;
 	/** `docker info` succeeds */
 	docker: boolean;
-	/** Minikube `boilerhouse-test` profile is running and reachable */
+	/**
+	 * A boilerhouse deployment is reachable via `BOILERHOUSE_K8S_API_URL`.
+	 * Set this env var to the API base URL (e.g. `http://localhost:8080`)
+	 * before running kubernetes e2e tests.
+	 */
 	kubernetes: boolean;
 }
 
@@ -20,24 +24,15 @@ function commandSucceeds(cmd: string, args: string[]): boolean {
 }
 
 /**
- * Check that minikube is running with our test profile and the K8s API is reachable.
+ * Kubernetes e2e is available when `BOILERHOUSE_K8S_API_URL` is set.
+ *
+ * Typical setup: deploy the operator + API to a cluster, then set the env var
+ * to the API's external or port-forwarded address before running tests:
+ *
+ *   BOILERHOUSE_K8S_API_URL=http://localhost:8080 bun test tests/e2e/ --timeout 120000
  */
 function kubernetesAvailable(): boolean {
-	try {
-		const status = Bun.spawnSync(
-			["minikube", "status", "-p", "boilerhouse-test", "-o", "json"],
-			{ stdout: "pipe", stderr: "ignore" },
-		);
-		if (status.exitCode !== 0) return false;
-
-		const probe = Bun.spawnSync(
-			["kubectl", "--context", "boilerhouse-test", "cluster-info"],
-			{ stdout: "ignore", stderr: "ignore" },
-		);
-		return probe.exitCode === 0;
-	} catch {
-		return false;
-	}
+	return !!process.env.BOILERHOUSE_K8S_API_URL;
 }
 
 export function detectRuntimes(): RuntimeAvailability {

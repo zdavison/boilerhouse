@@ -1,0 +1,76 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: boilerhousetriggers.boilerhouse.dev
+spec:
+  group: boilerhouse.dev
+  names:
+    kind: BoilerhouseTrigger
+    listKind: BoilerhouseTriggerList
+    plural: boilerhousetriggers
+    singular: boilerhousetrigger
+    shortNames: [bht]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Workload
+          type: string
+          jsonPath: .spec.workloadRef
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [type, workloadRef]
+              properties:
+                type:
+                  type: string
+                  enum: [webhook, slack, telegram, cron]
+                workloadRef:
+                  type: string
+                tenant:
+                  type: object
+                  properties:
+                    from:
+                      type: string
+                    prefix:
+                      type: string
+                driver:
+                  type: string
+                driverOptions:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                guards:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      config:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                config:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Active, Error]
+                detail:
+                  type: string

@@ -1,6 +1,6 @@
 import { describe, test, expect, afterAll } from "bun:test";
 import type { InstanceId, Workload } from "@boilerhouse/core";
-import { KubernetesRuntime } from "@boilerhouse/runtime-kubernetes";
+import { KubernetesRuntime } from "../../apps/operator/src/runtime";
 
 /**
  * Detect if minikube boilerhouse-test cluster is available.

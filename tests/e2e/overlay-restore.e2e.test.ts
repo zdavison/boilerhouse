@@ -52,6 +52,9 @@ for (const rt of availableRuntimes()) {
 		test(
 			"expired overlay data is not restored on re-claim",
 			async () => {
+				// Requires direct DB access to simulate storage TTL expiry
+				if (!server.db) return;
+
 				const tenantId = generateTenantId();
 				const testData = `overlay-test-${Date.now()}`;
 

@@ -8,7 +8,6 @@
 		"@boilerhouse/envoy-config": "workspace:*",
 		"@boilerhouse/o11y": "workspace:*",
 		"@boilerhouse/runtime-docker": "workspace:*",
-		"@boilerhouse/runtime-kubernetes": "workspace:*",
 		"@boilerhouse/triggers": "workspace:*",
 		"@elysiajs/cors": "^1.4.1",
 		"drizzle-orm": "0.44.7",

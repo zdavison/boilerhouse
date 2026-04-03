@@ -1,0 +1,161 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: boilerhouseworkloads.boilerhouse.dev
+spec:
+  group: boilerhouse.dev
+  names:
+    kind: BoilerhouseWorkload
+    listKind: BoilerhouseWorkloadList
+    plural: boilerhouseworkloads
+    singular: boilerhouseworkload
+    shortNames: [bhw]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Version
+          type: string
+          jsonPath: .spec.version
+        - name: Image
+          type: string
+          jsonPath: .spec.image.ref
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [version, image, resources]
+              properties:
+                version:
+                  type: string
+                image:
+                  type: object
+                  required: [ref]
+                  properties:
+                    ref:
+                      type: string
+                resources:
+                  type: object
+                  required: [vcpus, memoryMb, diskGb]
+                  properties:
+                    vcpus:
+                      type: integer
+                    memoryMb:
+                      type: integer
+                    diskGb:
+                      type: integer
+                network:
+                  type: object
+                  properties:
+                    access:
+                      type: string
+                      enum: [none, restricted, unrestricted]
+                    expose:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          guest:
+                            type: integer
+                    allowlist:
+                      type: array
+                      items:
+                        type: string
+                    credentials:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          domain:
+                            type: string
+                          secretRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                          headers:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
+                    websocket:
+                      type: string
+                filesystem:
+                  type: object
+                  properties:
+                    overlayDirs:
+                      type: array
+                      items:
+                        type: string
+                    encryptOverlays:
+                      type: boolean
+                idle:
+                  type: object
+                  properties:
+                    timeoutSeconds:
+                      type: integer
+                    action:
+                      type: string
+                      enum: [hibernate, destroy]
+                    watchDirs:
+                      type: array
+                      items:
+                        type: string
+                health:
+                  type: object
+                  properties:
+                    intervalSeconds:
+                      type: integer
+                    unhealthyThreshold:
+                      type: integer
+                    httpGet:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                        port:
+                          type: integer
+                    exec:
+                      type: object
+                      properties:
+                        command:
+                          type: array
+                          items:
+                            type: string
+                entrypoint:
+                  type: object
+                  properties:
+                    cmd:
+                      type: string
+                    args:
+                      type: array
+                      items:
+                        type: string
+                    env:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    workdir:
+                      type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Creating, Ready, Error]
+                detail:
+                  type: string
+                observedGeneration:
+                  type: integer

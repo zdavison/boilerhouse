@@ -1,13 +1,13 @@
 import type { NodeId, Runtime } from "@boilerhouse/core";
 import type { DrizzleDb, ActivityLog } from "@boilerhouse/db";
 import type { Logger, Tracer, Meter } from "@boilerhouse/o11y";
-import type { InstanceManager } from "../instance-manager";
-import type { TenantManager } from "../tenant-manager";
-import type { EventBus } from "../event-bus";
+import type { InstanceManager } from "@boilerhouse/domain";
+import type { TenantManager } from "@boilerhouse/domain";
+import type { EventBus } from "@boilerhouse/domain";
 import type { ResourceLimiter } from "../resource-limits";
-import type { BootstrapLogStore } from "../bootstrap-log-store";
+import type { BootstrapLogStore } from "@boilerhouse/domain";
 import type { SecretStore } from "../secret-store";
-import type { PoolManager } from "../pool-manager";
+import type { PoolManager } from "@boilerhouse/domain";
 
 export interface RouteDeps {
 	db: DrizzleDb;

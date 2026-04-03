@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import type { InstanceId, TenantId, WorkloadId } from "@boilerhouse/core";
 import { createTestApp } from "../test-helpers";
-import type { DomainEvent } from "../event-bus";
+import type { DomainEvent } from "@boilerhouse/domain";
 
 function waitForMessage(ws: WebSocket): Promise<string> {
 	return new Promise((resolve, reject) => {
