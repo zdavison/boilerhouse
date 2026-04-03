@@ -82,6 +82,7 @@ export interface BoilerhousePoolStatus {
 	ready?: number;
 	warming?: number;
 	phase?: "Healthy" | "Degraded" | "Error";
+	detail?: string;
 }
 
 export interface BoilerhousePool {

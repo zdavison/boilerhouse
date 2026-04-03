@@ -61,7 +61,7 @@ export async function reconcilePool(
       };
     }
 
-    if (workloadRow.status !== "ready" && workloadRow.status !== "created") {
+    if (workloadRow.status !== "ready") {
       return {
         phase: "Degraded",
         ready: 0,
