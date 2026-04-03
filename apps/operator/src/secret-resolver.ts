@@ -4,17 +4,27 @@ export interface KubeSecretResolverConfig {
   apiUrl: string;
   headers: Record<string, string>;
   namespace: string;
+  caCert?: string;
 }
 
 /**
  * Resolves SecretRef by reading native K8s Secrets.
  */
 export class KubeSecretResolver implements SecretResolver {
-  constructor(private readonly config: KubeSecretResolverConfig) {}
+  private readonly tlsOptions: { rejectUnauthorized: boolean; ca?: string };
+
+  constructor(private readonly config: KubeSecretResolverConfig) {
+    this.tlsOptions = config.caCert
+      ? { rejectUnauthorized: true, ca: config.caCert }
+      : { rejectUnauthorized: false };
+  }
 
   async resolve(ref: SecretRef): Promise<string> {
     const url = `${this.config.apiUrl}/api/v1/namespaces/${this.config.namespace}/secrets/${ref.name}`;
-    const resp = await fetch(url, { headers: this.config.headers });
+    const resp = await fetch(url, {
+      headers: this.config.headers,
+      tls: this.tlsOptions,
+    } as RequestInit);
 
     if (!resp.ok) {
       throw new Error(`Failed to read secret "${ref.name}": ${resp.status}`);
