@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { WorkloadId } from "@boilerhouse/core";
 import type { DrizzleDb } from "@boilerhouse/db";
-import { workloads } from "@boilerhouse/db";
+import { workloads, instances } from "@boilerhouse/db";
 import type { PoolManager } from "@boilerhouse/domain";
 import type {
   BoilerhousePool,
@@ -57,6 +57,7 @@ export async function reconcilePool(
         phase: "Error",
         ready: 0,
         warming: 0,
+        detail: `Workload "${workloadName}" not found`,
       };
     }
 
@@ -65,31 +66,37 @@ export async function reconcilePool(
         phase: "Degraded",
         ready: 0,
         warming: 0,
+        detail: `Workload "${workloadName}" is in status "${workloadRow.status}"`,
       };
     }
 
     const workloadId = workloadRow.workloadId as WorkloadId;
 
-    // 2. Check current pool depth
-    const currentDepth = deps.poolManager.getPoolDepth(workloadId);
+    const countWarming = () =>
+      deps.db
+        .select({ instanceId: instances.instanceId })
+        .from(instances)
+        .where(and(eq(instances.workloadId, workloadId), eq(instances.poolStatus, "warming")))
+        .all().length;
 
-    // 3. Replenish if under target
-    if (currentDepth < targetSize) {
+    // 2. Replenish if under target (getPoolDepth counts ready; replenish checks warming+ready)
+    const readyCount = deps.poolManager.getPoolDepth(workloadId);
+    const warmingCount = countWarming();
+    if (readyCount + warmingCount < targetSize) {
       await deps.poolManager.replenish(workloadId);
     }
 
-    const readyCount = deps.poolManager.getPoolDepth(workloadId);
-
     return {
       phase: "Healthy",
-      ready: readyCount,
-      warming: 0,
+      ready: deps.poolManager.getPoolDepth(workloadId),
+      warming: countWarming(),
     };
   } catch (err) {
     return {
       phase: "Error",
       ready: 0,
       warming: 0,
+      detail: err instanceof Error ? err.message : String(err),
     };
   }
 }

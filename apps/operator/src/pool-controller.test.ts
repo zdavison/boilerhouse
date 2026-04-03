@@ -50,13 +50,14 @@ beforeEach(() => {
 });
 
 describe("reconcilePool", () => {
-  test("missing workload returns Error", async () => {
+  test("missing workload returns Error with detail", async () => {
     const crd = makePoolCrd("nonexistent", 3);
 
     const status = await reconcilePool(crd, { db, poolManager });
 
     expect(status.phase).toBe("Error");
     expect(status.ready).toBe(0);
+    expect(status.detail).toContain("nonexistent");
   });
 
   test("existing workload returns Healthy", async () => {
