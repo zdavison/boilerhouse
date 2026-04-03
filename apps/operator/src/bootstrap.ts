@@ -30,15 +30,15 @@ import {
   AuditLogger,
   recoverState,
 } from "@boilerhouse/domain";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { TenantId, WorkloadId } from "@boilerhouse/core";
 import { Controller } from "./controller";
 import { LeaderElector } from "./leader-election";
-import { KubeSecretResolver } from "./secret-resolver";
 import { reconcileWorkload } from "./workload-controller";
 import { reconcilePool } from "./pool-controller";
 import { reconcileClaim } from "./claim-controller";
 import { reconcileTrigger } from "./trigger-controller";
+import { createInternalApi } from "./internal-api";
 
 const log = createLogger("operator");
 
@@ -69,7 +69,7 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
     caCert: config.caCert,
   };
 
-  // Database (ephemeral — rebuilt via recovery)
+  // Database (ephemeral — rebuilt via recovery on leader election)
   const db = initDatabase(config.dbPath);
   const nodeId = generateNodeId();
   db.insert(nodes)
@@ -88,13 +88,8 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
   const eventBus = new EventBus();
   const audit = new AuditLogger(activityLog, eventBus, nodeId);
 
-  // Secret resolver for K8s-native credential resolution (used by network credential injection)
-  const secretResolver = new KubeSecretResolver({
-    apiUrl: config.apiUrl,
-    headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
-    namespace: config.namespace,
-  });
-  void secretResolver; // wired into credential flows when network.credentials is set
+  // TODO: wire KubeSecretResolver into InstanceManager / TenantManager once those managers
+  // accept a SecretResolver for network.credentials injection.
 
   // Runtime — use in-cluster auth if no token provided, otherwise external
   const runtime = config.token
@@ -121,7 +116,29 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
     { idleMonitor, watchDirsPoller, poolManager },
   );
 
+  // Base API paths
+  const basePath = `/apis/${API_GROUP}/${API_VERSION}`;
+
+  // K8s status patchers — one per CRD resource
+  const workloadPatcher = new KubeStatusPatcher(
+    kubeConfig,
+    `${API_GROUP}/${API_VERSION}/boilerhouseworkloads`,
+  );
+  const poolPatcher = new KubeStatusPatcher(
+    kubeConfig,
+    `${API_GROUP}/${API_VERSION}/boilerhousepools`,
+  );
+  const claimPatcher = new KubeStatusPatcher(
+    kubeConfig,
+    `${API_GROUP}/${API_VERSION}/boilerhouseclaims`,
+  );
+  const triggerPatcher = new KubeStatusPatcher(
+    kubeConfig,
+    `${API_GROUP}/${API_VERSION}/boilerhousetriggers`,
+  );
+
   // Idle handler — release the claim and patch the CR status
+  // Registered after claimPatcher and basePath are available.
   idleMonitor.onIdle(async (instanceId, action) => {
     log.info({ instanceId, action }, "idle timeout fired");
 
@@ -180,27 +197,6 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
     }
   });
 
-  // Base API paths
-  const basePath = `/apis/${API_GROUP}/${API_VERSION}`;
-
-  // K8s status patchers — one per CRD resource
-  const workloadPatcher = new KubeStatusPatcher(
-    kubeConfig,
-    `${API_GROUP}/${API_VERSION}/boilerhouseworkloads`,
-  );
-  const poolPatcher = new KubeStatusPatcher(
-    kubeConfig,
-    `${API_GROUP}/${API_VERSION}/boilerhousepools`,
-  );
-  const claimPatcher = new KubeStatusPatcher(
-    kubeConfig,
-    `${API_GROUP}/${API_VERSION}/boilerhouseclaims`,
-  );
-  const triggerPatcher = new KubeStatusPatcher(
-    kubeConfig,
-    `${API_GROUP}/${API_VERSION}/boilerhousetriggers`,
-  );
-
   // Controllers
   const workloadController = new Controller<BoilerhouseWorkload>({
     name: "workload",
@@ -213,9 +209,12 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
         await workloadPatcher.patchMetadata(ns, name, { finalizers: withFinalizer.finalizers });
       }
       const status = await reconcileWorkload(crd, { db });
-      await workloadPatcher.patchStatus(ns, name, status);
-      // Remove finalizer after deletion handling
-      if (crd.metadata.deletionTimestamp) {
+      // On deletion path: only patch status if there's an error blocking deletion
+      if (!crd.metadata.deletionTimestamp || status.phase === "Error") {
+        await workloadPatcher.patchStatus(ns, name, status);
+      }
+      // Remove finalizer after successful deletion handling
+      if (crd.metadata.deletionTimestamp && status.phase !== "Error") {
         const withoutFinalizer = removeFinalizer(crd.metadata, FINALIZER);
         await workloadPatcher.patchMetadata(ns, name, { finalizers: withoutFinalizer.finalizers });
       }
@@ -291,13 +290,15 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
     },
   });
 
-  // Recovery
-  await recoverState(runtime, db, nodeId, audit);
-  log.info("recovery complete");
-
   // KubeWatcher instances — one per CRD (created fresh; started on leader election)
   let watchers: KubeWatcher<any>[] = [];
   let controllerAbort: AbortController | null = null;
+
+  // Internal HTTP server (health + stats endpoints) — runs on all replicas
+  const internalApi = createInternalApi({ instanceManager, db });
+  const apiPort = Number(process.env.INTERNAL_API_PORT ?? 9090);
+  Bun.serve({ fetch: internalApi.fetch, port: apiPort });
+  log.info({ port: apiPort }, "internal API server listening");
 
   // Leader election
   const elector = new LeaderElector({
@@ -309,8 +310,13 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
     retryPeriodSeconds: 2,
     apiUrl: config.apiUrl,
     headers: config.token ? { Authorization: `Bearer ${config.token}` } : {},
-    onStartedLeading: () => {
-      log.info("became leader, starting controllers");
+    caCert: config.caCert,
+    onStartedLeading: async () => {
+      log.info("became leader, starting recovery and controllers");
+      // Recovery only runs on the leader — rebuilds in-memory state from K8s
+      await recoverState(runtime, db, nodeId, audit);
+      log.info("recovery complete");
+
       controllerAbort = new AbortController();
       const signal = controllerAbort.signal;
 
@@ -319,7 +325,7 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
         path: `${basePath}/boilerhouseworkloads`,
         namespace: config.namespace,
         onEvent: (e) => {
-          if (e.type !== "BOOKMARK") workloadController.enqueue(e.object);
+          if (e.type !== "BOOKMARK" && e.type !== "DELETED") workloadController.enqueue(e.object);
         },
       });
 
@@ -327,7 +333,7 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
         path: `${basePath}/boilerhousepools`,
         namespace: config.namespace,
         onEvent: (e) => {
-          if (e.type !== "BOOKMARK") poolController.enqueue(e.object);
+          if (e.type !== "BOOKMARK" && e.type !== "DELETED") poolController.enqueue(e.object);
         },
       });
 
@@ -335,7 +341,7 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
         path: `${basePath}/boilerhouseclaims`,
         namespace: config.namespace,
         onEvent: (e) => {
-          if (e.type !== "BOOKMARK") claimController.enqueue(e.object);
+          if (e.type !== "BOOKMARK" && e.type !== "DELETED") claimController.enqueue(e.object);
         },
       });
 
@@ -343,7 +349,7 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
         path: `${basePath}/boilerhousetriggers`,
         namespace: config.namespace,
         onEvent: (e) => {
-          if (e.type !== "BOOKMARK") triggerController.enqueue(e.object);
+          if (e.type !== "BOOKMARK" && e.type !== "DELETED") triggerController.enqueue(e.object);
         },
       });
 
