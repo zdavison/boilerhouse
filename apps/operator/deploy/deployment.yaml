@@ -6,7 +6,10 @@ metadata:
   labels:
     app: boilerhouse-operator
 spec:
-  replicas: 2
+  # replicas > 1 requires a shared persistent DB (not emptyDir). Leader election ensures only
+  # one replica runs controllers, but each replica rebuilds its own DB on start. Keep at 1
+  # until a PVC-backed or external DB is introduced.
+  replicas: 1
   selector:
     matchLabels:
       app: boilerhouse-operator
