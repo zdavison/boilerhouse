@@ -85,7 +85,7 @@ export class KubeStatusPatcher<TStatus = unknown, TMeta = unknown>
 
 	async patchMetadata(namespace: string, name: string, patch: Partial<TMeta>): Promise<void> {
 		const path = `/apis/${this.nsPath(namespace)}/${name}`;
-		await this.strategicMergePatch(path, { metadata: patch });
+		await this.mergePatch(path, { metadata: patch });
 	}
 
 	// ── Private ───────────────────────────────────────────────────────────────
@@ -103,10 +103,6 @@ export class KubeStatusPatcher<TStatus = unknown, TMeta = unknown>
 		await this.patch(path, body, "application/merge-patch+json");
 	}
 
-	private async strategicMergePatch(path: string, body: unknown): Promise<void> {
-		await this.patch(path, body, "application/strategic-merge-patch+json");
-	}
-
 	private async patch(path: string, body: unknown, contentType: string): Promise<void> {
 		const url = `${this.apiUrl}${path}`;
 		const res = await fetch(url, {
@@ -119,6 +115,12 @@ export class KubeStatusPatcher<TStatus = unknown, TMeta = unknown>
 			body: JSON.stringify(body),
 			tls: this.tlsOptions,
 		} as RequestInit);
+
+		// 404 is a no-op: the object was already deleted (race between DELETED event and finalizer patch)
+		if (res.status === 404) {
+			await res.body?.cancel();
+			return;
+		}
 
 		if (!res.ok) {
 			const text = await res.text().catch(() => "");
