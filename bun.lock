@@ -20,7 +20,6 @@
         "@boilerhouse/envoy-config": "workspace:*",
         "@boilerhouse/o11y": "workspace:*",
         "@boilerhouse/runtime-docker": "workspace:*",
-        "@boilerhouse/runtime-kubernetes": "workspace:*",
         "@boilerhouse/storage": "workspace:*",
         "@boilerhouse/triggers": "workspace:*",
         "@elysiajs/cors": "^1.4.1",
@@ -68,8 +67,8 @@
         "@boilerhouse/core": "workspace:*",
         "@boilerhouse/db": "workspace:*",
         "@boilerhouse/domain": "workspace:*",
+        "@boilerhouse/k8s": "workspace:*",
         "@boilerhouse/o11y": "workspace:*",
-        "@boilerhouse/runtime-kubernetes": "workspace:*",
         "@boilerhouse/storage": "workspace:*",
         "@boilerhouse/triggers": "workspace:*",
         "drizzle-orm": "^0.38.0",
@@ -153,6 +152,13 @@
         "@boilerhouse/triggers": "workspace:*",
       },
     },
+    "packages/k8s": {
+      "name": "@boilerhouse/k8s",
+      "version": "0.1.0",
+      "dependencies": {
+        "@boilerhouse/core": "workspace:*",
+      },
+    },
     "packages/o11y": {
       "name": "@boilerhouse/o11y",
       "version": "0.1.11",
@@ -180,13 +186,6 @@
       "dependencies": {
         "@boilerhouse/core": "workspace:*",
         "@opentelemetry/api": "^1.9.0",
-      },
-    },
-    "packages/runtime-kubernetes": {
-      "name": "@boilerhouse/runtime-kubernetes",
-      "version": "0.1.11",
-      "dependencies": {
-        "@boilerhouse/core": "workspace:*",
       },
     },
     "packages/storage": {
@@ -220,7 +219,6 @@
         "@boilerhouse/envoy-config": "workspace:*",
         "@boilerhouse/o11y": "workspace:*",
         "@boilerhouse/runtime-docker": "workspace:*",
-        "@boilerhouse/runtime-kubernetes": "workspace:*",
         "@boilerhouse/triggers": "workspace:*",
         "@elysiajs/cors": "^1.4.1",
         "drizzle-orm": "0.44.7",
@@ -389,13 +387,13 @@
 
     "@boilerhouse/guard-api": ["@boilerhouse/guard-api@workspace:packages/guard-api"],
 
+    "@boilerhouse/k8s": ["@boilerhouse/k8s@workspace:packages/k8s"],
+
     "@boilerhouse/o11y": ["@boilerhouse/o11y@workspace:packages/o11y"],
 
     "@boilerhouse/operator": ["@boilerhouse/operator@workspace:apps/operator"],
 
     "@boilerhouse/runtime-docker": ["@boilerhouse/runtime-docker@workspace:packages/runtime-docker"],
-
-    "@boilerhouse/runtime-kubernetes": ["@boilerhouse/runtime-kubernetes@workspace:packages/runtime-kubernetes"],
 
     "@boilerhouse/storage": ["@boilerhouse/storage@workspace:packages/storage"],
 

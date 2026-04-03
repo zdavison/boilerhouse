@@ -6,7 +6,7 @@ import type { PoolManager } from "@boilerhouse/domain";
 import type {
   BoilerhousePool,
   BoilerhousePoolStatus,
-} from "@boilerhouse/runtime-kubernetes";
+} from "./crd-types";
 
 export interface PoolControllerDeps {
   db: DrizzleDb;

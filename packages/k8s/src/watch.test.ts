@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { KubeWatcher } from "./watch";
-import type { WatchEvent } from "./crd-types";
+import type { WatchEvent } from "./watch";
 
 interface FakeResource {
 	metadata: { name: string; resourceVersion?: string };

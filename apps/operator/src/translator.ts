@@ -1,6 +1,6 @@
 import type { Workload } from "@boilerhouse/core";
 import type { InstanceId } from "@boilerhouse/core";
-import type { K8sPod, K8sService, K8sContainer, K8sVolume, K8sProbe, K8sNetworkPolicy } from "./types";
+import type { K8sPod, K8sService, K8sContainer, K8sVolume, K8sProbe, K8sNetworkPolicy } from "@boilerhouse/k8s";
 
 export const MANAGED_LABEL = "boilerhouse.dev/managed";
 export const INSTANCE_ID_LABEL = "boilerhouse.dev/instance-id";

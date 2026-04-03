@@ -393,37 +393,5 @@ async function createRuntime(
 		});
 	}
 
-	if (config.runtimeType === "kubernetes") {
-		const { KubernetesRuntime, isInCluster } = await import("@boilerhouse/runtime-kubernetes");
-
-		const common = {
-			namespace: config.k8s?.namespace,
-			context: config.k8s?.context,
-			minikubeProfile: config.k8s?.minikubeProfile,
-			workloadsDir: config.workloadsDir,
-		};
-
-		if (config.k8s?.apiUrl && config.k8s.token) {
-			log.info({ apiUrl: config.k8s.apiUrl, namespace: config.k8s.namespace }, "Using Kubernetes runtime (external auth)");
-			return new KubernetesRuntime({
-				auth: "external",
-				apiUrl: config.k8s.apiUrl,
-				token: config.k8s.token,
-				caCert: config.k8s.caCert,
-				...common,
-			});
-		}
-
-		if (isInCluster()) {
-			log.info({ namespace: config.k8s?.namespace }, "Using Kubernetes runtime (in-cluster auth)");
-			return new KubernetesRuntime({ auth: "in-cluster", ...common });
-		}
-
-		throw new Error(
-			"Kubernetes runtime requires either K8S_API_URL + K8S_TOKEN env vars, " +
-			"or to be running inside a K8s pod with a mounted service account.",
-		);
-	}
-
 	return new FakeRuntime();
 }

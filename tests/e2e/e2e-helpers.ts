@@ -33,8 +33,11 @@ type RuntimeOperation =
 export interface E2EServer {
 	/** Base URL including port, e.g. "http://localhost:54321" */
 	baseUrl: string;
-	/** Direct DB handle for read assertions only */
-	db: DrizzleDb;
+	/**
+	 * Direct DB handle for read assertions only.
+	 * Null when running against an external deployment (e.g. kubernetes e2e).
+	 */
+	db: DrizzleDb | null;
 	/** Stops server, destroys resources, removes temp files */
 	cleanup: () => Promise<void>;
 	/**
@@ -56,29 +59,6 @@ async function createRuntime(runtimeName: string): Promise<{ runtime: Runtime; f
 		const socketPath = process.env.DOCKER_SOCKET;
 		return { runtime: new DockerRuntime({ socketPath }) };
 	}
-	if (runtimeName === "kubernetes") {
-		const { KubernetesRuntime } = await import("@boilerhouse/runtime-kubernetes");
-		const apiUrl = Bun.spawnSync(
-			["kubectl", "--context", "boilerhouse-test", "config", "view",
-			 "--minify", "-o", "jsonpath={.clusters[0].cluster.server}"],
-			{ stdout: "pipe" },
-		).stdout.toString().trim();
-		const token = Bun.spawnSync(
-			["kubectl", "--context", "boilerhouse-test", "-n", "boilerhouse",
-			 "create", "token", "default"],
-			{ stdout: "pipe" },
-		).stdout.toString().trim();
-		return {
-			runtime: new KubernetesRuntime({
-				auth: "external",
-				apiUrl,
-				token,
-				namespace: "boilerhouse",
-				context: "boilerhouse-test",
-				minikubeProfile: "boilerhouse-test",
-			}),
-		};
-	}
 	throw new Error(`Runtime '${runtimeName}' not implemented for E2E`);
 }
 
@@ -99,6 +79,24 @@ export async function startE2EServer(
 		onDbReady?: (db: DrizzleDb) => void;
 	},
 ): Promise<E2EServer> {
+	// Kubernetes e2e runs against an external deployment — no in-process server.
+	if (runtimeName === "kubernetes") {
+		const baseUrl = process.env.BOILERHOUSE_K8S_API_URL?.replace(/\/$/, "");
+		if (!baseUrl) throw new Error("BOILERHOUSE_K8S_API_URL must be set for kubernetes e2e");
+		return {
+			baseUrl,
+			db: null,
+			cleanup: async () => {
+				// Best-effort: remove any pods created during the test run
+				Bun.spawnSync(
+					["kubectl", "--context", "boilerhouse-test", "-n", "boilerhouse",
+					 "delete", "pods", "-l", "boilerhouse.dev/managed=true", "--ignore-not-found"],
+					{ stdout: "ignore", stderr: "ignore" },
+				);
+			},
+		};
+	}
+
 	const db = createTestDatabase();
 	const nodeId = generateNodeId();
 	const activityLog = new ActivityLog(db);

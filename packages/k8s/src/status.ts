@@ -3,9 +3,6 @@ import { KubernetesRuntimeError } from "./errors";
 
 // ── Finalizer helpers ────────────────────────────────────────────────────────
 
-/** The standard finalizer name used by the Boilerhouse operator. */
-export const FINALIZER = "boilerhouse.dev/cleanup";
-
 export interface FinalizableMetadata {
 	finalizers?: string[];
 }

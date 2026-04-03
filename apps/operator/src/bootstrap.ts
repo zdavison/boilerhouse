@@ -1,22 +1,24 @@
 import { hostname } from "node:os";
 import { generateNodeId } from "@boilerhouse/core";
+import { KubernetesRuntime } from "./runtime";
 import {
-  KubernetesRuntime,
   KubeWatcher,
   KubeStatusPatcher,
   addFinalizer,
   removeFinalizer,
-  FINALIZER,
+} from "@boilerhouse/k8s";
+import type { KubeClientConfig } from "@boilerhouse/k8s";
+import {
   API_GROUP,
   API_VERSION,
-} from "@boilerhouse/runtime-kubernetes";
+  FINALIZER,
+} from "./crd-types";
 import type {
   BoilerhouseWorkload,
   BoilerhouseClaim,
   BoilerhousePool,
   BoilerhouseTrigger,
-  KubeClientConfig,
-} from "@boilerhouse/runtime-kubernetes";
+} from "./crd-types";
 import { initDatabase, ActivityLog, nodes, claims, workloads as workloadsTable } from "@boilerhouse/db";
 import { createLogger } from "@boilerhouse/o11y";
 import {
@@ -69,7 +71,7 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
     caCert: config.caCert,
   };
 
-  // Database (ephemeral — rebuilt via recovery on leader election)
+  // Database — persists on disk; state is recovered from K8s on leader election
   const db = initDatabase(config.dbPath);
   const nodeId = generateNodeId();
   db.insert(nodes)
@@ -88,8 +90,8 @@ export async function startOperator(config: OperatorConfig): Promise<void> {
   const eventBus = new EventBus();
   const audit = new AuditLogger(activityLog, eventBus, nodeId);
 
-  // TODO: wire KubeSecretResolver into InstanceManager / TenantManager once those managers
-  // accept a SecretResolver for network.credentials injection.
+  // TODO(#credentials): Wire KubeSecretResolver into InstanceManager/TenantManager for
+  // network.credentials injection. Blocked on those managers accepting a SecretResolver param.
 
   // Runtime — use in-cluster auth if no token provided, otherwise external
   const runtime = config.token

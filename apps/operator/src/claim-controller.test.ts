@@ -21,7 +21,7 @@ import {
   TenantManager,
   createTestAudit,
 } from "@boilerhouse/domain";
-import type { BoilerhouseClaim } from "@boilerhouse/runtime-kubernetes";
+import type { BoilerhouseClaim } from "./crd-types";
 import { reconcileClaim } from "./claim-controller";
 
 const API_VERSION = "boilerhouse.dev/v1alpha1" as const;

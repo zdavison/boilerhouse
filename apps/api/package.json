@@ -19,7 +19,6 @@
     "@boilerhouse/envoy-config": "workspace:*",
     "@boilerhouse/o11y": "workspace:*",
     "@boilerhouse/runtime-docker": "workspace:*",
-    "@boilerhouse/runtime-kubernetes": "workspace:*",
     "@boilerhouse/storage": "workspace:*",
     "@boilerhouse/triggers": "workspace:*",
     "@elysiajs/cors": "^1.4.1",

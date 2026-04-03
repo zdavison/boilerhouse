@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { eq } from "drizzle-orm";
 import { createTestDatabase, type DrizzleDb, workloads } from "@boilerhouse/db";
-import type { BoilerhouseWorkload } from "@boilerhouse/runtime-kubernetes";
+import type { BoilerhouseWorkload } from "./crd-types";
 import { reconcileWorkload } from "./workload-controller";
 
 const API_VERSION = "boilerhouse.dev/v1alpha1" as const;

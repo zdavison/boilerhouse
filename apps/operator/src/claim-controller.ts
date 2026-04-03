@@ -6,7 +6,7 @@ import type { TenantManager } from "@boilerhouse/domain";
 import type {
   BoilerhouseClaim,
   BoilerhouseClaimStatus,
-} from "@boilerhouse/runtime-kubernetes";
+} from "./crd-types";
 
 export interface ClaimControllerDeps {
   db: DrizzleDb;

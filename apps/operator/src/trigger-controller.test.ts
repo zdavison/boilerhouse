@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import type { BoilerhouseTrigger } from "@boilerhouse/runtime-kubernetes";
+import type { BoilerhouseTrigger } from "./crd-types";
 import { reconcileTrigger } from "./trigger-controller";
 
 const API_VERSION = "boilerhouse.dev/v1alpha1" as const;

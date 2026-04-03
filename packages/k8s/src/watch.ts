@@ -1,5 +1,23 @@
 import type { KubeClientConfig } from "./client";
-import type { CrdList, WatchEvent } from "./crd-types";
+
+// ── Generic list + watch types ───────────────────────────────────────────────
+
+export interface CrdList<T> {
+	apiVersion: string;
+	kind: string;
+	metadata: {
+		resourceVersion: string;
+		continue?: string;
+	};
+	items: T[];
+}
+
+export interface WatchEvent<T> {
+	type: "ADDED" | "MODIFIED" | "DELETED" | "BOOKMARK" | "ERROR";
+	object: T;
+}
+
+// ── KubeWatcher ──────────────────────────────────────────────────────────────
 
 /** Minimum backoff in ms before reconnecting after a watch stream ends. */
 const MIN_BACKOFF_MS = 500;

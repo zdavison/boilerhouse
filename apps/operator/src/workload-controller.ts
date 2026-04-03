@@ -6,7 +6,7 @@ import { workloads, claims } from "@boilerhouse/db";
 import type {
   BoilerhouseWorkload,
   BoilerhouseWorkloadStatus,
-} from "@boilerhouse/runtime-kubernetes";
+} from "./crd-types";
 import { crdToWorkload } from "./converters";
 
 export interface WorkloadControllerDeps {

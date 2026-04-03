@@ -1,5 +1,5 @@
 import type { Workload } from "@boilerhouse/core";
-import type { BoilerhouseWorkloadSpec } from "@boilerhouse/runtime-kubernetes";
+import type { BoilerhouseWorkloadSpec } from "./crd-types";
 
 /**
  * Converts a BoilerhouseWorkload CRD spec into the internal Workload type

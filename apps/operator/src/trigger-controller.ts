@@ -1,7 +1,7 @@
 import type {
   BoilerhouseTrigger,
   BoilerhouseTriggerStatus,
-} from "@boilerhouse/runtime-kubernetes";
+} from "./crd-types";
 
 export interface TriggerControllerDeps {
   adapters: Map<string, { stop: () => void }>;

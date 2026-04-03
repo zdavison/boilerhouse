@@ -1,9 +1,12 @@
-import type { K8sObjectMeta } from "./types";
+import type { K8sObjectMeta } from "@boilerhouse/k8s";
 
 // ── API constants ────────────────────────────────────────────────────────────
 
 export const API_GROUP = "boilerhouse.dev";
 export const API_VERSION = "v1alpha1";
+
+/** Finalizer name applied to all Boilerhouse CRs by the operator. */
+export const FINALIZER = "boilerhouse.dev/cleanup";
 
 // ── BoilerhouseWorkload ──────────────────────────────────────────────────────
 
@@ -166,21 +169,4 @@ export interface BoilerhouseTrigger {
 	};
 	spec: BoilerhouseTriggerSpec;
 	status?: BoilerhouseTriggerStatus;
-}
-
-// ── Generic list + watch types ───────────────────────────────────────────────
-
-export interface CrdList<T> {
-	apiVersion: string;
-	kind: string;
-	metadata: {
-		resourceVersion: string;
-		continue?: string;
-	};
-	items: T[];
-}
-
-export interface WatchEvent<T> {
-	type: "ADDED" | "MODIFIED" | "DELETED" | "BOOKMARK" | "ERROR";
-	object: T;
 }

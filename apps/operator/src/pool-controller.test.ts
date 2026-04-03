@@ -9,7 +9,7 @@ import {
 } from "@boilerhouse/db";
 import { InstanceManager, PoolManager, createTestAudit } from "@boilerhouse/domain";
 import { generateNodeId } from "@boilerhouse/core";
-import type { BoilerhousePool } from "@boilerhouse/runtime-kubernetes";
+import type { BoilerhousePool } from "./crd-types";
 import { reconcilePool } from "./pool-controller";
 
 const API_VERSION = "boilerhouse.dev/v1alpha1" as const;

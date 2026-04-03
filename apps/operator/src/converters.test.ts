@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { crdToWorkload } from "./converters";
-import type { BoilerhouseWorkloadSpec } from "@boilerhouse/runtime-kubernetes";
+import type { BoilerhouseWorkloadSpec } from "./crd-types";
 
 describe("crdToWorkload", () => {
   test("converts minimal CRD spec to Workload", () => {

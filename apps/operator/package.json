@@ -12,7 +12,7 @@
     "@boilerhouse/core": "workspace:*",
     "@boilerhouse/db": "workspace:*",
     "@boilerhouse/domain": "workspace:*",
-    "@boilerhouse/runtime-kubernetes": "workspace:*",
+    "@boilerhouse/k8s": "workspace:*",
     "@boilerhouse/storage": "workspace:*",
     "@boilerhouse/o11y": "workspace:*",
     "@boilerhouse/triggers": "workspace:*",
