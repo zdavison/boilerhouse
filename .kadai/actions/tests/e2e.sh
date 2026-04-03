@@ -43,6 +43,7 @@ ensure_docker() {
 
 ensure_kubernetes() {
   local PROFILE="boilerhouse-test"
+  local NAMESPACE="boilerhouse"
 
   if minikube status -p "$PROFILE" &>/dev/null; then
     echo "✓ Minikube cluster '$PROFILE' is running"
@@ -55,6 +56,9 @@ ensure_kubernetes() {
     echo "Error: kubectl cannot reach minikube cluster" >&2
     return 1
   fi
+
+  # Point at in-cluster infra services
+  export REDIS_URL="redis://redis.${NAMESPACE}.svc.cluster.local:6379"
 }
 
 if [ "$RUNTIMES" = "docker" ] || [ "$RUNTIMES" = "all" ]; then
