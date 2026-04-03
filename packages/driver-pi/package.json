@@ -1,0 +1,16 @@
+{
+  "name": "@boilerhouse/driver-pi",
+  "version": "0.1.0",
+  "private": true,
+  "license": "BUSL-1.1",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@boilerhouse/triggers": "workspace:*"
+  }
+}
