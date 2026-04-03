@@ -75,8 +75,12 @@ function buildDeployment(name: string, svc: ComposeService): string {
 
   let containerSpec = `      containers:\n      - name: ${name}\n        image: ${svc.image}`;
 
+  // Docker compose: entrypoint → k8s command, command → k8s args
+  if (svc.entrypoint) {
+    containerSpec += `\n        command:\n${renderCommand(svc.entrypoint)}`;
+  }
   if (svc.command) {
-    containerSpec += `\n        command:\n${renderCommand(svc.command)}`;
+    containerSpec += `\n        args:\n${renderCommand(svc.command)}`;
   }
 
   if (svc.ports && svc.ports.length > 0) {

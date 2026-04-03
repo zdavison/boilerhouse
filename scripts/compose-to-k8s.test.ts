@@ -86,7 +86,9 @@ describe("generateManifests", () => {
     expect(manifests).toContain("MINIO_ROOT_PASSWORD");
   });
 
-  test("minio deployment has command", () => {
+  test("minio deployment has args (compose command maps to k8s args)", () => {
+    // compose `command` → k8s `args` (preserves image entrypoint)
+    expect(manifests).toContain("args:");
     expect(manifests).toContain('- "server"');
     expect(manifests).toContain('- "/data"');
   });
