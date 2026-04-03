@@ -1,0 +1,44 @@
+workloads/pi/Dockerfile
+  33a0d06f81b9c269 1-33
+workloads/pi/bridge.mjs
+  33a0d06f81b9c269 1-237
+.kadai/actions/presets/pi.sh
+  33a0d06f81b9c269 1-91
+workloads/tg-pi.trigger.ts
+  33a0d06f81b9c269 1-23
+workloads/pi.workload.ts
+  33a0d06f81b9c269 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "d1a47e73551c245b577e1592b97e67be12b8bd10",
+  "prompts": {
+    "2b6cd2584b49ac7f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2feb56c-1de8-4256-8531-5881bf115f30",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "33a0d06f81b9c269": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0c50795b-16ac-4622-9350-aa331008d589",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "deer-agent",
+      "messages": [],
+      "total_additions": 423,
+      "total_deletions": 0,
+      "accepted_lines": 423,
+      "overriden_lines": 0
+    }
+  }
+}
